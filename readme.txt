@@ -1,3 +1,5 @@
+Read how_it_works.pdf to know how it works!
+
 The best way to run is to use build the docker image and run it from there.
 Download this directory. Make sure docker and docker-compose is installed in the system. The  follow these steps:
 1.	cd to the downloaded directory
