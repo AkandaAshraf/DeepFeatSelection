@@ -1,5 +1,5 @@
 Read how_it_works.pdf to know how it works!
-
+The dataset is https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data, any data in this format should work. (more information on the data: https://archive.ics.uci.edu/ml/datasets/Heart+Disease)
 The best way to run is to use build the docker image and run it from there.
 Download this directory. Make sure docker and docker-compose is installed in the system. The  follow these steps:
 1.	cd to the downloaded directory
