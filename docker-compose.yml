@@ -1,0 +1,25 @@
+version: '2.3'
+
+services:
+  experiment:
+    restart: always
+    build: ./
+    env_file:
+      - .env
+    image: deep-feat-selection
+    command: bash -c "python DeepFeatSelection/experiment.py"
+    hostname: server
+    tty: true
+    stdin_open: true
+    volumes:
+      - Data:/DeepFeatSelection/Data
+      - Models:/DeepFeatSelection/Models
+      - ExpOutput:/DeepFeatSelection/ExpOutput
+
+volumes:
+  Data:
+  Models:
+  ExpOutput:
+
+
+
