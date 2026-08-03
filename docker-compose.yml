@@ -1,25 +1,28 @@
-version: '2.3'
-
 services:
   experiment:
-    restart: always
-    build: ./
-    env_file:
-      - .env
+    build: .
     image: deep-feat-selection
-    command: bash -c "python DeepFeatSelection/experiment.py"
-    hostname: server
-    tty: true
-    stdin_open: true
+    # Bind mounts rather than named volumes, so results land in the working
+    # tree where they can actually be inspected.
     volumes:
-      - Data:/DeepFeatSelection/Data
-      - Models:/DeepFeatSelection/Models
-      - ExpOutput:/DeepFeatSelection/ExpOutput
+      - ./Data:/app/Data:ro
+      - ./ExpOutput:/app/ExpOutput
+    command: ["--n-models", "20", "--outdir", "/app/ExpOutput"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
-volumes:
-  Data:
-  Models:
-  ExpOutput:
-
-
-
+  # `docker compose run cpu --n-models 20` for machines without a GPU.
+  cpu:
+    build: .
+    image: deep-feat-selection
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"
+    volumes:
+      - ./Data:/app/Data:ro
+      - ./ExpOutput:/app/ExpOutput
+    command: ["--n-models", "20", "--outdir", "/app/ExpOutput"]

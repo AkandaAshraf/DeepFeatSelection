@@ -1,0 +1,22 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Experiment output and trained models are reproducible from the CLI.
+ExpOutput/
+Models/
+*.h5
+*.keras
+*.weights.h5
+
+.vscode/
+.idea/
+.DS_Store
+
+# Personal drafts, not part of the project.
+SHARE.md

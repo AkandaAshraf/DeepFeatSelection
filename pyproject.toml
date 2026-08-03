@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepfeatselect"
+version = "0.2.0"
+description = "Neural-network feature selection via learnable per-feature gates"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+authors = [{ name = "Akanda Ashraf", email = "akandaashraf@outlook.com" }]
+dependencies = [
+    "tensorflow>=2.17,<2.21",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "scipy>=1.11",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+deepfeatselect = "deepfeatselect.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["deepfeatselect*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
