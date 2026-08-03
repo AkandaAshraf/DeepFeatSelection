@@ -22,8 +22,8 @@ network — activation geometry, weight spectra, compressibility, learning
 curves — calibrated against injected noise features. The probe detects
 accuracy-invisible features (participation-ratio shifts, |z| > 3), but its
 ordering follows neither Shannon information, which is degenerate, nor causal
-order, which it inverts: it tracks conditional V-information, the information
-the network can cheaply extract. A pre-registered re-encoding of the target,
+order, which it inverts: it tracks usable (V-)information, what the model class
+can cheaply extract. A pre-registered re-encoding of the target,
 which changes which variable is cheap while leaving the data-generating process
 and the redundancy structure untouched, reverses the ordering completely: the
 dominant feature falls from eleven significant channels to one, and the true
@@ -60,8 +60,9 @@ Contributions:
 
 1. **A blindness theorem and its repair** (Sec. 2): risk-difference importance
    is identically zero under deterministic redundancy (Prop. 1); constraining
-   the function class reopens the gap, and the reopened quantity is exactly
-   conditional V-information (Prop. 2).
+   the function class reopens the gap (Prop. 2), and the reopened quantity is
+   V-information in the sense of Xu et al. (2020) — though *which* form of it
+   the probe reports is measured in Sec. 6.3 and only partly resolved.
 2. **A benchmark** (Sec. 3) in which the blindness is exact and the
    information structure is fully known: Shannon conditional information is
    zero for every informative feature, and ground-truth causal roles are
@@ -74,9 +75,9 @@ Contributions:
    features, and its detection ordering tracks usable (V-)information —
    dissociating from Shannon information (flat at zero) and from causal order
    (inverted: the true cause is the faintest signal).
-5. **A pre-registered reversal experiment** (Sec. 6): re-encode the target so
-   a different variable becomes the cheap one; the ordering must follow.
-   **[PENDING]**
+5. **A pre-registered reversal experiment** (Sec. 6): re-encoding the target so
+   a different variable becomes the cheap one reverses the ordering completely,
+   confirming the attribution by manipulation rather than correlation.
 
 We explicitly do *not* claim a causal discovery method. The paper's point is
 the opposite: internal-representation measurements are meters of
@@ -107,16 +108,22 @@ zero. So does conditional mutual information: I(X_j; Y | X_{−j}) = 0.
 Δ_ℱ(j) > 0 while Δ\*(j) = 0: take Y = h(X_j), X_j = g(X_{−j}) with h ∘ g
 requiring far more capacity than h.*
 
-Δ_ℱ(j) is precisely the conditional predictive V-information
-I_𝒱(X_j → Y | X_{−j}) of Xu et al. (2020): information is measured relative
-to what a bounded observer can extract. Unlike Shannon information it is not
-invariant to bijective recoding — computational cost counts.
+Δ_ℱ(j) is the *conditional* predictive V-information
+I_𝒱(X_j → Y | X_{−j}) in the sense of Xu et al. (2020): information measured
+relative to what a bounded observer can extract, and unlike Shannon information
+not invariant to bijective recoding — computational cost counts.
+
+A caution carried through the rest of the paper: this conditional quantity is
+the natural theoretical object here, but it is *not* what the probe turns out to
+report. Under redundancy it is near zero for every informative feature — that is
+Prop. 1 — so it cannot supply an ordering. Sec. 6.3 measures which V-information
+variant the probe's ordering actually follows.
 
 **A predicted corollary, confirmed — but only once the statistic was measured
 correctly.** Proposition 2 implies that the internal signatures should vanish
 with capacity: widen the network until synthesising the missing feature is free
 and there should be nothing left to measure. Sweeping widths 4–128 on
-`redundancy_demo` (Sec. 6.3), the *z-scores* appear to refute this outright —
+`redundancy_demo` (Sec. 6.4), the *z-scores* appear to refute this outright —
 `proxy_cos` rises from Σ|z| = 34 to 148–201. Comparing raw paired deltas
 instead reverses the conclusion. The raw effects decay exactly as predicted, by
 roughly an order of magnitude, and the apparent growth is entirely a
@@ -329,7 +336,43 @@ too low-dimensional for these summaries to resolve, and on a task the network
 solves almost perfectly the class-conditional maps may saturate.  We report the
 channel as measured and unhelpful in this regime rather than dropping it.
 
-### 6.3 Capacity sweep: a refuted prediction **[DONE]**
+### 6.3 Which quantity does the probe track? **[DONE]**
+
+Sections 5 and 6 establish that the ordering is neither Shannon nor causal, and
+attribute it to usable information.  That attribution needs testing directly,
+and there is a specific reason to doubt the *conditional* form named in Sec. 2:
+`R_ℱ(N \ {j}) − R_ℱ(N)` is exactly the quantity Proposition 1 sends to zero, so
+under redundancy it is flat by construction and cannot order anything.
+
+Three candidates were estimated with the same network class the probe uses --
+marginal (`v({j}) − v(∅)`), conditional, and Shapley over the same value
+function -- and rank-correlated against the probe's aggregate signature:
+
+| system | marginal | conditional | Shapley |
+|---|---|---|---|
+| `redundancy_demo`, baseline label | **+0.872** | +0.051 | +0.872 |
+| `redundancy_demo`, reversed label | **+0.975** | +0.564 | +0.975 |
+| `parity_redundancy` | +0.217 | −0.383 | — |
+| `manifold_redundancy` | +0.607 | **+0.857** | — |
+| mean | **+0.668** | +0.272 | +0.923 |
+
+The conditional form is ruled out as a complete account: on `redundancy_demo` it
+measures −0.003, +0.026, −0.004 across the informative features and correlates
+at ρ = 0.05, which is what Prop. 1 predicts and why it cannot be what the probe
+reports.  Marginal usable information does substantially better on average and
+on three systems of four, and Shapley -- which interpolates between the two --
+matches marginal exactly wherever the coalition count allowed computing it.
+
+We do not claim the functional form is settled.  `manifold_redundancy` reverses
+the ordering, with conditional at +0.857 against marginal at +0.607, and
+`parity_redundancy` is close to uninformative because eight of its nine features
+have marginal value indistinguishable from zero (no subset of parity bits is
+partially predictive), leaving a rank correlation dominated by ties.  The
+defensible statement is the one the reversal experiment supports directly: the
+probe orders features by how cheaply the class can extract the target from them,
+and the conditional form specifically is not that quantity.
+
+### 6.4 Capacity sweep: a refuted prediction **[DONE]**
 
 Widths 4, 8, 16, 32, 64, 128, four seeds each, otherwise the baseline protocol.
 Σ|z| over all functionals:
@@ -371,7 +414,7 @@ Proposition 2 therefore stands, including its scoping consequence: the probe is
 informative in the capacity-constrained regime and its raw sensitivity falls away
 as width grows.
 
-### 6.4 Design
+### 6.5 Design
 
 The dissociation claim says the ordering tracks the (class, encoding) pair,
 not the variables. It therefore makes a falsifiable prediction under a
@@ -403,11 +446,15 @@ the ordering is unchanged (probes measure something sticky about the
 variables) or follows causal order independent of encoding (probes measure
 causality after all — a more interesting refutation).
 
-**Additional hardening [PENDING]:** (i) capacity sweep — all signatures must
-decay toward null as width grows (Prop. 2); persistence at 128+ units
-refutes the proposed mechanism; (ii) rank-correlation of internal z-scores
-against directly estimated Δ_ℱ across a battery of synthetic systems;
-(iii) a second and third system family — one system is an anecdote.
+**Additional hardening, all three now run.** (i) The capacity sweep is Sec. 6.4:
+raw signatures decay with width as Prop. 2 requires, though only once effect
+sizes are compared rather than z-scores. (ii) The rank-correlation against
+directly estimated V-information is Sec. 6.3: it rules out the conditional form
+and favours the marginal one without settling it. (iii) Two further families
+were added — `parity_redundancy`, where the redundant route is a *sibling* of
+the target rather than a child and the computational gap is a parity
+computation, and `manifold_redundancy`, a two-dimensional latent read through
+six nonlinear sensors, which is the shape redundancy takes in practice.
 
 ---
 
@@ -585,21 +632,36 @@ predictive method — consistent with, and motivating, the present framing.
 
 ## 9. Limitations
 
-One synthetic family so far; small-capacity regime only (and necessarily so —
-Prop. 2 makes the large-capacity version provably empty); ten seeds with a
-30-sample null; 57 hypothesis tests, so individual |z| ≈ 2 findings (the
-driver row) are at the floor and we treat them as such; the probe orders
-features but does not orient causes — orientation requires assumptions
-external to prediction (noise asymmetry, non-invertibility, intervention),
-which we treat in companion work; and the novelty of the assembly is asserted
-"to our knowledge" pending a systematic literature pass.
+Three synthetic families, all constructed by us, so the dissociation has not
+been demonstrated on a system we did not design. The small-capacity regime only,
+which Prop. 2 and the width sweep together justify but which also bounds the
+result's reach. Ten seeds against a 30-sample null across 57 hypothesis tests,
+so individual |z| ≈ 2 findings — the `driver` row in Sec. 5 — sit at the
+detection floor and are treated as such; the one channel that looked strong at
+three seeds did not replicate at ten.
+
+**The functional form of the tracked quantity is not settled.** Sec. 6.3 rules
+out the conditional V-information named in Sec. 2 and favours the marginal form,
+but on three of four systems rather than all four, and `manifold_redundancy`
+reverses the comparison. What the reversal experiment establishes directly is
+weaker and safer: the ordering follows the encoding, hence cheap extractability,
+whatever its exact functional form.
+
+The probe orders features and does not orient causes; orientation needs
+assumptions external to prediction (noise asymmetry, non-invertibility,
+intervention), treated in companion work. The Grad-CAM attribution channel
+contributed nothing and is retained only as a reported null. Finally, the
+literature pass behind Sec. 8 was targeted rather than systematic, and it has
+already demoted one claim we had thought novel — the Shapley symmetry argument
+is the explicit motivation for Asymmetric Shapley Values — so further prior art
+should be assumed to exist.
 
 ## 10. Conclusion
 
 Risk-difference importance has an exact blind spot, and inside it the trained
 network still talks — but about economics, not causality. What its internals
 reveal is which features the class can cheaply use, an estimate of
-conditional V-information that survives when Shannon information is
+usable information that survives when Shannon information is
 degenerate and inverts the causal ordering. The practical reading for
 interpretability: an internal-representation importance is a statement about
 the model's budget, and re-encode the data and the ordering will follow the
