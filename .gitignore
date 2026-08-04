@@ -20,3 +20,7 @@ Models/
 
 # Personal drafts, not part of the project.
 SHARE.md
+
+# Large external datasets, fetched by scripts rather than tracked.
+Data/depmap/
+Data/variants/

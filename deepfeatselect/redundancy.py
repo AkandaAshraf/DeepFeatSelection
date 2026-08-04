@@ -26,6 +26,17 @@ from sklearn.model_selection import KFold
 # could not reconstruct, so its individual importance is not identifiable.
 REDUNDANT_R2 = 0.95
 
+# Below that threshold there is still a band worth reporting.  Real measurements
+# rarely reach deterministic redundancy: on DepMap CRISPR screens, subunits of
+# one protein complex reconstruct each other at only R^2 ~ 0.2-0.33, because
+# each gene is separately measured with its own guide efficiency and screen
+# noise even though the underlying biology is shared.  Deterministic redundancy
+# comes from *derivation* -- area computed from radius, an ensemble score
+# computed from its component scores, a one-hot column implied by its siblings --
+# not from two variables being causally related.  Importances in this middle band
+# are identifiable but unstable, which is a weaker and different warning.
+PARTIAL_R2 = 0.50
+
 
 def _cv_r2(inputs: np.ndarray, target: np.ndarray, seed: int = 0, n_splits: int = 3) -> float:
     """Cross-validated R-squared of predicting ``target`` from ``inputs``."""
@@ -49,19 +60,43 @@ def redundancy_scores(
     feature_names: list[str],
     seed: int = 0,
     threshold: float = REDUNDANT_R2,
+    partial_threshold: float = PARTIAL_R2,
 ) -> pd.DataFrame:
     """How well each feature is reconstructed from all the others.
 
     This is the Proposition 1 condition, estimated.  ``redundant`` marks the
     columns whose individual risk-difference importance should not be read as a
-    measure of anything.
+    measure of anything; ``verdict`` grades the result into three bands, since
+    most real data sits in the middle one rather than at either extreme.
     """
     rows = []
     for j, name in enumerate(feature_names):
         others = np.delete(x, j, axis=1)
         r2 = _cv_r2(others, x[:, j], seed=seed)
-        rows.append({"feature": name, "r2_from_others": r2, "redundant": r2 >= threshold})
+        rows.append({
+            "feature": name,
+            "r2_from_others": r2,
+            "redundant": r2 >= threshold,
+            "verdict": _verdict(r2, threshold, partial_threshold),
+        })
     return pd.DataFrame(rows).sort_values("r2_from_others", ascending=False).reset_index(drop=True)
+
+
+def _verdict(r2: float, threshold: float, partial: float) -> str:
+    """Three bands, because the middle one is a real and common case.
+
+    ``not_identifiable`` -- Proposition 1 applies: the individual importance is
+    undefined, and only the group it belongs to can be scored.
+    ``partially_redundant`` -- substantial shared information without
+    determinism; importances exist but their relative order within the group is
+    unstable across resamples and should not be read as a finding.
+    ``identifiable`` -- ordinary case, importances mean what they usually mean.
+    """
+    if r2 >= threshold:
+        return "not_identifiable"
+    if r2 >= partial:
+        return "partially_redundant"
+    return "identifiable"
 
 
 def pairwise_predictability(
