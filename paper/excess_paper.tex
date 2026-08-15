@@ -7,9 +7,9 @@
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 \usepackage{microtype}
 
-\title{GhostScan: scalable, self-validating detection of driven variables
-in large dynamical systems}
-\author{Akanda Ashraf}
+\title{MACE: masked-autoencoder conditional excess for scalable,
+self-validating detection of driven variables in large dynamical systems}
+\author{Akanda Wahid-Ul-Ashraf}
 \date{August 15, 2026 --- preprint draft \\[2pt]
 {\normalsize Licensed CC BY 4.0. Code, experiment ledger, pre-registration
 documents and figure sources:\\
@@ -19,6 +19,26 @@ documents and figure sources:\\
 
 \begin{document}
 \maketitle
+
+\section*{Highlights}
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item A scalable statistic, excess-over-self predictability, that identifies
+which variables of a large dynamical system are driven by the system.
+\item Three mechanisms by which learned causal readouts fail on redundant
+systems, each isolated with a separating experimental signature.
+\item An embedded negative control, the ghost channel, giving every scan a
+falsification test that requires no ground truth.
+\item Whole-brain scans of $71{,}721$ neurons in minutes on a single
+consumer laptop, where a pairwise equivalent would need $\sim$800{,}000
+GPU-hours.
+\item Validation across four open domains, including an interventional test
+in which the statistic tracks a targeted genetic silencing cell by cell.
+\end{itemize}
+
+\vspace{2pt}
+\noindent\textbf{Keywords:} causal discovery; time series; dynamical
+systems; drivenness; masked autoencoders; transfer entropy; surrogate data;
+whole-brain imaging; climate teleconnections
 
 \begin{abstract}
 We address the problem of determining which variables of a large
@@ -141,6 +161,16 @@ computed purely observationally, tracks a targeted genetic silencing of
 the \emph{C.~elegans} command hub AVA neuron-by-neuron in directions
 stated before the data was opened, alongside a measured
 method-selection map (Sections~\ref{sec:real}--\ref{sec:map}).
+The rest of this paper is structured as follows.
+Section~\ref{sec:mechanisms} isolates the three failure mechanisms.
+Section~\ref{sec:method} derives the proposed method from them and states
+its cost. Section~\ref{sec:synthetic} validates it on systems whose driven
+set is known by construction, and Section~\ref{sec:real} deploys it across
+four open real-world domains, including an interventional test.
+Section~\ref{sec:map} distils an empirical method-selection map,
+Section~\ref{sec:limits} states the limitations, and
+Section~\ref{sec:concl} concludes.
+
 \subsection*{Terminology across fields}
 This work spans dynamical systems, machine learning, neuroscience,
 clinical electrophysiology and climate science; we define the recurring
@@ -185,6 +215,8 @@ reproducible from the released code and public data.
 
 \section{Three failure mechanisms}
 \label{sec:mechanisms}
+
+The gap above is not closed by pointing a larger learned model at the problem, and it is worth being precise about why. The obvious learned readouts do not degrade gracefully as $V$ grows; they fail for three specific and separable reasons, and each reason turns out to prescribe part of the remedy. We isolate them here, before proposing anything, so that the statistic of Section~\ref{sec:method} can be read as the construction these failures leave standing rather than as one design choice among many.
 
 All experiments in this section use coupled logistic-map networks (with
 heterogeneous and stochastic variants) where ground truth is known by
@@ -242,6 +274,8 @@ degradation---the overfitting signature---is absent.}
 
 \begin{mechanism}[Typicality substitution in masked reconstruction]
 \label{mech:typicality}
+With difference-based scores ruled out by redundancy, the natural move is to stop removing inputs and instead ask how well the rest of the system reconstructs a channel outright.
+
 Scoring a channel by how well a trained masked autoencoder
 \citep{he2022mae} reconstructs it from the rest is a natural foundation-model-style probe of coupling \citep{devlin2019,he2022mae}. At scale, on homogeneous pools, it inverts: on a 1{,}000-channel
 benchmark (a coupled minority of $\sim$100 among $\sim$900 autonomous
@@ -295,19 +329,21 @@ the artifact is reproduced in every independent minimum.}
 \label{fig:lln}
 \end{figure}
 
-\section{The excess-over-self statistic}
+\section{Proposed method: MACE}
 \label{sec:method}
 
-The three mechanisms jointly motivate a single correction. Let $x_q(t)$ be variable $q$
+The three mechanisms do not merely motivate the correction below; each rules out a class of readout, and what survives all three rulings is a single construction. Mechanism~\ref{mech:maturity} rules out any score defined as a difference across redundant alternatives, forcing the comparison to be made against a variable's \emph{own} history rather than against its peers. Mechanism~\ref{mech:typicality} rules out reporting a reconstruction quality absolutely, forcing that own-history term to be \emph{subtracted} rather than merely reported, so that family-typicality cancels instead of ranking. Mechanism~\ref{mech:ensemble} rules out the consensus itself as evidence of validity, forcing an artifact meter that is external to the models and re-measured on every dataset---the ghost channel---to be scored by the same machinery as every real variable. A self-referenced, subtractive, externally controlled readout is what remains; the rest of this section specifies it. Let $x_q(t)$ be variable $q$
 after per-variable standardisation and first-differencing (stationarity is a prerequisite; on drifting data the circular-shift
 ghost inflates and the scan must be discarded rather than thresholded, and the ghost must
 be checked, since it does not announce failure). Form delay embeddings ($E=3$
 throughout) and the joint state $Z(t)$.
 
-We call the complete procedure (the encoder ensemble, the
-excess-over-self readout, and the embedded ghost control)
-\textbf{GhostScan},
-and the statistic it computes excess-over-self predictability (XSP).
+We call the complete procedure \textbf{MACE}, for
+\emph{masked-autoencoder conditional excess}: a masked autoencoder supplies
+the compressed code, and the statistic it computes is the conditional excess
+of Eq.~\ref{eq:excess}, the gain in predictability conditional on that code.
+The ensemble and the embedded ghost control are components of MACE rather
+than separate procedures.
 
 \paragraph{Code.} Train $M$ masked autoencoders (independent
 initialisations) on $Z$: random channel subsets are corrupted each batch,
@@ -358,7 +394,7 @@ to zero, retaining residual input).
 \paragraph{The self-model's function class is critical.} With a linear
 self-baseline the correction fails (a linear fit of a quadratic map leaves
 residual self-structure that the code then ``explains'', scoring periodic
-channels $+0.26$); with polynomial features matched to the dynamics
+channels $+0.26$---which is Mechanism~\ref{mech:typicality} returning under a weakened self-model: an under-powered own-history fit leaves exactly the family-typical structure that the code can then re-supply, and the typicality ordering reappears inside the excess itself, periodic channels first); with polynomial features matched to the dynamics
 (degree 2 suffices on the quadratic maps), self-baselines match theory to
 three decimals and the confound is cancelled rather than suppressed. On
 real data, where no exact function class exists, the ghost and known-root
@@ -372,7 +408,7 @@ measured wall-clock costs.
 
 \begin{table}[t]
 \centering
-\caption{\textbf{Measured cost of a complete GhostScan analysis}, on one
+\caption{\textbf{Measured cost of a complete MACE analysis}, on one
 consumer laptop (RTX 3070, 8\,GB). Training times are from archived model
 timestamps; readout is a ridge fit per variable. The final column is the
 cost of the pairwise alternative at the same width, from our own
@@ -400,9 +436,11 @@ encoder weights make any new readout (a different self-baseline, a new
 statistic, a re-analysis under a reviewer's suggestion) an evaluation
 rather than a retrain, at seconds per variable-sweep.
 
+\paragraph{Control.} The ghost of Section~\ref{sec:mechanisms} is a component of the statistic, not an auxiliary experiment: one real variable is duplicated, circularly shifted by a large random offset, and passed through the encoder and the readout alongside every other variable, so each scan reports its own artifact floor without reference to ground truth. Ensembling cannot serve this role. Mechanism~\ref{mech:ensemble} showed that a data-plus-objective bias is reproduced in every independent minimum, so agreement across models, seeds or bottleneck widths measures only variance; the consensus mean above is therefore used for what it can do---variance reduction, and a cross-model spread diagnostic---while validity is delegated to the ghost. A scan whose ghost does not sit at zero is discarded, not thresholded.
+
 The consequence is worth stating plainly, because it determines who can
 use this. A pairwise scan of the zebrafish recording would require
-roughly ninety GPU-years; the same question, asked through GhostScan,
+roughly ninety GPU-years; the same question, asked through MACE,
 took fourteen minutes on a laptop that also ran the authors' text editor.
 The method is not merely faster than the alternative at scale, it is the
 difference between an analysis that a small laboratory can run on
@@ -410,6 +448,8 @@ existing hardware and one that no laboratory would attempt.
 
 \section{Validation on systems with known ground truth}
 \label{sec:synthetic}
+
+Whether those three constraints were actually met is not something the construction can settle for itself; it needs systems whose driven set is fixed independently of the statistic, and a stated way to fail.
 
 We validate on systems of $V\in\{30,1000\}$ logistic-map channels in
 which a minority sub-web is coupled (sparse random DAG) and the remaining
@@ -461,7 +501,9 @@ $+0.0005$, an order of magnitude below the weakest top-20 member.
 \section{Real-world validation and deployments}
 \label{sec:real}
 
-We deploy the statistic on four open real-world domains. All datasets
+We deploy the statistic on four open real-world domains.
+
+They are ordered by how much independent ground truth each affords, from most to least, and each therefore tests something its predecessor could not. The worm has named cells, a published connectome and a targeted genetic silencing; the zebrafish has no labels at all, only three-dimensional coordinates, so its only available check is geometric---at $500\times$ the width; clinical EEG has an event annotation but no channel-level truth, and asks whether the statistic tracks a change of regime within one subject; the atmosphere has no truth of any kind, only a forcing that is exogenous by physics and a century of established circulation structure to fall against. All datasets
 are public and unrestricted. Registration status is stated per study
 below; the released protocol document and analysis-script headers
 are the citable artifacts. Table~\ref{tab:gates} summarises the validity
@@ -493,6 +535,8 @@ climate & 10{,}512 & $\sim$28{,}000 & $-0.005$ & sunspots $-0.003$\\
 \end{table}
 
 \subsection{\emph{C.~elegans}: label-free recovery of the motor-command circuit, and an interventional test}
+
+We start where the statistic can be checked hardest: the only system in this paper that offers named cells, an independently mapped wiring diagram, and a perturbation that can be aimed at a specific hub.
 
 \textbf{Wild type.} Whole-brain calcium imaging of five immobilised worms
 (109--135 neurons, $\sim$3{,}100 samples) \citep{kato2015}.
@@ -607,6 +651,8 @@ above it.}
 
 \subsection{Zebrafish: a whole-vertebrate-brain map}
 
+The worm tests the statistic against labels. The zebrafish removes them and asks whether the method survives a five-hundred-fold increase in width, where the only check left is whether the driven core is anywhere in particular.
+
 ZAPBench provides 71{,}721 segmented neurons $\times$ 7{,}879 timesteps of
 light-sheet imaging in a larval zebrafish \citep{zapbench}. On a
 2{,}241-step window (open-loop, rotation, dark), the full-brain excess map is computed in minutes on a laptop GPU. The ghost scores $-0.031$; $\sim$2{,}800 neurons clear the $+0.01$
@@ -632,6 +678,8 @@ draws of 1{,}000).}
 \end{figure}
 
 \subsection{Clinical EEG: a confirmed effect and an instructive null}
+
+Both animal deployments had a stable organisation to recover. Clinical recordings do not, and they are where the statistic's semantics can be violated by the clinical question itself: the quantity clinicians want is the onset zone, which is a source, and sources are invisible here by construction. What remains testable is whether drive reorganises between conditions---and, as it turns out, where that reorganisation stops being resolvable at the level of a single event.
 
 CHB-MIT scalp EEG, subject chb01: 23 channels, 256\,Hz; six of the seven
 annotated seizures are analysed (the seventh record was not in our
@@ -667,6 +715,8 @@ per-patient replication; we tested one subject.
 
 \subsection{Climate: a tropical driven core and an invisible solar forcing}
 
+The three biological deployments share one inference target: a single organism's internal organisation. The atmosphere supplies what none of them can---a driver that is exogenous by physics rather than by construction, which can be dropped in among ten thousand real variables and must score nothing.
+
 Seventy-seven years of daily sea-level pressure (NCEP/NCAR Reanalysis-1;
 10{,}512 cells, $\sim$28{,}000 days) \citep{kalnay1996}, deseasonalised and
 differenced, with the SILSO daily sunspot number \citep{silso} embedded as
@@ -699,12 +749,16 @@ locally generated dynamics---rank most autonomous.}
 \label{fig:climate}
 \end{figure}
 
+\paragraph{What the four establish together.} No one of these deployments is decisive, and they are not four repetitions of the same demonstration. Two of them converge: two nervous systems, imaged by different techniques at a five-hundred-fold difference in width and analysed without labels in either case, place the driven core on the same class of machinery---the canonical motor-command ensemble in the worm, the posterior-midline territory associated with internally generated motor dynamics in the fish. Three of them test the same designed blindness, by unrelated natural means: a hub silenced genetically (AVA, percentile $0.92\!\to\!0.38$---an approximate source, and it falls accordingly), a forcing that is exogenous by physics (the sunspot channel, $-0.003$ among $10{,}512$ atmospheric variables), and a structure that is a source by clinical definition (the seizure-onset zone, which the statistic correctly declines to find); the synthetic AR(1) family is the same test under construction. Blindness to sources is what makes the statistic falsifiable rather than merely descriptive, and it is the property most likely to be wrong; it survived three independent natural attempts to break it. Every deployment cleared its ghost gate without recourse to ground truth (Table~\ref{tab:gates}), across $V$ from $23$ to $71{,}721$ and $n$ from $2{,}000$ to $\sim$28{,}000. The EEG null marks the boundary this makes visible: the statistic resolves a change in network organisation between conditions well before it can be trusted to map a single event.
+
 \section{An empirical method-selection map}
 \label{sec:map}
 
 Because the goal is a usable tool, we summarise the regimes in which
 each method performed reliably in our measurements, including where ours
 should not be used.
+
+The rows below draw on measurements from three places: the wall-clock and sample-complexity results stated in the Introduction, the synthetic systems of Section~\ref{sec:synthetic} and the near-synchrony chains run alongside them, and two datasets that appear only here---a 48-point circadian gene-circuit series \citep{hughes2009} and the causal-chamber wind-tunnel system \citep{gamella2025}. The latter two are too short and too far from the membership question to warrant deployments of their own, but they are where the short-series and near-linear recommendations come from; both are reported in full in the released ledger.
 
 \begin{center}
 \small
@@ -744,6 +798,8 @@ precision---far from clean recovery.
 \section{Limitations}
 \label{sec:limits}
 
+The statistic's semantics are narrow by construction, and the evidence above has boundaries that no ghost channel can detect. We state both, roughly in the order in which they would bite a new user.
+
 (1) Drivenness only; sources are invisible, and a source-detection
 complement is future work. (2) Top-$k$ semantics; weakly driven members are
 indistinguishable from non-members. (3) Validity is established down to $n\approx2{,}000$ samples; no
@@ -758,7 +814,8 @@ the ghost and known-root channels are the practical guard. (7) The
 statistic estimates a known causal quantity; the contribution is scale,
 controls, failure analysis and validation, not the concept.
 
-\section{Conclusion}
+\section{Conclusions and future work}
+\label{sec:concl}
 
 Three failure mechanisms explain why learned causal readouts break on
 redundant dynamical systems. The correction they imply, excess over
@@ -767,7 +824,9 @@ turns chance-level detection into high-precision membership
 scans. It does so at widths where pairwise scanning is infeasible in our
 wall-clock measurements and local conditioning is sample-starved, and it
 behaves as theory predicts across worm, fish, clinical and geophysical
-data, including under a genetic intervention. The operational protocol that found every failure here
+data, including under a genetic intervention.
+
+That closes the gap stated at the outset in both of its halves: variable-level drivenness is estimable at $V \gtrsim 10^3$---demonstrated to $71{,}721$ variables in minutes on a laptop---and every scan carries a control that travels with the data rather than with a benchmark, so a result on a system for which nobody has ground truth can still be falsified. The evidence is not only correlational: on the worm, a statistic computed with no access to the perturbation tracked a targeted genetic silencing cell by cell, in directions written down before the data was opened. What the statistic cannot do is name sources, and the same self-referenced construction that makes it scalable and self-checking is what makes it blind to them---a source-detection complement built on the same subtraction is the natural next step, and the ghost channel is already the instrument for validating it. The operational protocol that found every failure here
 (embedded ghosts, known-root channels, trajectory checkpointing,
 pre-registration, precision-recall against stated baselines, published
 negatives) is, we believe, as transferable as the statistic itself.
