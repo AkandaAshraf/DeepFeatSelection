@@ -10,7 +10,9 @@
 \title{Excess-over-self predictability: scalable, ghost-controlled detection
 of driven variables in large dynamical systems}
 \author{Akanda Ashraf}
-\date{August 15, 2026 --- preprint draft}
+\date{August 15, 2026 --- preprint draft \\[2pt]
+{\normalsize Licensed CC BY 4.0. Code, ledger and protocols:
+released alongside this paper.}}
 
 \newtheorem{mechanism}{Mechanism}
 
@@ -133,8 +135,21 @@ three decimals in all three worms tested---and no intermediate checkpoint
 opens a usable window. This is the
 function-class dependence of importance gaps \citep{xu2020} expressed along
 the training trajectory: such scores work \emph{because of} restricted
-capacity, not despite it.
+capacity, not despite it. Figure~\ref{fig:maturity} shows the crossing.
 \end{mechanism}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.55\linewidth]{figs/fig_maturity.pdf}
+\caption{\textbf{Maturity collapse is redundancy-ordered, not uniform.}
+Leave-one-out gain versus training epochs on a hub-structured synthetic
+network (mean of two system seeds). Gains for the hub parent, whose imprint
+is redundant across six children, rise, peak at partial maturity, and
+collapse to zero as the model learns alternative routes; gains for
+single-child parents, whose imprint is unique, grow monotonically. Uniform
+degradation---the overfitting signature---is absent.}
+\label{fig:maturity}
+\end{figure}
 
 \begin{mechanism}[Typicality substitution in masked recreation]
 \label{mech:typicality}
@@ -150,8 +165,20 @@ last (0.25). The decoder's loss-optimal completion of a masked slot is the
 coupling---and coupled channels, perturbed off the family manifold by their
 drive, are the least typical. Bottleneck width ($8\!\to\!256$), fill values,
 and masked-only losses all fail to repair the inversion, because none
-changes the optimal blind completion.
+changes the optimal blind completion. Figure~\ref{fig:typicality} shows
+the inversion.
 \end{mechanism}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.55\linewidth]{figs/fig_typicality.pdf}
+\caption{\textbf{Masked recreation measures typicality, not coupling.}
+Consensus masked-recreation $R^2$ per channel class at $V{=}1001$
+(8-encoder ensemble). Periodic autonomous channels and the ghost---which
+carries no causal information by construction---score highest; genuinely
+coupled members score lowest. The causal ordering is inverted.}
+\label{fig:typicality}
+\end{figure}
 
 \begin{mechanism}[Ensembles average variance, not bias]
 \label{mech:ensemble}
@@ -163,8 +190,21 @@ $1/\sqrt{M}$ deceleration, exactly as the law of large numbers predicts,
 and converges to the wrong place: the ghost's recreation score is
 $0.740\pm0.004$ \emph{across the eight independent minima}. The typicality
 artifact is a property of data-plus-objective, reproduced in every basin;
-averaging over minima cannot touch it.
+averaging over minima cannot touch it. Figure~\ref{fig:lln} shows both
+curves.
 \end{mechanism}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{figs/fig_lln.pdf}
+\caption{\textbf{Ensembling averages variance, not bias.} Left: consensus
+average precision rises with ensemble size exactly as the law of large
+numbers predicts, converging toward $\sim$0.15---signal plus shared bias,
+far below useful detection (baseline dashed). Right: the ghost channel's
+recreation score across the same prefix ensembles is $0.740\pm0.004$:
+the artifact is reproduced in every independent minimum.}
+\label{fig:lln}
+\end{figure}
 
 \section{The excess-over-self statistic}
 \label{sec:method}
@@ -249,7 +289,20 @@ heterogeneous pool & 10/10 & 18/20 & 0\\
 
 \noindent All autonomous channels---including 61 periodic ones, a
 deliberately stochastic AR(1) family in the heterogeneous pool, and the
-ghost---pin at zero excess. Two boundaries, measured: the statistic is a
+ghost---pin at zero excess (Figure~\ref{fig:synthetic}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figs/fig_synthetic.pdf}
+\caption{\textbf{The excess statistic at $V{=}1001$ (system seed 0).}
+Channels ranked by consensus excess. The top of the ranking is pure
+coupled members (blue); all 907 autonomous channels (orange) and the ghost
+(star) pin at or below zero. The statistic is a top-$k$ detector: weakly
+driven members fall below the zero-pinned non-members, which is why
+full-population AUROC (0.28) is uninformative while top-10 precision is
+perfect.}
+\label{fig:synthetic}
+\end{figure} Two boundaries, measured: the statistic is a
 \textbf{top-$k$ detector} (members whose drive share falls below the
 readout's noise floor receive slightly negative excess and rank below the
 zero-pinned non-members, so full-population AUROC is uninformative even
@@ -267,7 +320,33 @@ non-member excess pins at or below zero to the reported precision.
 
 All datasets are public and unrestricted. Registration status is stated
 per study below; the released protocol document and analysis-script headers
-are the citable artifacts.
+are the citable artifacts. Table~\ref{tab:gates} summarises the validity
+gates across all deployments.
+
+\begin{table}[t]
+\centering
+\caption{\textbf{Validity gates across deployments.} The ghost is a
+circularly shifted real channel (must score $\approx 0$); exogenous-root
+channels are known non-driven variables (must score $\approx 0$).}
+\label{tab:gates}
+\small
+\begin{tabular}{lcccc}
+\toprule
+deployment & $V$ & $n$ & ghost & exogenous root\\
+\midrule
+synthetic ($\times$3 seeds + het.) & 1{,}001 & 2{,}000 & $\leq 0$ & AR(1)
+family $\approx 0$\\
+worm, wild type ($\times$5) & 109--135 & $\sim$3{,}100 & $-0.03$..$0.00$ &
+---\\
+worm, AVA silenced ($\times$5) & 120--138 & $\sim$3{,}000 &
+$-0.02$..$-0.01$ & silenced hub falls to 0.38 pct\\
+zebrafish & 71{,}721 & 2{,}241 & $-0.031$ & ---\\
+EEG (chb01, 14 windows) & 23 & $\geq$2{,}000 & $|{\cdot}|\leq0.034$ &
+---\\
+climate & 10{,}512 & $\sim$28{,}000 & $-0.005$ & sunspots $-0.003$\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{\emph{C.~elegans}: the motor-command circuit, found blind---and an interventional test}
 
@@ -303,7 +382,48 @@ forward hub AVB} ($+0.34$, excess turning positive). We report these as
 candidate observations pending adjudication against the reversal-circuit
 literature \citep{gray2005,sordillo2021}; independent of their novelty
 grade, an observational statistic tracked a targeted genetic intervention
-neuron-by-neuron in the pre-registered directions.
+neuron-by-neuron in the stated directions.
+Table~\ref{tab:intervention} and Figure~\ref{fig:worm} give the per-cell
+contrast.
+
+\begin{table}[t]
+\centering
+\caption{\textbf{Drivenness percentile, wild type versus AVA-silenced}
+(cells identified in $\geq 3$ worms of both five-animal cohorts;
+L/R-collapsed).}
+\label{tab:intervention}
+\small
+\begin{tabular}{lccc}
+\toprule
+cell & WT & AVA:HisCl & $\Delta$\\
+\midrule
+AVA (silenced hub) & 0.92 & 0.38 & $-0.54$\\
+VB01 (motor)       & 0.91 & 0.28 & $-0.64$\\
+RMED (motor)       & 0.90 & 0.41 & $-0.49$\\
+VA01 (motor)       & 0.82 & 0.37 & $-0.45$\\
+AVE                & 0.97 & 0.69 & $-0.28$\\
+RIB                & 0.66 & 0.37 & $-0.29$\\
+\midrule
+RIM                & 0.93 & 0.84 & $-0.08$\\
+AIB                & 0.75 & 0.65 & $-0.09$\\
+\midrule
+AVB (forward hub)  & 0.49 & 0.82 & $+0.34$\\
+ALA                & 0.16 & 0.46 & $+0.30$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.58\linewidth]{figs/fig_worm.pdf}
+\caption{\textbf{An observational statistic tracks a genetic
+intervention.} Per-cell drivenness percentile in wild type (horizontal)
+versus AVA-silenced animals (vertical); each point is a cell identified in
+at least three worms of both cohorts. The silenced hub AVA and its module
+fall below the diagonal; RIM and AIB barely move; the forward hub AVB rises
+above it.}
+\label{fig:worm}
+\end{figure}
 
 \subsection{Zebrafish: a whole-vertebrate-brain map}
 
@@ -316,7 +436,20 @@ coherent: the top-1{,}000 neurons are $1.78\times$ more tightly packed than
 random draws (median nearest-neighbour distance 16.8 vs.\ $29.8\pm0.6$),
 concentrated posteriorly and against the midline---consistent with the
 hindbrain/midline territory where internally generated motor dynamics are
-reported to reside---in a window dominated by the dark condition. Region names await atlas registration and are not claimed.
+reported to reside---in a window dominated by the dark condition. Region
+names await atlas registration and are not claimed
+(Figure~\ref{fig:fish}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{figs/fig_fish.pdf}
+\caption{\textbf{The driven core of a larval zebrafish brain is a place.}
+All 71{,}721 segmented neurons in horizontal projection (gray); the 1{,}000
+highest-excess neurons (blue) concentrate posteriorly and near the midline
+(median nearest-neighbour distance 16.8 versus $29.8\pm0.6$ for random
+draws of 1{,}000).}
+\label{fig:fish}
+\end{figure}
 
 \subsection{Clinical EEG: a confirmed effect and an instructive null}
 
@@ -330,7 +463,18 @@ large-$n$ runs (where $|$ghost$| < 0.01$; no numeric tolerance was
 pre-specified); drivenness \emph{concentration} (top-4 channel share) is
 higher during seizures than between them (0.68 vs.\ 0.47; five of six
 within-record pairs, the exception---record 03---in the opposite
-direction)---seizures recruit the network into a driven regime. The third pre-registered
+direction)---seizures recruit the network into a driven regime
+(Figure~\ref{fig:eeg}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\linewidth]{figs/fig_eeg.pdf}
+\caption{\textbf{Seizures concentrate network drive.} Top-4 channel share
+of total excess, interictal versus ictal, per record with an annotated
+seizure. Five of six records move in the predicted direction; the exception
+(record 03, red) is shown, not excused.}
+\label{fig:eeg}
+\end{figure} The third pre-registered
 prediction failed, and the failure is the useful result: per-event driven
 patterns do not replicate across the same patient's seizures (mean pairwise
 Spearman 0.08 over 15 pairs). Whatever the cause---genuine per-event
@@ -353,8 +497,20 @@ carry no prior claim, reproduces textbook structure: 99\% of the 500
 most-driven cells lie within $30^{\circ}$ of the equator (mean $|$lat$|$
 $6.1^{\circ}$ vs.\ $45.6^{\circ}$ for the grid)---the Walker/ENSO belt,
 where tropical pressure is slaved to planetary-scale circulation---while
-polar and storm-track cells rank most autonomous. Every cell shows positive
-excess: one connected fluid has no autonomous members.
+polar and storm-track cells rank most autonomous. Every cell shows positive excess: one connected fluid has no autonomous
+members (Figure~\ref{fig:climate}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figs/fig_climate.pdf}
+\caption{\textbf{The atmosphere's driven core is the deep tropics.} Left:
+excess per grid cell for 77 years of daily sea-level pressure (single-hue
+scale; darker = more driven). Right: zonal mean excess by latitude; the
+shaded band marks $\pm30^{\circ}$, which contains 99\% of the 500
+most-driven cells. Polar and mid-latitude storm-track cells---dominated by
+locally generated dynamics---rank most autonomous.}
+\label{fig:climate}
+\end{figure}
 
 \section{A measured method-selection map}
 \label{sec:map}
