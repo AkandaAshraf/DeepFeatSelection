@@ -78,6 +78,13 @@ Contributions:
 5. **A pre-registered reversal experiment** (Sec. 6): re-encoding the target so
    a different variable becomes the cheap one reverses the ordering completely,
    confirming the attribution by manipulation rather than correlation.
+6. **A target-specification failure, reported in full** (Sec. 8): scoring a
+   feature-detection method against a target the fitted model never learned
+   measures the target's learnability rather than the method, silently and
+   with a well-formed AUROC. We made this error across four sweeps before an
+   attribution-share breakdown by role exposed it, and the guard — report the
+   model's own generalisation beside every detection score — is cheap enough
+   that it should be standard.
 
 We explicitly do *not* claim a causal discovery method. The paper's point is
 the opposite: internal-representation measurements are meters of
@@ -532,7 +539,114 @@ selection benchmark.  The same search on `nonlinear_scm` returns `{x_effect}`,
 the target's child — the shortest *predictive* route again running through an
 effect, which is the Markov-blanket ceiling reappearing at the set level.
 
-## 8. Related work
+## 8. Detection against baselines, and a target-specification failure **[DONE]**
+
+Sections 5 and 6 concern what the probe *measures*. A separate question is
+whether it *detects* better than the standard alternatives, and the attempt to
+answer it produced a methodological error worth reporting in full, because we
+made it four times before noticing and it is not specific to this method.
+
+### 8.1 The setup
+
+A scalable system (`deepfeatselect/scaling.py`) places a k-way interaction among
+d features: `oblique_interaction` makes the target depend on
+`sin(f · w·x)` for a random unit vector `w` over k = 4 features, tilted away from
+every coordinate axis, plus 2 marginal causes that are individually informative
+and 14 noise columns. Raising `f` raises the coupling's nonlinearity. Feature
+positions are permuted, so no method benefits from column ordering.
+
+The design intent was a regime where a dense network beats axis-aligned splits:
+a tree approximates an oblique surface with a staircase whose cost grows with
+`f`, while a dense layer holds the same projection vector regardless.
+
+### 8.2 What we reported, and why it was wrong
+
+Sweeping `f` over {1, 2, 4, 8, 16} at d = 20, every method scored 1.000 at
+f ≤ 2 and then fell to 0.34–0.63 — chance — at f ≥ 4, simultaneously. We read
+this as the interaction becoming undetectable and concluded the deep probe had
+no advantage on either axis, dimensionality or nonlinearity.
+
+The scoring was *interaction members versus irrelevant features*. But an
+attribution-share breakdown by role shows what the models were actually doing at
+f = 8:
+
+| role | share of attribution mass | null share |
+|---|---|---|
+| interaction (4 columns) | 0.054 | 0.20 |
+| **marginal (2 columns)** | **0.675** | 0.10 |
+| irrelevant (14 columns) | 0.272 | 0.70 |
+
+A 6.75× enrichment on the marginal causes, with noise suppressed well below its
+null share. The models had not failed. They had correctly determined that the
+sine interaction was unlearnable from 6000 samples — the network's own
+validation loss sits at 0.682 against a chance level of 0.693 — abandoned it,
+and concentrated on the causes that remained learnable. That is the right
+behaviour, and our metric gave no credit for it while recording the abandoned
+target as method failure.
+
+### 8.3 Re-scored
+
+Re-scoring the saved per-feature deltas against the learnable target, and
+recomputing baselines on the identically seeded data
+(`scripts/rescore_targets.py`):
+
+**Target: marginal causes versus irrelevant**
+
+| method | f=2 | f=8 | f=16 |
+|---|---|---|---|
+| random forest | 1.000 | **1.000** | **1.000** |
+| permutation | 1.000 | **1.000** | **1.000** |
+| deprivation probe (val-loss channel) | 1.000 | **1.000** | **1.000** |
+| mutual information | 0.982 | 0.964 | 0.964 |
+
+**Target: interaction versus irrelevant** (the original)
+
+| method | f=2 | f=8 | f=16 |
+|---|---|---|---|
+| random forest | 1.000 | 0.759 | 0.527 |
+| permutation | 1.000 | 0.625 | 0.621 |
+| deprivation probe (val-loss channel) | 1.000 | 0.661 | 0.625 |
+| mutual information | 0.911 | 0.545 | 0.643 |
+
+Nothing collapsed. Every method detects the learnable causes perfectly at every
+nonlinearity level tested. What degrades is detection of a specific interaction
+that the fitted model provably never represented, and a feature-attribution
+method cannot report a dependence its model does not have.
+
+### 8.4 The lesson, which generalises
+
+**Scoring a feature-detection method against a target the model cannot learn
+measures the target's learnability, not the method.** The failure is silent: the
+AUROC is well-formed, lands plausibly above chance, and gives no indication that
+the quantity being detected was absent from the model in the first place.
+
+The guard is cheap and we should have had it from the start: report the fitted
+model's own generalisation alongside every detection score. A held-out AUC at
+chance means the attribution scores are describing a model that learned nothing
+about that target, whatever the detection number says.
+
+### 8.5 Consequences for the method
+
+The deprivation probe is not worse than the baselines. On the learnable target
+it reaches 1.000, tying random forest and permutation importance at every
+frequency. An earlier draft's conclusion that it "has no niche on either axis"
+was drawn from the mis-specified target and is withdrawn.
+
+The cost argument stands unchanged, and is now the whole argument: random forest
+reaches 1.000 in about 1.4 seconds, the probe in about 340, because the probe
+retrains once per feature. Tying at 240× the price is not a reason to prefer it.
+
+The nonlinearity hypothesis also turns out to have been **untestable with this
+system**. Raising sine frequency makes the coupling harder for axis-aligned
+splits *and* pushes it outside the network's sample complexity at the same
+point: the system passes directly from "every method solves it" at f = 2 to
+"no model can learn it" at f ≥ 4, with no intervening window. Testing whether
+dense connectivity beats subspace sampling requires a nonlinearity that defeats
+axis-aligned splits while remaining learnable, and sine frequency does not
+separate those two properties. That is a property of the benchmark, not a
+result about the methods.
+
+## 9. Related work
 
 **Usable information.** Xu et al. (2020) define 𝒱-information;
 Ethayarajh et al. (2022) apply it to dataset difficulty. We use *deprivation
@@ -630,7 +744,7 @@ predictive method — consistent with, and motivating, the present framing.
 
 ---
 
-## 9. Limitations
+## 10. Limitations
 
 Three synthetic families, all constructed by us, so the dissociation has not
 been demonstrated on a system we did not design. The small-capacity regime only,
@@ -651,12 +765,23 @@ The probe orders features and does not orient causes; orientation needs
 assumptions external to prediction (noise asymmetry, non-invertibility,
 intervention), treated in companion work. The Grad-CAM attribution channel
 contributed nothing and is retained only as a reported null. Finally, the
-literature pass behind Sec. 8 was targeted rather than systematic, and it has
+literature pass behind Sec. 9 was targeted rather than systematic, and it has
 already demoted one claim we had thought novel — the Shapley symmetry argument
 is the explicit motivation for Asymmetric Shapley Values — so further prior art
 should be assumed to exist.
 
-## 10. Conclusion
+**The comparison against baselines is bounded by the benchmark, not settled by
+it.** Sec. 8 shows the probe ties random forest and permutation importance on
+the learnable target at every nonlinearity tested, but the system it was tested
+on cannot separate the two properties the comparison needed: raising the sine
+frequency defeats axis-aligned splits and exceeds the network's sample
+complexity at the same point, leaving no regime where one method could win. A
+system whose coupling is oblique enough to require many splits while remaining
+learnable would be needed to decide it, and we do not have one. The cost figures
+are not so bounded: the probe retrains once per feature, so its ~240x overhead
+against random forest holds regardless of how that comparison resolves.
+
+## 11. Conclusion
 
 Risk-difference importance has an exact blind spot, and inside it the trained
 network still talks — but about economics, not causality. What its internals

@@ -24,3 +24,18 @@ SHARE.md
 # Large external datasets, fetched by scripts rather than tracked.
 Data/depmap/
 Data/variants/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/main.pdf
+Data/causalchamber/
+Data/circadian/
+Data/celegans/
+Data/zapbench/
+Data/eeg/
+Data/climate/
