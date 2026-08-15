@@ -77,26 +77,43 @@ def _v1000_classes():
 
 
 def fig_typicality(truth, periodic):
+    """Horizontal group summary: median, IQR box, and full point spread.
+
+    The earlier vertical strip plot collided its x-tick labels and hid the
+    bimodality of each group behind a single mean bar; horizontal layout
+    gives the labels room and lets the spread be read directly.
+    """
     scores = np.load("ExpOutput/ensemble/all_scores.npy").mean(axis=0)
     groups = [
-        ("periodic\nautonomous", scores[100:1000][periodic], GRAY),
-        ("ghost\n(shifted copy)", np.array([scores[-1]]), VERM),
-        ("chaotic\nautonomous", scores[100:1000][~periodic], GRAY),
-        ("coupled\nmembers", scores[:100][truth[:100]], BLUE),
+        ("coupled members", scores[:100][truth[:100]], BLUE),
+        ("chaotic autonomous", scores[100:1000][~periodic], GRAY),
+        ("ghost (shifted copy)", np.array([scores[-1]]), VERM),
+        ("periodic autonomous", scores[100:1000][periodic], GRAY),
     ]
-    fig, ax = plt.subplots(figsize=(3.4, 2.6))
+    fig, ax = plt.subplots(figsize=(5.4, 2.5))
+    rng = np.random.default_rng(0)
     for i, (label, vals, c) in enumerate(groups):
-        jitter = (np.random.default_rng(0).uniform(-0.16, 0.16, len(vals))
-                  if len(vals) > 1 else np.zeros(1))
-        ax.plot(i + jitter, vals, "o", ms=2.5, alpha=0.35, color=c,
-                markeredgewidth=0)
-        ax.plot([i - 0.25, i + 0.25], [vals.mean()] * 2, "-", color=c, lw=2.5)
-        ax.annotate(f"{vals.mean():+.2f}", (i, vals.mean()),
-                    xytext=(0, 6), textcoords="offset points",
-                    ha="center", color=c, fontsize=8)
-    ax.set_xticks(range(4))
-    ax.set_xticklabels([g[0] for g in groups], fontsize=8)
-    ax.set_ylabel("masked-recreation consensus $R^2$")
+        if len(vals) > 1:
+            jit = rng.uniform(-0.17, 0.17, len(vals))
+            ax.plot(vals, i + jit, "o", ms=2.2, alpha=0.28, color=c,
+                    markeredgewidth=0, zorder=1)
+            q1, med, q3 = np.percentile(vals, [25, 50, 75])
+            ax.plot([q1, q3], [i, i], "-", color=c, lw=5, alpha=0.55,
+                    solid_capstyle="butt", zorder=2)
+            ax.plot(med, i, "|", color=c, ms=16, mew=2.2, zorder=3)
+            txt = f"median {med:.2f}"
+        else:
+            ax.plot(vals[0], i, "D", ms=7, color=c, zorder=3)
+            txt = f"{vals[0]:.2f}"
+        ax.annotate(txt, (1.03, i), xycoords=("axes fraction", "data"),
+                    va="center", ha="left", color=c, fontsize=8)
+    ax.set_yticks(range(len(groups)))
+    ax.set_yticklabels([g[0] for g in groups], fontsize=9)
+    ax.set_xlabel("masked-reconstruction consensus $R^2$")
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.6, len(groups) - 0.4)
+    ax.grid(axis="y", alpha=0)
+    fig.subplots_adjust(right=0.78)
     fig.savefig(FIGS / "fig_typicality.pdf")
     plt.close(fig)
 
@@ -126,31 +143,36 @@ def fig_lln(truth):
 
 
 def fig_synthetic(truth):
+    """Top-40 ranks as bars, plus the count of everything below.
+
+    The statistic is a top-k detector, so the honest visual is the top of
+    the ranking at full resolution; the flat zero tail is reported as a
+    count rather than 960 overplotted points.
+    """
     ex = np.load("ExpOutput/excess_poly/excess_consensus.npy")
     truth_all = np.append(truth, False)
     order = np.argsort(-ex)
-    fig, ax = plt.subplots(figsize=(5.6, 2.5))
-    xs = np.arange(len(ex))
-    colors = np.where(truth_all[order], BLUE, ORANGE)
-    ghost_rank = int(np.where(order == len(ex) - 1)[0][0])
-    ax.vlines(xs[:60], 0, ex[order][:60], colors=colors[:60], lw=1.4)
-    ax.plot(xs[60:], ex[order][60:], ".", ms=1.2,
-            color=ORANGE, alpha=0.4, markeredgewidth=0)
-    for i in range(60):
-        if truth_all[order[i]]:
-            continue
-    ax.plot(ghost_rank, ex[len(ex) - 1], "*", ms=9, color=VERM)
-    ax.annotate("ghost", (ghost_rank, ex[len(ex) - 1]), xytext=(6, 8),
-                textcoords="offset points", color=VERM)
-    ax.annotate("members", (8, ex[order][8]), xytext=(12, 6),
-                textcoords="offset points", color=BLUE)
-    ax.annotate("autonomous channels pinned at $\\leq 0$",
-                (400, 0), xytext=(0, -16), textcoords="offset points",
-                color=ORANGE)
+    vals, is_mem = ex[order], truth_all[order]
+    k = 40
+    fig, ax = plt.subplots(figsize=(5.4, 2.5))
+    ax.bar(np.arange(1, k + 1), vals[:k],
+           color=np.where(is_mem[:k], BLUE, ORANGE), width=0.8)
     ax.axhline(0, color=GRAY, lw=0.8)
-    ax.set_xlabel("rank by consensus excess (V = 1001)")
+    ax.set_xlabel("rank by consensus excess")
     ax.set_ylabel("excess")
-    ax.set_xlim(-8, 1010)
+    ax.set_xlim(0.2, k + 0.8)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUE),
+               plt.Rectangle((0, 0), 1, 1, color=ORANGE)]
+    ax.legend(handles, ["coupled member (true positive)",
+                        "autonomous channel"],
+              loc="upper right", frameon=False, fontsize=8)
+    n_below = len(vals) - k
+    n_mem_below = int(is_mem[k:].sum())
+    note = ("remaining {} channels: all at or below 0\n"
+            "({} weakly driven members among them)").format(
+                n_below, n_mem_below)
+    ax.annotate(note, (0.42, 0.30), xycoords="axes fraction",
+                fontsize=8, color=GRAY)
     fig.savefig(FIGS / "fig_synthetic.pdf")
     plt.close(fig)
 
