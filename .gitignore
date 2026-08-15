@@ -48,6 +48,9 @@ Data/climate/
 # (paper/validation_protocol.md).
 paper/*.tex
 paper/*.pdf
+# ...but the compiled manuscript itself is tracked, so a reader arriving from
+# the preprint finds the paper beside the code it describes.
+!paper/excess_paper.pdf
 paper/*.bib
 paper/Makefile
 paper/figs/
