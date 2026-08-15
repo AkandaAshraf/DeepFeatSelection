@@ -1,0 +1,520 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{microtype}
+
+\title{Excess-over-self predictability: scalable, ghost-controlled detection
+of driven variables in large dynamical systems}
+\author{Akanda Ashraf}
+\date{August 15, 2026 --- preprint draft}
+
+\newtheorem{mechanism}{Mechanism}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Which variables of a large dynamical system are driven by the system, and
+which evolve autonomously? Existing causal-detection methods cannot ask this
+at scale: we measure full pairwise convergent cross mapping (CCM) at
+$\sim$528\,ms per pair ($\approx$14{,}700 compute-hours for one scan of
+$10^4$ variables), nearest-neighbour conditioning starved at 18 conditioning dimensions in
+our two-seed synthetic tests, and PCMCI with partial correlation acquires
+mediated false positives near synchrony on synthetic chains. We first isolate three mechanisms by which
+\emph{learned} readouts fail on such systems---maturity collapse of
+difference-based importance under Takens redundancy, typicality substitution
+in masked-recreation scores, and the inability of ensembling to remove
+shared bias---each demonstrated with a separating experimental signature.
+These mechanisms jointly imply a corrected statistic---an amortised
+Granger/transfer-entropy-type quantity we call
+\emph{excess-over-self predictability}: the gain in one-step predictability
+of a variable when a learned low-dimensional code of the entire remaining
+system is added to a flexible model of the variable's own history. The code
+comes from a small ensemble of unsupervised masked autoencoders; each
+per-variable readout is a ridge regression, so a complete scan of 71{,}721
+variables runs in minutes on a laptop. Every analysis embeds a \emph{ghost
+channel}---a circularly shifted copy of a real variable---whose score must
+be zero, giving each dataset a built-in falsification test that needs no
+ground truth. On synthetic systems with known membership the statistic
+attains top-10 precision of 30/30 across three system seeds with zero false
+alarms among 907 autonomous channels. Across four open real-world domains
+it behaves as theory demands where it should, and fails informatively
+where it does: in \emph{C.~elegans} it blindly ranks the
+canonical motor-command circuit as the brain's driven core (top-10 all
+command/motor in two of three development worms, the command core topping
+both held-out rankings; all predictions stated in advance pass in five of
+five) and tracks a genetic silencing of the command hub AVA
+neuron-by-neuron; in a 71{,}721-neuron zebrafish recording the driven core
+is spatially coherent ($1.78\times$ tighter than chance) and
+posterior-midline; in clinical EEG (where the statistic maps spread, never onset), seizures
+measurably concentrate network drive while per-event spread maps fail to
+replicate---itself a useful warning; and in 77 years of daily sea-level pressure the driven core is the
+deep tropics (99\% of top cells within $30^{\circ}$ of the equator), while
+an embedded solar-forcing channel scores zero within the ghost tolerance
+($-0.003$), confirming designed blindness to exogenous roots on real
+data. We state semantics and limits
+precisely---drivenness only, top-$k$ precision, validated down to
+$n\approx2{,}000$ samples---and
+release code, pre-registrations, and a ledger including all negative
+results.
+\end{abstract}
+
+\section{Introduction}
+
+Causal structure discovery from time series has excellent tools at small
+scale. Convergent cross mapping exploits Takens' embedding theorem to detect
+coupling between pairs of variables on shared attractors
+\citep{sugihara2012,takens1981}; constraint-based frameworks such as PCMCI
+condition away spurious associations across moderate variable counts
+\citep{runge2019}; and Granger causality and transfer entropy define the
+underlying conditional-predictability quantity
+\citep{granger1969,schreiber2000}. The question practitioners increasingly
+hold, however---\emph{which of my ten thousand variables does this system
+drive?}---sits outside every tool's demonstrated envelope. Neural
+implementations of Granger causality report tens to $\sim$100 variables
+\citep{tank2021}; our own wall-clock measurement of pairwise CCM projects a
+single $10^4$-variable scan at roughly 1.7 years of compute; and the
+shortcuts one might hope for fail in our tests (cross-mapping against
+principal-component summaries scores its own control at the maximum;
+$k$NN-based conditioning collapses at 18 conditioning dimensions in a
+two-seed synthetic test).
+
+This paper makes three contributions. \textbf{(i)} We isolate, with
+separating experimental signatures, three mechanisms by which learned
+causal readouts fail on redundant dynamical systems
+(\S\ref{sec:mechanisms}). \textbf{(ii)} We derive from them a corrected,
+scalable statistic with a built-in falsification control
+(\S\ref{sec:method}), and validate it where truth is known
+(\S\ref{sec:synthetic}). \textbf{(iii)} We deploy it across four open
+real-world domains---including an interventional test in which the
+statistic tracks a targeted genetic silencing neuron-by-neuron---and
+distil a measured method-selection map (\S\ref{sec:real}--\ref{sec:map}).
+Registration discipline varied by study and we state it exactly: the EEG
+and climate deployments were registered in a protocol document before their
+data was accessed; the wild-type worm predictions were fixed in the analysis
+script's header before execution, with two animals reserved untouched for
+held-out confirmation; the intervention directions were stated in the
+working ledger before the silenced-worm data was opened; the zebrafish
+analysis was exploratory apart from its in-code ghost gate. Negatives are
+reported at the same volume as positives, and every number below is
+reproducible from the released code and public data.
+
+\section{Three failure mechanisms}
+\label{sec:mechanisms}
+
+All experiments in this section use coupled logistic-map networks (with
+heterogeneous and stochastic variants) where ground truth is known by
+construction; full protocols are in the released ledger. Every analysis
+embeds a \emph{ghost channel}: a circularly shifted copy of a real
+variable, carrying realistic marginals and autocorrelation but no temporal
+alignment. Any score the ghost earns is artifact by construction.
+
+\begin{mechanism}[Maturity collapse of difference-based importance]
+\label{mech:maturity}
+Difference-based scores (leave-one-covariate-out and relatives) measure a
+trained model's loss when one input is removed. When a cause's imprint is
+redundant across several observed effects---generic for dynamical systems,
+since any single effect's delay embedding reconstructs its driver
+\citep{takens1981}---the difference collapses to zero \emph{precisely when
+training succeeds}: a mature model re-routes around any single removed
+input. The separating signature, distinct from overfitting: on a
+hub-structured network, checkpointing each model across its own training
+trajectory shows redundant-parent scores rising, peaking at partial
+maturity, and collapsing to zero by epoch 50, while unique-parent scores
+grow monotonically throughout ($0.02\!\to\!0.28$; two system seeds---the
+crossing is the synthetic signature). On real neural data
+(\emph{C.~elegans}, dense connectome redundancy) the collapse endpoint
+replicates: mature leave-one-out gains are exactly zero---AUROC $0.500$ to
+three decimals in all three worms tested---and no intermediate checkpoint
+opens a usable window. This is the
+function-class dependence of importance gaps \citep{xu2020} expressed along
+the training trajectory: such scores work \emph{because of} restricted
+capacity, not despite it.
+\end{mechanism}
+
+\begin{mechanism}[Typicality substitution in masked recreation]
+\label{mech:typicality}
+Scoring a channel by how well a trained masked autoencoder
+\citep{he2022mae} recreates it from the rest is an attractive
+foundation-model-style probe of coupling. At scale, on homogeneous
+pools, it inverts: on a
+1{,}000-channel benchmark (100 coupled members among 900 autonomous
+channels), recreation ranks periodic autonomous channels highest (0.76),
+the ghost at 0.74, chaotic autonomous channels at 0.29, and true members
+last (0.25). The decoder's loss-optimal completion of a masked slot is the
+\emph{family-typical} trajectory, so recreation measures typicality, not
+coupling---and coupled channels, perturbed off the family manifold by their
+drive, are the least typical. Bottleneck width ($8\!\to\!256$), fill values,
+and masked-only losses all fail to repair the inversion, because none
+changes the optimal blind completion.
+\end{mechanism}
+
+\begin{mechanism}[Ensembles average variance, not bias]
+\label{mech:ensemble}
+The natural rescue---train many models from independent initialisations and
+trust the consensus---was tested directly: eight masked autoencoders on one
+fixed system, only the seed varying. The consensus average-precision curve
+rises with ensemble size ($0.111\!\to\!0.148$) with the expected
+$1/\sqrt{M}$ deceleration, exactly as the law of large numbers predicts,
+and converges to the wrong place: the ghost's recreation score is
+$0.740\pm0.004$ \emph{across the eight independent minima}. The typicality
+artifact is a property of data-plus-objective, reproduced in every basin;
+averaging over minima cannot touch it.
+\end{mechanism}
+
+\section{The excess-over-self statistic}
+\label{sec:method}
+
+The three mechanisms point at one repair. Let $x_q(t)$ be variable $q$
+after per-variable standardisation and first-differencing (stationarity is a prerequisite; on drifting data the circular-shift
+ghost inflates and the scan must be discarded rather than thresholded---the
+ghost must be checked, it does not announce failure). Form delay embeddings ($E=3$
+throughout) and the joint state $Z(t)$.
+
+\paragraph{Code.} Train $M$ masked autoencoders (independent
+initialisations) on $Z$: random channel subsets are corrupted each batch,
+the loss is computed on masked positions only \citep{he2022mae}, and a hard
+linear bottleneck of width $b \ll \dim Z$ yields codes $c_m(t)$.
+
+\paragraph{Readout.} For each variable $q$ and model $m$,
+\begin{equation}
+\mathrm{excess}_m(q) \;=\;
+R^2\!\left[\,x_q(t{+}1)\;\middle|\;\phi\big(\text{own lags of } q\big)\oplus
+c_m(t)\right]
+\;-\;
+R^2\!\left[\,x_q(t{+}1)\;\middle|\;\phi\big(\text{own lags of }
+q\big)\right],
+\label{eq:excess}
+\end{equation}
+with both terms ridge regressions fit on a training segment and evaluated
+on a held-out contiguous tail ($R^2$ clamped at zero), and $\phi$ a
+polynomial feature map (degree 3). The reported score is the consensus mean
+over models. The subtraction cancels typicality by construction (a channel
+predictable from its own structure gains nothing from the code); the
+statistic is not a difference across redundant alternatives, so
+Mechanism~\ref{mech:maturity} does not apply (the architecture-identical
+absolute readout was empirically stable across 5--100 encoder-training
+epochs at $V{=}30$; the excess readout reuses those saved encoders); and
+its lineage is explicit: a
+Granger/transfer-entropy-type quantity \citep{granger1969,schreiber2000}
+amortised to large $V$ by unsupervised compression---CCM's
+convergence-with-library-size criterion makes the analogous self-control
+implicitly \citep{sugihara2012}; Eq.~\ref{eq:excess} makes it explicit and
+scalable.
+
+\paragraph{Semantics.} Positive excess means the system's state carries
+information about $X$'s next step beyond $X$'s own past: $X$ is
+\emph{driven}. A pure source is perfectly predicted by its own history and
+is therefore invisible---a designed, testable asymmetry: known-exogenous
+variables must score zero (verified below on solar forcing; a genetic
+silencing approximates it---the silenced hub falls sharply but not to
+zero, retaining residual input).
+
+\paragraph{The self-model's function class is load-bearing.} With a linear
+self-baseline the correction fails (a linear fit of a quadratic map leaves
+residual self-structure that the code then ``explains'', scoring periodic
+channels $+0.26$); with degree-3 features, self-baselines match theory to
+three decimals and the confound is cancelled rather than suppressed. On
+real data, where no exact function class exists, the ghost and known-root
+channels are the practical check.
+
+\paragraph{Cost.} Training is $\sim$57\,s per model at $V=71{,}721$
+(and $\sim$80\,s at $V=10{,}512$) on a consumer GPU with a streaming input
+pipeline; each readout is a ridge fit ($\sim$7\,ms per variable); saved
+encoders make any new readout an evaluation rather than a retrain.
+
+\section{Validation where truth is known}
+\label{sec:synthetic}
+
+Systems of $V\in\{30,1000\}$ logistic-map channels, a minority sub-web
+coupled (sparse random DAG), the rest autonomous; membership is truth by
+construction. At $V{=}1001$ (94 members, baseline precision 0.094):
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+system & precision@10 & precision@20 & false alarms (907 non-members)\\
+\midrule
+seed 0 & 10/10 & 16/20 & 0\\
+seed 1 & 10/10 & 20/20 & 0\\
+seed 2 & 10/10 & 20/20 & 0\\
+heterogeneous pool & 10/10 & 18/20 & 0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent All autonomous channels---including 61 periodic ones, a
+deliberately stochastic AR(1) family in the heterogeneous pool, and the
+ghost---pin at zero excess. Two boundaries, measured: the statistic is a
+\textbf{top-$k$ detector} (members whose drive share falls below the
+readout's noise floor receive slightly negative excess and rank below the
+zero-pinned non-members, so full-population AUROC is uninformative even
+when top-$k$ precision is perfect---0.28 here by mechanism, not accident;
+average precision and top-$k$ against stated baselines are the correct
+metrics); the \textbf{encoder is necessary} (the same readout conditioning
+on all raw dimensions with tuned regularisation fails, AP 0.10 vs.\ 0.24);
+and \textbf{ensembling is helpful but not critical} (single-model AP
+0.23--0.28 vs.\ consensus 0.24; its chief value is the cross-model variance
+diagnostic). ``False alarm'' throughout means excess above the ghost floor;
+non-member excess pins at or below zero to the reported precision.
+
+\section{Real-world validation and deployments}
+\label{sec:real}
+
+All datasets are public and unrestricted. Registration status is stated
+per study below; the released protocol document and analysis-script headers
+are the citable artifacts.
+
+\subsection{\emph{C.~elegans}: the motor-command circuit, found blind---and an interventional test}
+
+\textbf{Wild type.} Whole-brain calcium imaging of five immobilised worms
+($\sim$110--135 neurons, $\sim$3{,}100 samples) \citep{kato2015}.
+Predictions fixed in the analysis script before execution: ghost
+$\approx 0$; sensory neurons (hand-curated canonical classes; $n{=}8/6/1$
+per development worm, so per-worm evidence is weak though the direction is
+uniform) less driven than command/motor neurons in the constant
+environment; positive correlation with anatomical in-weight
+\citep{white1986,cook2019}. All three passed on three development worms and
+again on two animals reserved since the study's declaration and opened only
+after predictions were fixed---with the strongest anatomy correlations of
+the five ($+0.30$, $+0.34$). The top-10 most-driven neurons are 10/10 command/motor class in two of
+the three development worms, with the command core topping the two held-out
+rankings as well: AVA, AVE, RIM, AIB, RIB, RIV, RME, SMDV and
+ventral-cord motor neurons---the canonical motor-command ensemble of the
+immobilised worm \citep{kato2015}, produced by a statistic with no access
+to biology.
+
+\textbf{Intervention.} The same pipeline on five worms with the
+reverse-command hub AVA silenced via a histamine-gated channel
+\citep{kato2015}. Directions stated in the working ledger before the
+silenced-worm data was opened: the silenced hub falls hardest
+among the command core (drivenness percentile $0.92\!\to\!0.38$); its
+module and motor pool collapse (AVE $-0.28$, RIB $-0.29$, VB01 $-0.64$,
+RMED $-0.49$, VA01 $-0.45$); ghosts pin in all five animals. Two further
+observations replicate five-of-five: \textbf{RIM and AIB retain drive
+almost unchanged} ($-0.08$, $-0.09$) while every other module member
+collapses, consistent with the strong AIB$\to$RIM anatomical route
+operating independently of AVA; and \textbf{drive reorganises onto the
+forward hub AVB} ($+0.34$, excess turning positive). We report these as
+candidate observations pending adjudication against the reversal-circuit
+literature \citep{gray2005,sordillo2021}; independent of their novelty
+grade, an observational statistic tracked a targeted genetic intervention
+neuron-by-neuron in the pre-registered directions.
+
+\subsection{Zebrafish: a whole-vertebrate-brain map}
+
+ZAPBench provides 71{,}721 segmented neurons $\times$ 7{,}879 timesteps of
+light-sheet imaging in a larval zebrafish \citep{zapbench}. On a
+2{,}241-step window (open-loop, rotation, dark), the full-brain excess map
+computes in minutes on a laptop GPU. The ghost pins at $-0.031$; $\sim$2{,}800 neurons clear the $+0.01$
+excess threshold; and the driven core is spatially
+coherent: the top-1{,}000 neurons are $1.78\times$ more tightly packed than
+random draws (median nearest-neighbour distance 16.8 vs.\ $29.8\pm0.6$),
+concentrated posteriorly and against the midline---consistent with the
+hindbrain/midline territory where internally generated motor dynamics are
+reported to reside---in a window dominated by the dark condition. Region names await atlas registration and are not claimed.
+
+\subsection{Clinical EEG: a confirmed effect and an instructive null}
+
+CHB-MIT scalp EEG, subject chb01: 23 channels, 256\,Hz; six of the seven
+annotated seizures are analysed (the seventh record was not in our
+retrieved subset) \citep{shoeb2009,physionet}. One caveat governs all outputs:
+seizure-onset zones are \emph{sources}, and sources are invisible to this
+statistic by design---the tool maps the spread network, never the origin.
+Results: max $|$ghost$|$ 0.034 across the 14 windows, noisier than the
+large-$n$ runs (where $|$ghost$| < 0.01$; no numeric tolerance was
+pre-specified); drivenness \emph{concentration} (top-4 channel share) is
+higher during seizures than between them (0.68 vs.\ 0.47; five of six
+within-record pairs, the exception---record 03---in the opposite
+direction)---seizures recruit the network into a driven regime. The third pre-registered
+prediction failed, and the failure is the useful result: per-event driven
+patterns do not replicate across the same patient's seizures (mean pairwise
+Spearman 0.08 over 15 pairs). Whatever the cause---genuine per-event
+variability or single-window noise---the practical warning stands: single-event connectivity maps at these
+window lengths should not be treated as patient signatures without
+per-patient replication; we tested one subject.
+
+\subsection{Climate: the tropics are the driven core; solar forcing is invisible}
+
+Seventy-seven years of daily sea-level pressure (NCEP/NCAR Reanalysis-1;
+10{,}512 cells, $\sim$28{,}000 days) \citep{kalnay1996}, deseasonalised and
+differenced, with the SILSO daily sunspot number \citep{silso} embedded as
+an additional channel. Pre-registered gates: ghost $-0.005$;
+\textbf{sunspot channel $-0.003$}---a real exogenous forcing, embedded
+among ten thousand atmospheric variables, scores nothing, the cleanest
+field test of designed root-blindness; and the driven core is spatially
+clustered (top-500 median nearest-neighbour distance 0.0435 vs.\
+$0.0676\pm0.0048$ under a spatial null). The exploratory map, fixed to
+carry no prior claim, reproduces textbook structure: 99\% of the 500
+most-driven cells lie within $30^{\circ}$ of the equator (mean $|$lat$|$
+$6.1^{\circ}$ vs.\ $45.6^{\circ}$ for the grid)---the Walker/ENSO belt,
+where tropical pressure is slaved to planetary-scale circulation---while
+polar and storm-track cells rank most autonomous. Every cell shows positive
+excess: one connected fluid has no autonomous members.
+
+\section{A measured method-selection map}
+\label{sec:map}
+
+Because the goal is a usable tool, we summarise where each method earned
+trust in our measurements, including where ours should not be used.
+
+\begin{center}
+\small
+\begin{tabular}{p{5.2cm}p{4.2cm}p{5.2cm}}
+\toprule
+regime & recommendation & basis (measured)\\
+\midrule
+pairs / small systems, weak coupling & CCM & detects coupling 0.01 in
+seconds; learned methods need 0.04--0.08\\
+short real series ($n \lesssim 50$) & conditional $k$NN first (best AP,
+1.75$\times$ baseline); CCM and PCMCI beside it & measured on gene-circuit
+data \citep{hughes2009}; no trained estimator viable\\
+noise-driven, near-linear systems & PCMCI or CCM & statistically
+indistinguishable on wind-tunnel physics \citep{gamella2025} (AP 0.265
+vs.\ 0.256); learned recreation methods fail there and emit false positives
+on exogenous actuators\\
+strong coupling near synchrony & conditional learned models
+(\emph{candidate only}: synthetic chains, 3 seeds, unverified; did not
+transfer to the one dense real circuit tested) & CCM, conditional $k$NN and
+PCMCI all acquire mediated false positives from coupling 0.3--0.5 on
+synthetic chains\\
+membership at $V \gtrsim 10^3$ & this statistic & pairwise CCM is
+measured-infeasible and $k$NN conditioning starves; PCMCI at this width is
+untested; top-$k$ precision with ghost control\\
+edge-level maps on dense real circuits & nothing we tested &
+difference-based scores collapse under redundancy
+(Mechanism~\ref{mech:maturity})\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Absolute expectations matter as much as rankings: on real data
+the best methods deliver roughly 1.5--2.4$\times$ baseline average
+precision---far from clean recovery.
+
+\section{Limitations}
+\label{sec:limits}
+
+(1) Drivenness only; sources are invisible, and a source-detection
+complement is future work. (2) Top-$k$ semantics; weakly driven members are
+indistinguishable from non-members. (3) validated down to $n\approx2{,}000$ samples; a 48-point circadian
+dataset defeats every learned arm we tested, and the intermediate regime is
+unmeasured. (4)
+Stationarity is load-bearing. (5) Single recordings per condition in the biological analyses; the
+intervention contrast is five animals per cohort from one preparation; the
+EEG analysis covers one subject; absolute excess magnitudes on the worm are
+small (0.02--0.11); synthetic validation is confined to map-type generator
+families. (6) The self-model's function class governs transfer;
+the ghost and known-root channels are the practical guard. (7) The
+statistic estimates a known causal quantity; the contribution is scale,
+controls, failure analysis and validation, not the concept.
+
+\section{Conclusion}
+
+Three failure mechanisms explain why learned causal readouts break on
+redundant dynamical systems; the correction they imply---excess over
+self-predictability, computed against a compressed code of everything
+else---turns chance-level detection into high-precision membership scans at
+widths where pairwise scanning is measured-infeasible and local
+conditioning starves, and behaves as theory demands across
+worm, fish, clinical and geophysical data, including under a genetic
+intervention. The operational protocol that found every failure here
+(embedded ghosts, known-root channels, trajectory checkpointing,
+pre-registration, precision-recall against stated baselines, published
+negatives) is, we believe, as transferable as the statistic itself.
+
+\paragraph{Data and code.} All datasets are public and unrestricted (OSF, ZAPBench, PhysioNet, NOAA
+PSL, SILSO, NCBI GEO, causal-chamber releases, OpenWorm).
+Code, pre-registration documents, and the complete experiment ledger---
+including negative results and voided attempts---are released alongside
+this paper.
+
+\bibliographystyle{unsrtnat}
+\begin{thebibliography}{99}
+
+\bibitem{sugihara2012} G.~Sugihara et al.
+Detecting causality in complex ecosystems. \emph{Science} 338:496--500, 2012.
+
+\bibitem{takens1981} F.~Takens.
+Detecting strange attractors in turbulence.
+\emph{Lecture Notes in Mathematics} 898:366--381, 1981.
+
+\bibitem{runge2019} J.~Runge et al.
+Detecting and quantifying causal associations in large nonlinear time
+series datasets. \emph{Science Advances} 5:eaau4996, 2019.
+
+\bibitem{granger1969} C.~W.~J.~Granger.
+Investigating causal relations by econometric models and cross-spectral
+methods. \emph{Econometrica} 37:424--438, 1969.
+
+\bibitem{schreiber2000} T.~Schreiber.
+Measuring information transfer. \emph{Physical Review Letters}
+85:461--464, 2000.
+
+\bibitem{tank2021} A.~Tank, I.~Covert, N.~Foti, A.~Shojaie, E.~Fox.
+Neural Granger causality. \emph{IEEE Transactions on Pattern Analysis and
+Machine Intelligence} 44:4267--4279, 2022.
+
+\bibitem{xu2020} Y.~Xu, S.~Zhao, J.~Song, R.~Stewart, S.~Ermon.
+A theory of usable information under computational constraints.
+\emph{ICLR}, 2020.
+
+\bibitem{he2022mae} K.~He, X.~Chen, S.~Xie, Y.~Li, P.~Doll\'ar,
+R.~Girshick. Masked autoencoders are scalable vision learners.
+\emph{CVPR}, 2022.
+
+\bibitem{kato2015} S.~Kato, H.~S.~Kaplan, T.~Schr\"odel, S.~Skora,
+T.~H.~Lindsay, E.~Yemini, S.~Lockery, M.~Zimmer.
+Global brain dynamics embed the motor command sequence of
+\emph{Caenorhabditis elegans}. \emph{Cell} 163:656--669, 2015.
+
+\bibitem{white1986} J.~G.~White, E.~Southgate, J.~N.~Thomson, S.~Brenner.
+The structure of the nervous system of the nematode \emph{C.~elegans}.
+\emph{Philosophical Transactions of the Royal Society B} 314:1--340, 1986.
+
+\bibitem{cook2019} S.~J.~Cook et al.
+Whole-animal connectomes of both \emph{Caenorhabditis elegans} sexes.
+\emph{Nature} 571:63--71, 2019.
+
+\bibitem{gray2005} J.~M.~Gray, J.~J.~Hill, C.~I.~Bargmann.
+A circuit for navigation in \emph{Caenorhabditis elegans}.
+\emph{PNAS} 102:3184--3191, 2005.
+
+\bibitem{sordillo2021} A.~Sordillo, C.~I.~Bargmann.
+Behavioral control by depolarized and hyperpolarized states of an
+integrating neuron. \emph{eLife} 10:e67723, 2021.
+
+\bibitem{zapbench} J.-M.~Lueckmann et al.
+ZAPBench: a benchmark for whole-brain activity prediction in zebrafish.
+\emph{ICLR}, 2025.
+
+\bibitem{shoeb2009} A.~Shoeb.
+Application of machine learning to epileptic seizure onset detection and
+treatment. PhD thesis, MIT, 2009.
+
+\bibitem{physionet} A.~L.~Goldberger et al.
+PhysioBank, PhysioToolkit, and PhysioNet: components of a new research
+resource for complex physiologic signals. \emph{Circulation}
+101:e215--e220, 2000.
+
+\bibitem{kalnay1996} E.~Kalnay et al.
+The NCEP/NCAR 40-year reanalysis project.
+\emph{Bulletin of the American Meteorological Society} 77:437--471, 1996.
+
+\bibitem{hughes2009} M.~E.~Hughes et al.
+Harmonics of circadian gene transcription in mammals.
+\emph{PLoS Genetics} 5:e1000442, 2009.
+
+\bibitem{silso} SILSO World Data Center.
+The international sunspot number. Royal Observatory of Belgium.
+
+\bibitem{gamella2025} J.~L.~Gamella, J.~Peters, P.~B\"uhlmann.
+Causal chambers as a real-world physical testbed for AI methodology.
+\emph{Nature Machine Intelligence} 7:107--118, 2025.
+
+\end{thebibliography}
+\end{document}
