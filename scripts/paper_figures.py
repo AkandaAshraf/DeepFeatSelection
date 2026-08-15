@@ -47,21 +47,22 @@ plt.rcParams.update({
 def fig_maturity():
     d = pd.read_csv("ExpOutput/maturity_synth/synthetic_curve.csv")
     m = d.groupby("epochs").mean(numeric_only=True)
-    fig, ax = plt.subplots(figsize=(3.4, 2.6))
-    ax.plot(m.index, m.hub_gain, "-o", color=BLUE, lw=2, ms=4)
-    ax.plot(m.index, m.few_gain, "-s", color=ORANGE, lw=2, ms=4)
-    ax.annotate("hub parent (6 children)\nredundant imprint",
-                (m.index[-1], m.hub_gain.iloc[-1]), xytext=(-5, 12),
-                textcoords="offset points", ha="right", color=BLUE)
-    ax.annotate("single-child parents\nunique imprint",
-                (m.index[-1], m.few_gain.iloc[-1]), xytext=(-5, -22),
-                textcoords="offset points", ha="right", color=ORANGE)
+    xs = range(len(m.index))
+    fig, ax = plt.subplots(figsize=(3.8, 2.7))
+    ax.plot(xs, m.hub_gain, "-o", color=BLUE, lw=2, ms=4)
+    ax.plot(xs, m.few_gain, "-s", color=ORANGE, lw=2, ms=4)
+    ax.annotate("hub parent (6 children),\nredundant imprint",
+                (2, m.hub_gain.iloc[2]), xytext=(0, -30),
+                textcoords="offset points", ha="center", color=BLUE,
+                fontsize=8)
+    ax.annotate("single-child parents,\nunique imprint",
+                (2.6, 0.12), ha="center", color=ORANGE, fontsize=8)
     ax.axhline(0, color=GRAY, lw=0.8)
     ax.set_xlabel("training epochs")
     ax.set_ylabel("leave-one-out gain")
-    ax.set_xscale("log")
-    ax.set_xticks(m.index)
+    ax.set_xticks(list(xs))
     ax.set_xticklabels([str(int(e)) for e in m.index])
+    ax.set_ylim(-0.05, 0.32)
     fig.savefig(FIGS / "fig_maturity.pdf")
     plt.close(fig)
 
@@ -143,36 +144,47 @@ def fig_lln(truth):
 
 
 def fig_synthetic(truth):
-    """Top-40 ranks as bars, plus the count of everything below.
+    """Top-25 ranks as stems with markers, so zero-valued entries stay visible.
 
-    The statistic is a top-k detector, so the honest visual is the top of
-    the ranking at full resolution; the flat zero tail is reported as a
-    count rather than 960 overplotted points.
+    A plain bar chart drew the non-members at zero height, making them
+    invisible and leaving a legend entry with no corresponding mark. The
+    marker at each stem tip fixes that, and it is the substantive point:
+    the few non-members that rank inside the top 20 sit at exactly zero,
+    so they are ranked high only because everything below them is zero too.
     """
     ex = np.load("ExpOutput/excess_poly/excess_consensus.npy")
     truth_all = np.append(truth, False)
     order = np.argsort(-ex)
     vals, is_mem = ex[order], truth_all[order]
-    k = 40
-    fig, ax = plt.subplots(figsize=(5.4, 2.5))
-    ax.bar(np.arange(1, k + 1), vals[:k],
-           color=np.where(is_mem[:k], BLUE, ORANGE), width=0.8)
-    ax.axhline(0, color=GRAY, lw=0.8)
-    ax.set_xlabel("rank by consensus excess")
-    ax.set_ylabel("excess")
-    ax.set_xlim(0.2, k + 0.8)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUE),
-               plt.Rectangle((0, 0), 1, 1, color=ORANGE)]
-    ax.legend(handles, ["coupled member (true positive)",
-                        "autonomous channel"],
+    k = 25
+    xs = np.arange(1, k + 1)
+
+    fig, ax = plt.subplots(figsize=(5.6, 2.6))
+    ax.axhline(0, color=GRAY, lw=0.9, zorder=1)
+    for i in range(k):
+        c = BLUE if is_mem[i] else ORANGE
+        ax.plot([xs[i], xs[i]], [0, vals[i]], "-", color=c, lw=2.6,
+                solid_capstyle="round", zorder=2)
+        ax.plot(xs[i], vals[i], "o", color=c, ms=5,
+                markeredgecolor="white", markeredgewidth=0.6, zorder=3)
+
+    n_mem_top = int(is_mem[:20].sum())
+    ax.annotate(f"top 20: {n_mem_top}/20 are true members",
+                (0.03, 0.90), xycoords="axes fraction", fontsize=8,
+                color=BLUE)
+    note = ("non-members here sit at exactly 0;\n"
+            "they rank high only because the\n"
+            "961 channels below are also 0")
+    ax.annotate(note, (0.44, 0.42), xycoords="axes fraction", fontsize=8,
+                color=ORANGE)
+    handles = [plt.Line2D([], [], color=BLUE, marker="o", lw=2.6, ms=5),
+               plt.Line2D([], [], color=ORANGE, marker="o", lw=2.6, ms=5)]
+    ax.legend(handles, ["coupled member", "autonomous channel"],
               loc="upper right", frameon=False, fontsize=8)
-    n_below = len(vals) - k
-    n_mem_below = int(is_mem[k:].sum())
-    note = ("remaining {} channels: all at or below 0\n"
-            "({} weakly driven members among them)").format(
-                n_below, n_mem_below)
-    ax.annotate(note, (0.42, 0.30), xycoords="axes fraction",
-                fontsize=8, color=GRAY)
+    ax.set_xlabel("rank by consensus excess ($V = 1001$)")
+    ax.set_ylabel("excess")
+    ax.set_xlim(0.3, k + 0.7)
+    ax.set_xticks([1, 5, 10, 15, 20, 25])
     fig.savefig(FIGS / "fig_synthetic.pdf")
     plt.close(fig)
 
