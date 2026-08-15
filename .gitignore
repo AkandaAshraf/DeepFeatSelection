@@ -39,3 +39,39 @@ Data/celegans/
 Data/zapbench/
 Data/eeg/
 Data/climate/
+
+# ---------------------------------------------------------------------------
+# Manuscript sources and the arXiv submission package.
+# The paper is distributed through arXiv, not this repository. What the paper
+# promises to release lives here and stays tracked: scripts/, the experiment
+# ledger (paper/causal_detection_log.md) and the pre-registrations
+# (paper/validation_protocol.md).
+paper/*.tex
+paper/*.pdf
+paper/*.bib
+paper/Makefile
+paper/figs/
+paper/arxiv/
+paper/arxiv_submission.tar.gz
+
+# Superseded drafts. These still assert claims the corrected manuscript
+# withdraws (per-cell intervention resolution, the doubled CCM cost, the
+# four-systems framing), so publishing them beside it would mislead.
+paper/draft.md
+paper/preprint_excess_detector.md
+paper/preprint_mechanisms.md
+paper/design_curve_discriminator.md
+paper/proposal_depmap.md
+
+# Manuscript-production tooling. These operate on the LaTeX, which is not
+# distributed here; the analysis and verification scripts beside them are.
+scripts/make_arxiv_package.py
+scripts/render_float_pages.py
+scripts/check_float_drift.py
+scripts/check_float_refs.py
+scripts/diagnose_render.py
+scripts/check_citations.py
+
+# Windows shell redirect artifacts.
+$null
+NUL

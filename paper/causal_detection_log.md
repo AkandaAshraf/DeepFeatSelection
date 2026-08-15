@@ -539,7 +539,14 @@ motor/command system, found blind both times. Remaining fish work: atlas
 registration for named regions, and the dark-vs-stimulus condition contrast
 from the saved encoders.
 
-## The intervention test — AVA silencing, tracked neuron by neuron (2026-08-15)
+## The intervention test — AVA silencing (2026-08-15)
+
+> **PARTLY SUPERSEDED.** The per-cell resolution claimed in this entry did
+> not survive the nulls added later the same day: only VB01 clears a
+> max-statistic correction across the ten contrasted cells, AVA reaches
+> p = 0.135, and the AVB rise sits inside the wild-type-only noise range.
+> See "Second adversarial pass" and "AVB and the Kato passage" below.
+> The cohort-level effect stands.
 
 `ExpOutput/celegans_excess_avahiscl/`, same pipeline, five AVA-HisCl worms
 (Kato 2015's histamine-silenced line), compared to the banked five-WT
@@ -622,6 +629,294 @@ the statistic behaves as a graded field exactly as it should.
 Both cross-domain deployments (EEG, climate) completed same-day on open
 data with pre-registered gates -- the open-science mode of working.
 
+## Recall characterisation, and a flaw in the ghost donor (2026-08-15)
+
+> **PARTLY SUPERSEDED.** This entry pools four systems. The heterogeneous
+> pool reuses seed 0's coupled web byte-for-byte, so the distinct totals
+> are 219 driven / 63 source / 18 isolated over three graphs, not
+> 294 / 82 / 24. See "Second adversarial pass" below.
+
+`scripts/recall_analysis.py`, `scripts/recall_probe.py`,
+`scripts/ghost_calibration.py`, `scripts/ghost_tail.py`,
+`scripts/ghost_corrected.py`, `ExpOutput/recall/`. All readouts on the
+archived encoders; no retraining. The recomputed ghost matches the archived
+value to delta 0.00e+00 on all four systems, which validates the shortcut.
+
+**VERIFIED — the truth label was never a drivenness label.** `build_system`
+sets `truth[:members] = deg > 0` with `deg` counting in- AND out-edges, so a
+pure source is labelled positive while receiving no drive. 82 of 400
+first-block channels across the four systems are such sources. This alone
+explains a large part of the below-chance AUROC of 0.28: the label disagrees
+with the estimand for roughly a fifth of its positives. Recall is now
+reported against the driven subset and the roles are reported separately.
+
+**VERIFIED — a single ghost is not a threshold, and its donor matters.** The
+archived ghost sits at the 4th–22nd percentile of all scores, so "above the
+ghost" admits ~900 of 907 non-members; the ghost is a validity check, not a
+cutoff. Worse, `excess_membership.py` draws its donor from `[0, members)`,
+i.e. from the coupled web. Proposition 1 (new theory section) guarantees a
+ghost's null only when the donor's self-baseline saturates, which a driven
+donor's does not. Measured on 200-ghost panels per system (800 total): every
+ghost above +0.001 had a web donor with one-step self-predictability
+0.84–0.95; ghosts from donors above 0.99 never exceeded +0.0004.
+
+**VERIFIED — corrected rule.** Panel restricted to donors with self-
+predictability > 0.99, threshold `max(0, panel max)`:
+
+| rule | true pos | false pos | precision |
+|---|---|---|---|
+| single ghost, `> abs(ghost)` | 82 | 43 | 0.656 |
+| corrected panel | 81 | 4 | **0.953** |
+
+Role accounting at the corrected threshold, pooled over four systems:
+driven 81/294 = **28% recall**; sources **0/82**; isolated **0/24**. The
+zero on sources and isolated channels across four systems is the sharpest
+confirmation to date that the estimand is drivenness and not participation.
+
+**Headline results unchanged.** Top-10 precision remains 30/30; this
+corrects the threshold rule and the recall claim, not the reported cores.
+
+**The honest recall statement, now in the paper and abstract:** MACE is a
+high-precision, low-recall detector. Absence from the driven core is NOT
+evidence of autonomy.
+
+## Adversarial review corrections (2026-08-15)
+
+A multi-lens adversarial review of the paper raised 36 findings; 8 were
+refuted under independent verification and 28 survived. Every surviving
+finding below was re-derived from primary data before any text was changed
+(`scripts/verify_review.py`), and the final state is gated by
+`scripts/audit_paper_numbers.py`, which re-derives each number from
+`ExpOutput/` and asserts it appears in the compiled PDF (38/38 passing).
+
+**VOID - the pairwise-CCM cost was double-counted.** `ccm(i,j)` returns both
+directions, but the benchmark loop calls it for every ORDERED pair and divides
+by `v(v-1)`, so the projection assumed twice the necessary work. Corrected:
+1.14 s per unordered pair, **15,800 h** (not 31,700) for V=1e4, worm 2.7 h (not
+5 h). The climate (17,000 h) and fish (800,000 h) figures already used the
+correct convention and are unchanged. The conclusion is unaffected: 1.8 years
+is still infeasible.
+
+**VOID - my own in-degree claim was directionally false.** The paper claimed
+flagged channels have mean in-degree 1.63 against a population 1.20. The 1.20
+is just `n_edges/MEMBERS`, a fixed generator constant carrying no detection
+information, and it includes the 106 in-degree-zero channels that can never be
+flagged. Against the admissible comparator: flagged 1.617 vs undetected driven
+1.638, **Mann-Whitney p = 0.63**. There is no in-degree effect. The claim is
+removed; the companion claim (no in-degree-zero channel is ever flagged, 0/106)
+is verified and retained.
+
+**VOID - "four systems" were three.** `build_system_hetero(seed=0)` and
+`build_system(seed=0)` produce a byte-identical coupled web (max abs diff 0.0,
+identical truth vectors); only the autonomous background differs. Distinct
+totals are **219 driven / 63 source / 18 isolated** from three graphs, not
+294/82/24. Precision on the three distinct graphs is **1.00** (63/63) and the
+heterogeneous re-analysis is now reported separately (18 TP, 4 FP, 0.82).
+
+**VOID - "zero false alarms" was false three ways.** The stated rule (above the
+signed ghost) gives 742-900 false alarms since the ghost is negative; under
+`|ghost|` the heterogeneous cell is **43, not 0**; and the "+0.0005 an order of
+magnitude below the weakest top-20 member" sentence is inverted, the autonomous
+channel (+4.03e-4) being LARGER than that system's weakest top-20 member
+(+3.67e-4). All 43 are sine-family, the degree-2 function-class failure the
+theory predicts; at degree 3 the count is 0 and the margin is 15x. Table now
+labels degree and prints true counts.
+
+**VERIFIED - Prop 1's premise is absent on every real deployment.** Across all
+ten worm recordings self-R2 has median 0.179-0.222, max 0.352, and **0 of 1,276
+channels reach 0.9**, against the 0.99 the donor rule requires. The paper's own
+step 3 said "do not proceed"; the flagship deployment proceeded. Now disclosed:
+on real data the ghost is an empirical artifact meter, not a corollary, and the
+real results rest on their external checks alone. Step 3 is graded rather than
+absolute, and the panel correction is scoped to synthetics.
+
+**VOID - Table 2's worm ghost range.** Measured -0.041 to **+0.0035**; the table
+said "-0.03 to 0.00". Wild-type worm 0's ghost is positive and by our own rule
+that scan should have been discarded. Disclosed, with the note that worm 0 is
+the weakest animal anyway (top-10 8/10 vs 10/10 for worms 1-2), so excluding it
+strengthens rather than weakens the result.
+
+**VOID - the EEG recruitment claim.** `concentration()` clamps at zero, so both
+numerator and denominator are surviving-positive mass. Spearman(top-4 share,
+n_positive) = **-0.925 (p=2e-6)**; seizures reduce driven channels 18.5 -> 11.7
+and total drive 1.15 -> 0.61. Three clamp-free statistics show no ictal rise
+(all p = 0.42-0.84). The reported statistic does rise (paired Wilcoxon
+**p = 0.031**, previously reported with no test at all), but it reflects
+redistribution onto fewer channels, not recruitment.
+
+**VOID - "neuron by neuron" intervention resolution.** Percentiles are
+within-animal ranks and the silenced cohort's identified neurons fall as a
+block (-0.14), so any initially-high cell must fall. Three nulls added
+(`scripts/intervention_null.py`), all computed on the pooled-row statistic the
+table actually reports. Cohort-label null: VB01 p=0.032, AVA p=0.008, AVE
+p=0.024. **After max-statistic correction over the ten cells, only VB01
+survives** (p=0.032); AVA reaches p=0.135. RIB, AIB and AVB lie inside the
+range wild-type-only split-halves already produce, so **the AVB rise is not
+supported** and its reorganisation reading is now marked as an unsupported
+conjecture. The cohort-level effect is real; cell-level resolution is withdrawn
+from the abstract, highlights and conclusions.
+
+**VERIFIED - Prop 2 needed a hypothesis Prop 1 states.** Eq. 1 applies the
+polynomial map to the own lags only and appends the code RAW, so the readout is
+affine in the code while the decoder is tanh-nonlinear. With an oracle code the
+affine readout recovers 0.0394 of an identified 0.0443, and an
+own-by-code-interaction readout recovers 0.0443 to 1e-12; the shortfall is
+10-16% (`scripts/readout_class_gap.py`). MACE therefore computes a LOWER BOUND.
+The error direction is favourable (false negatives, never false positives) and
+Prop 1, which carries the no-false-positive guarantee, is untouched.
+
+Also corrected: a mangled `\ref` shipping as "Section efsec:theory" in the PDF;
+"Figure 1 shows the crossing" (the curves never cross in the plotted mean, and
+the collapse appears in one of two seeds); Figure 2's body text quoting means
+against a caption quoting medians; Takens cited for the box-counting result
+that is Sauer, Yorke & Casdagli (added); Definition 1's missing invertibility
+hypothesis; four bare tables promoted to numbered floats. A new **Data and
+methods** section gives per-deployment E, tau, b, M, epochs, degree, optimiser,
+splits and hardware, none of which appeared anywhere before, and corrects the
+claim that tau came from the first minimum of the auto-mutual-information (no
+such computation exists; tau was declared per dataset on physical grounds) and
+that E=3 throughout (the synthetics use E=2).
+
+## Literature audit of the worm claims (2026-08-15)
+
+Two independent literature searches against the C. elegans primary literature.
+Outcome: the METHOD appears novel (no prior work scores each neuron by residual
+predictability from the rest of the brain), but several BIOLOGICAL claims were
+either already published or anatomically wrong.
+
+**RESOLVED, not a problem - no stimulus confound.** A flag was raised that
+AVA_HisCl might have been recorded under stimulus while WT_NoStim was not,
+which would confound silencing with stimulation. Checked directly
+(`scripts/check_kato_arms.py`): the `dataset` field of every recording in both
+arms ends `_1mMTet_basal_1080s`. Both arms are basal. The 8-state vs 4-state
+annotation difference is annotation granularity (WT_NoStim carries
+fwd/rev1/rev2/revsus/slow/dt/vt/nostate; AVA_HisCl carries a 4-level
+reversal-only key), not a difference in recording condition.
+
+**VOID - "AVA's module and motor pool" is anatomically wrong.** Of the five
+cells listed, only AVE (gap-junction coupled to AVA) and VA01 (A-class) are
+AVA's targets. VB01 is B-class, driven by AVB via gap junctions (Kawano et al.
+2011). RIB is a forward-command neuron, anticorrelated with AVA. RMED is a head
+motor neuron. Corrected to "drivenness declines across the command cycle",
+which is also what Kato et al. describe (network-wide uncoupling) rather than
+selective loss of AVA's outputs.
+
+**VOID - the RIM/AIB retention was presented as an observation the method
+surfaced.** It is published. Gordus et al. 2015 silenced AVA with the same
+histamine-gated channel and found AIB and RIM not only retain responses but
+respond FASTER and MORE RELIABLY without AVA. The AVA::HisCl recordings are
+also not a new experiment; they are the perturbation published with this
+dataset. Reframed as convergent validation: an unsupervised score, given no
+labels and no knowledge of the manipulation, reproduces a known dissociation.
+That is worth reporting and is now what we report.
+
+**VOID - the AIB->RIM sign was wrong.** Piggott et al. 2011 show AIB INHIBITS
+RIM, and it is RIM SUPPRESSION that triggers reversals "independently of the
+AVA/AVD/AVE-mediated stimulatory circuit". The AVA-independent route is
+disinhibitory, not a driving input. Corrected.
+
+**VOID - "RIM's intrinsic dynamics".** No primary literature reports plateau
+potentials, bistability or persistent currents in RIM; the only published RIM
+whole-cell recordings support a graded, non-spiking, monotonic response, and
+two modelling papers built on them classify RIM as the near-linear exemplar.
+Sordillo & Bargmann attribute RIM's two modes to circuit-level mechanisms
+(glutamate/tyramine when depolarised, gap junctions when hyperpolarised), and
+Gordus et al. attribute the bimodality of AIB/RIM/AVA jointly to network
+feedback. We now claim only that RIM and AIB carry drive that does not route
+through AVA, which the interventional literature supports.
+
+**VOID - the AVB rationale.** Meng et al. 2024 (Sci Adv) report that
+inactivating AVA REDUCES AVB calcium, and that AVA and AVB are not strictly
+reciprocally inhibitory: AVA tonically excites AVB extrasynaptically over
+exactly the timescale a sustained histamine silencing occupies. Their model
+predicts AVB should FALL. The rise was already downgraded to an unsupported
+conjecture on statistical grounds; the contradicting prediction is now cited
+alongside it.
+
+**VERIFIED but reframed - the wild-type command ensemble.** Not a discovery.
+Kato et al. identified it from unsupervised decomposition of these same
+recordings, and Uzel et al. 2022 independently identified an overlapping hub
+set and confirmed it causally by silencing. Recovering it validates the
+statistic; it says nothing new about the worm. Cited accordingly.
+
+**NEEDS AUTHOR VERIFICATION BEFORE POSTING.** Both searches were blocked by 403
+on cell.com, ScienceDirect and bioRxiv; all full texts came via PMC/Europe PMC.
+Specifically unverified against the primary PDF: (i) the exact wording of Kato
+et al.'s report on preserved dynamics under AVA silencing, said to be their
+Figure S6 - the text now attributes this generally rather than to a numbered
+figure, but confirm before it stands; (ii) whether RIM is in Uzel et al.'s hub
+set (their abstract does not name neurons); (iii) Ray & Gordus 2025 (Curr Biol)
+reportedly find AIB activity is largely driven by AVA, which cuts against AIB
+autonomy - not yet cited, and worth reading before a referee raises it.
+
+## Second adversarial pass, on the corrections themselves (2026-08-15)
+
+The first round's fixes were reviewed by four fresh lenses: 24 findings, 8
+refuted, 16 survived (9 blocking). Nearly all of the blockers were introduced
+by the corrections, which is the argument for reviewing a diff rather than
+trusting it.
+
+**VOID - "every deployment but one cleared its ghost gate".** The correction
+adopted a POSITIVITY rule for the ghost, conceded wild-type worm 0 (+0.0035) as
+the sole exception, and then failed to apply the same rule to the EEG. Measured
+(ExpOutput/eeg_excess/windows.csv): **5 of 14 EEG windows have positive ghosts,
+largest +0.0218, i.e. 6.2x worm 0.** Table 2 reported the EEG as
+|.| <= 0.034 while every other row was signed, and 0.034 is the NEGATIVE
+extreme, so the summary concealed the sign. Now reported as two exceptions with
+the signed range. Consequence disclosed: only records 03, 15 and 26 have both
+windows ghost-clean, and on those three the concentration result falls to
+**p = 0.25** against p = 0.031 on all six. Both are reported.
+
+**VOID - E=2 on the synthetics.** The new methods table said the V=1001 runs
+used E=2, read off `network_scale.py` (the 10-node pairwise experiment). The
+deployment imports `E = 3` from `bottleneck_membership.py`, and the archived
+encoder settles it: `ExpOutput/ensemble/models/m0.weights.h5` has an input
+layer of shape **(3003, 256)**, and 3003 = 1001 x 3. Self-undermining as well
+as false, since Prop 1 needs E > 2*d_q and E=2 fails it by exactly one for a
+one-dimensional map. Corrected in four places.
+
+**VOID - the Introduction kept the withdrawn per-cell claim.** Abstract,
+Highlights and Conclusions were corrected; the Introduction still read
+"neuron-by-neuron". The audit gate forbade "neuron by neuron" as a literal
+string and so certified 38/38 on a PDF containing the hyphenated form.
+
+**VOID - "seizures concentrate a smaller total amount of detectable drive".**
+Untested, and the median moves the other way: total positive drive falls in
+3 of 6 records, median RISES 0.47 -> 0.61, paired p = 0.84. The mean fall
+(1.15 -> 0.61) is carried entirely by one interictal window ~8x larger than any
+other. The supported claim is the channel count: 18.5 -> 11.7, five of six,
+one-sided p = 0.047.
+
+**VOID - the seizure-onset zone counted as a blindness test.** Listed as one of
+"three independent natural attempts" to break source-blindness. There is no
+channel-level ground truth in the recording (channels.csv has no SOZ field, and
+chb01-summary.txt carries only montage and seizure times), so nothing was
+tested and the proposition was unfalsifiable as posed. Removed from the count;
+restated as an untested expectation.
+
+**VOID - the in-degree null pooled the heterogeneous re-analysis** (n = 81 and
+213 = 294) immediately after the paper established that pooling double-counts
+seed 0. Recomputed over the three distinct graphs: **1.60 vs 1.66, n = 63 and
+156, p = 0.79 one-sided**. The null survives de-duplication slightly better.
+"0 of 106" is now "0 of 81 over three distinct graphs (0 of 106 including the
+re-analysis)".
+
+**VOID - "encoder architecture, optimiser and splits are shared".** Climate uses
+Adam(1e-3) with batch 128 and zebrafish Adam(1e-3) with batch 16, against
+3e-3/64 elsewhere. Learning rate and batch are now table columns; the caption
+claims only that architecture and splits are shared, which is true.
+
+**VOID - "every series is first-differenced".** The synthetic pipeline is not
+differenced (no np.diff in bottleneck_membership / ensemble_membership /
+excess_membership). Corrected, with the right justification: stationarity, not
+differencing, is what the circular-shift ghost requires, and the logistic web is
+stationary on a bounded invariant set post-burn-in.
+
+**Audit gate hardened.** Two plain-string forbids let real defects through
+("four systems" missed "four synthetic systems"; "neuron by neuron" missed the
+hyphenated form) while the gate reported 38/38. Both are now regexes. This is
+the second time a green gate accompanied a live defect.
+
 ## Standing protocol (violations of each cost a result this arc)
 
 1. Coupling sweeps run at `r_x=3.8, r_y=3.7`; c=0 must be byte-identical to
@@ -639,3 +934,79 @@ data with pre-registered gates -- the open-science mode of working.
 7. Clamp recreation r2 at zero before differencing.
 8. Fixed embedding dimension across arms of a comparison — never let a selector
    vary D between coupled and control.
+9. A ghost's donor must have a saturating self-baseline. Draw ghost donors
+   from the top self-R2 band, never uniformly, and never from channels
+   suspected of being driven. Use a panel, not one ghost; each ghost costs
+   what one variable costs.
+10. Report the statistic a p-value tests, not a near relative of it. The
+    intervention nulls first used a mean-of-per-animal-means while the table
+    reported a pooled-row mean; the deltas disagreed (AVB 0.301 vs 0.337) and
+    the p-values referred to a quantity the paper never printed.
+11. A number that appears in the paper must be re-derivable from ExpOutput by a
+    script that runs in CI. `scripts/audit_paper_numbers.py` is that gate.
+12. Check whether a biological "finding" is already published in the dataset's
+    own source paper before calling it an observation the method surfaced.
+    Three of the four worm claims were prior art, one of them in the same
+    animals.
+13. Verify cell identity against the connectome before grouping cells into a
+    module. VB01, RIB and RMED were assigned to AVA's motor pool; none of them
+    belongs to it.
+14. Review the diff, not just the result. Nine of this round's blockers were
+    created by the previous round's fixes.
+15. A forbid-list gate must match phrasings, not literals. A gate that passes
+    while the defect is present is worse than no gate, because it is trusted.
+16. When a rule is adopted (here: a ghost is clean iff its sign is negative),
+    apply it to every deployment in the same commit. The EEG was left unjudged
+    by a rule the same sentence had just invoked.
+
+## AVB and the Kato passage, verified against primary PDFs (2026-08-15)
+
+A third literature pass obtained full text of Meng 2024, Kawano 2011 and Kato
+2015 (the last from a course mirror; cell.com 403s throughout), which closes
+one of the three open verification items and sharpens two claims.
+
+**Kato 2015 AVA::HisCl passage, now verbatim.** AVA "substantial attenuation
+... strong uncoupling of AVA from the global brain cycle"; AVE and RIM
+"slightly attenuated"; A-class motor neurons "significant attenuation"; but
+"their phase relationships with most other neurons appeared normal" and "the
+cyclical dynamics and neuronal recruitment patterns were largely preserved",
+concluding AVA "is not a privileged generator of motor commands". Note this is
+NOT the earlier report that "RIM dynamics retained wild-type appearance" - Kato
+says RIM was slightly attenuated in POWER while phase relationships stayed
+normal. That distinction is favourable to us and the text now uses it: excess
+measures coupling, not amplitude, so RIM can be attenuated in power and retain
+drivenness. AVB is never mentioned in Kato's AVA-silencing results, and the
+Fig. 5B bar labels are vector text that could not be extracted, so whether AVB
+was plotted remains unknown.
+
+**AVB: the literature is uniformly against a rise.** Meng et al. 2024 Fig. 4D,
+verified: "Inactivation of AVA led to reduced AVB calcium dynamics." Silencing
+AVA with the same channel slows forward locomotion ~50% (Pokala 2014); AVA
+ablation shortens forward runs (Roberts 2016: 6.73 -> 3.14 s; Rakowski 2013:
+8.98 -> 0.71 s). Kawano 2011: AVA receives synaptic input from AVB but makes NO
+direct synapse onto it. Two coupling results also point away from us: Meng's
+AVA-TeTx WEAKENS the AVA-AVB relationship, and Kato's silencing uncouples AVA
+from the global cycle. The AVB paragraph now states all of this.
+
+**Two honest counterweights, both retained.** Reciprocal inhibition is
+contested rather than refuted: Roberts et al. 2016 model it explicitly, fit
+behaviour well, and take as their motivating puzzle the same paradox at issue
+here (silencing reverse-command neurons REDUCES forward dwell time), so the
+canonical model already predicts non-monotonic responses to removing AVA. And
+nobody has measured AVB's predictability under AVA silencing; Brennan & Proekt
+2019 find removing AVA computationally leaves whole-brain predictive structure
+intact and identify AVB as one of only two locomotion neurons with no
+significant across-animal variability. We record observation and contrary
+evidence together and claim neither. Three references added: roberts2016,
+pokala2014, brennan2019.
+
+**STILL UNVERIFIED, for the author.** (i) Whether AVB appears in Kato 2015
+Fig. 5B and what its bar shows - needs a human eye on the figure, and it is the
+single cleanest datum. (ii) The AVA->AVB entry in the Randi/Leifer 2023
+functional atlas, which lives in their web tool rather than the paper text.
+(iii) Whether RIM is in Uzel et al. 2022's hub set. (iv) Ray & Gordus 2025,
+reportedly finding AIB is largely driven by AVA.
+
+17. When a claim contradicts a field's direct measurements, cite those
+    measurements yourself, up front, with their numbers. A referee reaches for
+    them within a minute; pre-empting costs less than defending.
