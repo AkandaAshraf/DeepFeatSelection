@@ -47,8 +47,8 @@ Existing causal-detection methods cannot address this question at scale. We meas
 $\sim$1.1\,s per pair under the full protocol ($\approx$31{,}700
 compute-hours for one scan of $10^4$ variables); $k$-nearest-neighbour
 ($k$NN) conditioning became sample-starved at 18 conditioning dimensions in
-our two-seed synthetic tests; and PCMCI (the Peter--Clark algorithm with
-momentary conditional independence) with partial correlation produced
+our two-seed synthetic tests; and PCMCI (the Peter--Clark algorithm with Momentary Conditional
+Independence) with partial correlation produced
 mediated false positives near synchrony on synthetic chains. We first
 isolate three mechanisms by which
 \emph{learned} readouts fail on such systems: maturity collapse of difference-based importance
@@ -100,8 +100,9 @@ results.
 Causal structure discovery from time series is well served by
 established tools at small scale. Convergent cross mapping exploits Takens' embedding theorem to detect
 coupling between pairs of variables on shared attractors
-\citep{sugihara2012,takens1981,ye2015}; constraint-based frameworks such as PCMCI (the Peter--Clark step
-combined with a momentary-conditional-independence test) condition away spurious associations across moderate variable
+\citep{sugihara2012,takens1981,ye2015}; constraint-based frameworks such as PCMCI (the Peter--Clark, or PC,
+algorithm combined with a Momentary Conditional Independence test)
+condition away spurious associations across moderate variable
 counts \citep{runge2019,runge2019nc}; and Granger causality and transfer entropy define the
 underlying conditional-predictability quantity
 \citep{granger1969,schreiber2000}. The question increasingly posed in practice, however, is which of ten
@@ -263,8 +264,11 @@ capacity, not despite it. Figure~\ref{fig:maturity} shows the crossing.
 \centering
 \includegraphics[width=0.55\linewidth]{figs/fig_maturity.pdf}
 \caption{\textbf{Maturity collapse is redundancy-ordered, not uniform.}
-Leave-one-out gain versus training epochs on a hub-structured synthetic
-network (mean of two system seeds). Gains for the hub parent, whose imprint
+Leave-one-out gain, the increase in a target's held-out prediction error
+when one input variable is withheld from an otherwise identical model,
+plotted against the number of training epochs of the model being probed
+(mean of two independently generated synthetic networks; epoch values are
+categorical, not to scale). Gains for the hub parent, whose imprint
 is redundant across six children, rise, peak at partial maturity, and
 collapse to zero as the model learns alternative routes; gains for
 single-child parents, whose imprint is unique, grow monotonically. Uniform
@@ -293,11 +297,15 @@ the inversion.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.55\linewidth]{figs/fig_typicality.pdf}
-\caption{\textbf{Masked reconstruction measures typicality, not coupling.}
-Consensus masked-reconstruction $R^2$ per channel class at $V{=}1001$
-(8-encoder ensemble). Periodic autonomous channels and the ghost---which
-carries no causal information by construction---score highest; genuinely
-coupled members score lowest. The causal ordering is inverted.}
+\caption{\textbf{Masked reconstruction measures typicality, not
+coupling.} Consensus masked-reconstruction $R^2$ per channel class at
+$V{=}1001$ (8-encoder ensemble). Each point is one channel; the bar spans
+the interquartile range and the tick marks the median. Periodic autonomous
+channels (median 0.79) and the ghost (0.74), which carries no causal
+information by construction, score highest, while genuinely coupled members
+(0.03) and chaotic autonomous channels (0.00) score lowest. The causal
+ordering is inverted. The ghost is a single channel and so has one marker
+rather than a distribution.}
 \label{fig:typicality}
 \end{figure}
 
@@ -478,11 +486,15 @@ ghost, lie at or below zero excess (Figure~\ref{fig:synthetic}).
 \centering
 \includegraphics[width=0.92\linewidth]{figs/fig_synthetic.pdf}
 \caption{\textbf{The excess statistic at $V{=}1001$ (system seed 0).}
-Channels ranked by consensus excess. The top of the ranking is pure
-coupled members (blue); all 907 autonomous channels (orange) and the ghost
-(star) pin at or below zero. The statistic is a top-$k$ detector: weakly
-driven members fall below the zero-pinned non-members, which is why
-full-population AUROC (0.28) is uninformative while top-10 precision is
+The 25 highest-ranked channels by consensus excess, each drawn as a stem
+with a marker at its value so that channels scoring exactly zero remain
+visible. Ranks 1--16 are all coupled members (blue). The autonomous
+channels that appear inside the top 25 (orange) sit at exactly zero: they
+are ranked high only because the 961 channels below them are also zero,
+not because they earned a positive score. This is what makes the statistic
+a top-$k$ detector rather than a ranker: weakly driven members also fall to
+zero and are therefore indistinguishable from non-members, which is why
+full-population AUROC is 0.28 while precision within the top 10 is
 perfect.}
 \label{fig:synthetic}
 \end{figure} Two boundaries of the statistic were measured directly. First, it is a

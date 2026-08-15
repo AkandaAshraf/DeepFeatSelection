@@ -137,7 +137,7 @@ def fig_lln(truth):
     axes[1].plot(list(Ms), ghost, "-o", color=VERM, lw=2, ms=4)
     axes[1].axhline(0, color=GRAY, lw=0.8)
     axes[1].set_xlabel("ensemble size $M$")
-    axes[1].set_ylabel("ghost recreation $R^2$")
+    axes[1].set_ylabel("ghost reconstruction $R^2$")
     axes[1].set_ylim(-0.05, 0.85)
     fig.savefig(FIGS / "fig_lln.pdf")
     plt.close(fig)
