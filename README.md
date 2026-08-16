@@ -9,6 +9,75 @@ TensorFlow 2.20 / Keras 3 and fixes the parts of the method that made the
 importances hard to defend. The 2021 code is preserved unchanged in
 [`legacy/`](legacy/).
 
+**Looking for the causal-detection paper?** The repository also holds a second,
+independent line of work on identifying which variables of a large dynamical
+system are driven by the system. See
+[MACE](#mace-detecting-driven-variables-in-large-dynamical-systems) below, or go
+straight to the paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf).
+
+---
+
+## MACE: detecting driven variables in large dynamical systems
+
+This repository also contains a second, self-contained line of work. **MACE**
+(Masked-Autoencoder Conditional Excess) answers a different question from the
+feature-selection tool above: given many simultaneously recorded time series,
+**which variables are driven by the rest of the system, and which evolve
+autonomously?**
+
+📄 **Paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf)**
+
+The statistic is the gain in one-step predictability of a variable when a
+learned low-dimensional code of the entire remaining system is added to a
+flexible model of that variable's own history. Because the code is shared
+across variables and each readout is a ridge regression, a complete scan of
+71,721 variables runs in minutes on a consumer laptop, against roughly 800,000
+GPU-hours for the pairwise equivalent. Every scan embeds a **ghost channel**, a
+circularly shifted copy of real data connected to nothing by construction, so
+each analysis carries its own falsification test and needs no ground truth.
+
+**Limits, stated up front.** MACE measures drivenness only, so pure sources are
+invisible by design. It reaches precision 0.95 at 28% recall: it finds the
+strongly driven variables and stays quiet about the rest, so **a variable's
+absence from the result is not evidence that it is autonomous.** Validity is
+established down to n ≈ 2,000 samples.
+
+### Reproducing the results
+
+Every number in the paper is derived from the scripts below and re-checked by
+`scripts/audit_paper_numbers.py`, which asserts each published figure against
+the files in `ExpOutput/`.
+
+| script | what it produces |
+|---|---|
+| `scripts/bottleneck_membership.py` | the synthetic coupled-map systems and the masked autoencoder |
+| `scripts/excess_membership.py` | the core statistic; top-k precision at V = 1001 |
+| `scripts/recall_analysis.py` | the precision/recall operating curve |
+| `scripts/ghost_calibration.py`, `ghost_tail.py`, `ghost_corrected.py` | the ghost panel, the donor requirement, and the calibrated threshold |
+| `scripts/readout_class_gap.py` | the gap between the estimator and the quantity it identifies |
+| `scripts/celegans_excess.py` | *C. elegans* wild-type and AVA-silenced scans |
+| `scripts/intervention_null.py` | the three per-cell nulls for the intervention |
+| `scripts/zapbench_feasibility.py` | the 71,721-neuron zebrafish scan |
+| `scripts/eeg_excess.py`, `eeg_concentration_null.py` | clinical EEG, and the clamp-free re-analysis |
+| `scripts/climate_excess.py` | 77 years of sea-level pressure |
+| `scripts/paper_figures.py`, `fig_recall.py` | all figures, from primary data |
+| `scripts/audit_paper_numbers.py` | re-derives every published number and checks it appears in the PDF |
+
+### Protocol and negative results
+
+- [`paper/causal_detection_log.md`](paper/causal_detection_log.md) — the full
+  experiment ledger, including every negative result, every voided finding, and
+  the standing protocol rules each failure produced.
+- [`paper/validation_protocol.md`](paper/validation_protocol.md) — the
+  pre-registrations, fixed before the corresponding data was opened.
+
+Findings that did not survive scrutiny are marked VOID in the ledger rather
+than removed, and superseded entries carry forward-pointers to whatever
+overturned them.
+
+Datasets are public and require no registration. They are not tracked here;
+the scripts fetch them.
+
 ---
 
 ## Quick start
