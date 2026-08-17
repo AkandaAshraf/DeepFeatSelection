@@ -9,6 +9,9 @@ TensorFlow 2.20 / Keras 3 and fixes the parts of the method that made the
 importances hard to defend. The 2021 code is preserved unchanged in
 [`legacy/`](legacy/).
 
+**Looking for the findings?** [FINDINGS.md](FINDINGS.md) consolidates every
+result in this repository — including the negative ones — in plain language.
+
 **Looking for the causal-detection paper?** The repository also holds a second,
 independent line of work on identifying which variables of a large dynamical
 system are driven by the system. See
