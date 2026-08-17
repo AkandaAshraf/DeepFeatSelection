@@ -1010,3 +1010,181 @@ reportedly finding AIB is largely driven by AVA.
 17. When a claim contradicts a field's direct measurements, cite those
     measurements yourself, up front, with their numbers. A referee reaches for
     them within a minute; pre-empting costs less than defending.
+
+## WormWideWeb gate check: freely-moving worms can carry MACE (2026-08-16)
+
+`scripts/wormwideweb_gate.py`, declared header, predictions fixed before any
+activity values were seen. Two baseline + one GFP recording (Atanas & Kim
+2023), 105-151 neurons x 1600 frames at ~0.6 s. Torch/CUDA reimplementation of
+the pipeline (RTX 3070); a paper-grade result would re-run through the TF
+pipeline for fidelity.
+
+- G1 length: n=1596 < 2000 validated floor. MARGINAL as declared; stands.
+- G2 saturation: self-R2 median 0.64-0.70, max 0.97-0.99, ~10-15% of channels
+  above 0.9. STRIKINGLY higher than immobilised Kato data (median ~0.21, max
+  0.35, 0% above 0.9). Consequence: this is the FIRST real dataset where the
+  corrected ghost-donor rule (self-R2 > 0.9 donors) is satisfiable. Caveat:
+  traces are the site's processed arrays; denoising may inflate
+  self-predictability. GFP self-R2 is low (median 0.20), consistent with
+  motion being poorly self-predictable.
+- G3 stationarity: PREDICTION WRONG. Declared expectation was ghost inflation
+  from behavioural-state nonstationarity; measured panels are clean (median
+  -0.016 to -0.033, max +0.013, 4-6% positive). The discard rule does not
+  fire on freely-moving data.
+- G4 GFP artifact floor: REAL and material. Activity-free worm shows top
+  excess +0.081 with 22/105 channels positive - shared motion masquerades as
+  drivenness, exactly as declared. Platform floor = +0.081; any drivenness
+  claim on this platform must clear it, not zero.
+- Verdict per pre-fixed rule: both baselines clear (top excess +0.395 and
+  +0.113 vs floor +0.081). Honest thinness: only the top ~4 channels
+  (baseline-1) and ~1-2 (baseline-2) clear the floor - top-k semantics with
+  small k.
+- Wall-clock per animal on GPU: ~10 s total (8 s encoder training). Full
+  90-dataset corpus projects to ~15 minutes.
+
+18. An activity-independent fluorophore recording is the platform-level
+    negative control: it measures the artifact floor the ghost cannot see
+    (within-platform shared artifacts survive circular shifting of one
+    channel). Where a GFP-like control exists, use it and report the floor.
+
+## WormWideWeb corpus scan: pre-registered replication FAILS (2026-08-16)
+
+`scripts/wormwideweb_corpus.py`, predictions in header before execution. All
+91 recordings (35 baseline, 30 heat, 8 reFed, 8 sickness, 7 patchEncounter,
+3 GFP), donor-filtered ghost panels (self-R2>0.9 donors; no fallback needed
+on any baseline recording). Total wall-clock: 9.2 minutes on the laptop GPU
+for the full corpus including all controls - the speed claim demonstrated at
+corpus scale, and what made this honest null cheap.
+
+**P2 PASS, emphatically. The GFP artifact band is large and the ghost cannot
+see it.** The three activity-free recordings show top excess +0.081, +0.133,
++0.240 with 17-42 channels above their own ghost thresholds - while those
+ghost panels are CLEAN (max +0.007 to +0.043). Shared motion is genuinely
+shared information across channels; circular shifting destroys alignment, so
+the ghost stays at zero while real GFP channels score large excess. The
+pre-fixed floor rule (max over GFP animals) gives 0.240, which swallows most
+of the baseline signal band (only 10/35 baseline recordings have even their
+top channel above it).
+
+**P1 FAIL, robustly.** Pooled over 35 baseline recordings, labelled channels
+(conf>=2) clearing max(thr, floor): 6, of which command/motor 2 - exactly the
+33% base rate, p=0.64. Sensitivity (post-hoc, labelled as such): at the gate
+floor 0.081, 19 clear at 36.8% command (p=0.44); with NO GFP floor at all,
+190 clear at 34.7% command (p=0.32). At every threshold the flagged channels
+are command-enriched at BASE RATE. The failure is not the floor's severity:
+in freely-moving worms the channels MACE flags are simply not the command
+ensemble. Coherent reading: in moving animals, behaviour- and motion-locked
+shared signal is brain-wide (the source papers' own finding), so "driven by
+the rest of the system" stops being selective for the command core; the
+immobilised prep is what made the original result clean. Not tested further;
+recorded as the honest state.
+
+**The gate's pass was premature.** Its floor came from ONE GFP animal
+(0.081); three animals put it at 0.240. Verdict flips: freely-moving
+WormWideWeb data cannot carry MACE mutant phenotyping as-is. Declared
+fallback stands: immobilised datasets.
+
+What survives with value: (a) the methodological finding - surrogate/ghost
+controls are structurally blind to shared-artifact drivenness on
+freely-moving imaging, and an activity-independent fluorophore control is
+necessary, quantifying an artifact band comparable to the largest genuine
+signals; without the GFP arm this scan would have reported ~14 driven
+channels per animal as biology. (b) A pre-registered, controlled negative
+result obtained for ~10 minutes of compute. (c) The corpus machinery,
+reusable on immobilised data.
+
+19. A control floor estimated from one animal is not a floor. The gate used
+    one GFP recording (0.081); the corpus's three put it at 0.240, tripling
+    the bar and flipping the verdict. Floors need the full control arm.
+
+## DepMap calibration phase 1: the curve exists, the ceiling is low (2026-08-17)
+
+`scripts/depmap_calibration.py` per paper/depmap_protocol.md with amendments
+A7 (gene-label ghost; the declared row-permutation ghost was a no-op by
+algebra and was caught when it returned bin-identical counts) and A8 (two-axis
+equivalence measure; the positive control failed on lineage-corrected Pearson
+exactly as the protocol's interpretation rule anticipated - canonical complex
+pairs PSMA1-PSMB5 score Pearson 0.04 but proximity 0.90, because uniform
+co-essentiality lives in the mean that centring erases).
+
+Controls, all passing after A7+A8: positive 253 complex pairs P(e_prox>0.8) =
+0.88 (median 0.93); negative random pairs at base rate; BOTH ghosts flat at
+base rate across bins. 24Q4 release, 1,103 lines x 17,716 genes, 9,368 after
+declared filters, 39.0M pairs, seconds per histogram on the GPU.
+
+Pre-registered predictions:
+1. Curve rises - PASS. P(e_prox>0.8 | r_obs bin) climbs monotonically from
+   0.2% to ~18% at r_obs 0.60-0.70 (lift ~40x over the 0.42% base rate),
+   ghost flat at base throughout.
+2. Ceiling under 50% - PASS, emphatically. The measured ceiling is ~18% at
+   the best-populated high bin; at the declared headline bin (r_obs>0.8, 13
+   pairs) ZERO pairs are equivalent on either axis. Read for a practitioner:
+   even at the strongest expression redundancy, the odds that two
+   interchangeable-looking genes produce the same knockout phenotype are at
+   best about 1 in 5, and the most extreme redundancy delivered 0 of 13.
+3. Asymmetry - FAILS AS DECLARED, direction reversed at the pre-registered
+   thresholds: P(prox>0.8 | r_obs>0.5) ~ 15% while P(r_obs>0.5 | prox>0.8)
+   ~ 0.6%, because equivalent pairs (~164k) vastly outnumber redundant pairs
+   (~7k). The prediction was written with soft literature thresholds in
+   mind; at ours it inverts. Reported as a failed prediction.
+4. Lineage correction matters - PASS. Correction removes ~40% of
+   high-redundancy pairs (12,017 -> 6,911 at r_obs>0.5).
+
+Pending: gene-bootstrap CIs on the prox axis, TNBC arm, r_obs(A|rest) arm,
+write-up with the practitioner framing.
+
+20. A control that cannot fail is not a control. The declared ghost was
+    invariant under the very permutation it prescribed; it was caught only
+    because bin-identical counts looked too good. Before trusting any
+    control, state the mechanism by which it COULD fail.
+21. When a positive control fails, suspect the measure before the biology.
+    The protocol wrote this rule in advance and it paid for itself the same
+    day.
+
+## iEEG gate: the saturation premise is met on real data for the first time (2026-08-17)
+
+`scripts/ieeg_gate.py` per paper/ieeg_protocol.md (pre-registered before any
+download; one breach logged there - sub-NIH1 quarantined from the
+confirmatory cohort after a shell command displayed one channel's SOZ
+label). Two interictal SEEG subjects from OpenNeuro ds003876, 105-180
+channels at ~1 kHz, decimated to 256 Hz, middle 120 s, CAR and raw-reference
+arms, float64 ridge (float32's ridge term vanishes under the ~1e12 Gram
+scale of reference-dominated lag features).
+
+G1 length: PASS, n ~ 30,000 after decimation.
+
+G2 saturation: PASS - historic for this project. On NIH2's raw-reference arm
+self-R2 reaches median 0.714, max 1.000, with 32% of channels above 0.9: the
+donor-filtered ghost rule engaged on real data for the FIRST time (every
+prior real deployment fell back to uniform donors). NIH1 maxima 0.909/0.917.
+Proposition 1's premise, absent on every dataset in the companion paper, is
+met here. Caveat recorded: raw-reference saturation is partly the shared
+reference being smooth and self-predictable; the premise is met, but partly
+for platform reasons rather than neural ones.
+
+G3 stationarity: segment-dependent, as the rule intends. NIH1's segment
+fails under CAR (ghost median +0.026, 68% positive) and is discarded per
+rule. NIH2 passes both arms (CAR median -0.070, 4% positive; raw-ref median
++0.0001 with a very tight panel, max +0.014).
+
+G4 reference floor: characterised, with a surprise. CAR is NOT automatically
+the clean arm - on NIH1 it made the ghosts worse (68% vs 46% positive),
+consistent with CAR redistributing a nonstationary common component into
+every channel. The donor-FILTERED panel on NIH2 raw-ref gives the tightest
+null of any arm (max +0.014). Montage choice is therefore an open design
+decision; a bipolar arm will be evaluated before any confirmatory run.
+
+Near-universal drivenness (95-103 of 105 channels above ghost max on NIH2):
+volume conduction plus genuinely shared field activity make the binary
+reading uninformative, so the pre-registered P-S1 depletion test proceeds on
+RANKS (SOZ depletion from the top-k), which the protocol wording already
+specifies.
+
+VERDICT: platform passes conditionally. Proceed with per-segment ghost
+screening, a three-way montage comparison (CAR / raw / bipolar) on gate
+subjects, then the confirmatory cohort with SOZ labels opened only after
+each subject's gate is clean. NIH1 remains quarantined.
+
+22. Reference/montage choices are controls, not conveniences: CAR moved a
+    ghost panel from 46% to 68% positive on the same segment. Evaluate
+    montages as arms with their own ghosts, never adopt one by convention.

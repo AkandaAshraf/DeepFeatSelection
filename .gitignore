@@ -78,3 +78,13 @@ scripts/check_citations.py
 # Windows shell redirect artifacts.
 $null
 NUL
+
+# Study data fetched by scripts; large and redistributable from source.
+Data/wormwideweb/
+Data/depmap_24q4/
+Data/ieeg876/
+
+# Submission logistics and derived text; the canonical artifacts are the
+# manuscript on the preprint server and the protocols tracked here.
+paper/biorxiv/
+paper/abstract_plain.txt
