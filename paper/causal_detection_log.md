@@ -1227,3 +1227,62 @@ confound class, universal G3 pass, most selective maps), with RAW as the
 labelled sensitivity arm and CAR dropped. Confirmatory inclusion = G3 pass
 on the primary montage; the depletion test runs on ranks as declared.
 NIH1 remains quarantined (gate/exploratory only).
+
+## DepMap phase 2: the three declared arms (2026-08-17)
+
+`scripts/depmap_arms.py`, measures imported from depmap_calibration so they
+cannot drift from the published numbers.
+
+### Arm A - TNBC: closed as declared-underpowered, with a definition failure
+
+The receptor-low definition was gated by a positive control BEFORE the arm
+ran, using documented cell-line receptor status only (no dependency data).
+The first definition (lower tertile of ESR1/PGR/ERBB2 among breast lines)
+recovered 4 of 19 documented TNBC lines: it FAILED its positive control, so
+per rule 21 the definition was replaced rather than the biology
+reinterpreted. Replacement: ESR1,PGR <= 1.0 log2(TPM+1) (the conventional
+not-expressed line) and ERBB2 <= breast median (HER2+ lines carry the
+amplified mode). Recovers 10/19 known TNBC, admits 0 of 8 documented
+receptor-positive lines. n = 18 lines.
+
+A separate bug was caught in the first definition: PGR's lower tertile IS
+0.00, so a strict `<` against a threshold sitting on the distribution's floor
+excluded exactly the receptor-negative lines it was meant to select (0 lines
+selected). Boundary made inclusive.
+
+Result, reported as the protocol requires rather than as a claim: at n = 18
+the calibration DEGENERATES. 11.4% of pairs land above r_obs 0.6 (4.82M of
+42M), against 0.33% in the 50-line breast panel (145k of 44M) - a ~35x
+inflation of the high-redundancy bin, because r_obs is a noisy statistic at
+n = 18. Lift collapses from ~11x (breast, 0.086 over 0.0078) to ~3.3x (TNBC,
+0.042 over 0.0126). The TNBC arm supports NO subgroup claim, exactly as
+declared in advance, and is not rescued by re-binning.
+
+### Arm B - many-to-one: panel redundancy is not better than best-pair
+
+Per gene: best-pair r_obs, panel R^2 from a ridge fit on its top-10
+expression partners, and whether ANY partner is interventionally equivalent.
+AUC for predicting has-an-equivalent-partner: best-pair 0.607, panel 0.614.
+P(equiv | axis >= 0.6): best-pair 0.735 (n=623), panel 0.677 (n=2687).
+The pre-registered question is answered in the negative: panel redundancy
+carries essentially the same information as best-pair redundancy, and is not
+the better selector. Base P(a gene has some equivalent partner) = 0.542.
+
+### Arm C - real gene families (HGNC) replace the symbol-root proxy
+
+Proxy agreement with HGNC gene groups: 0.703 (3,644 false positives, 1,626
+missed). The published direction is unchanged: ceiling at r_obs >= 0.6 is
+0.264 excluding real families vs 0.231 excluding proxy families. New finding:
+genes INSIDE a real family have a LOWER ceiling (0.139) than genes outside
+one (0.264) - consistent with the buffering blindness the study declared,
+where paralogs that compensate for each other look non-equivalent under
+single knockout precisely because they are redundant.
+
+### Rules added
+
+23. A definition is a measure. Gate it with a positive control before running
+    the arm it defines - the TNBC definition failed at 4/19 and would have
+    produced a confidently wrong subgroup analysis.
+24. Calibration needs cohort size. Below a few dozen samples the observational
+    axis inflates (here 35x in the top bin at n=18) and the curve flattens;
+    a subgroup calibration is not a small version of the pan-cohort one.
