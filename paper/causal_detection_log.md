@@ -1188,3 +1188,12 @@ each subject's gate is clean. NIH1 remains quarantined.
 22. Reference/montage choices are controls, not conveniences: CAR moved a
     ghost panel from 46% to 68% positive on the same segment. Evaluate
     montages as arms with their own ghosts, never adopt one by convention.
+
+## DepMap calibration: gene-bootstrap CIs (2026-08-17)
+
+Phase C per A4, B=100, both axes, 58 s on GPU. Headline (prox axis):
+base rate 0.42% [0.37, 0.47]; ceiling (r_obs 0.60-0.70 pooled) 17.4%
+[7.8, 30.9]; lift 42.6x [18.2, 76.9]; r_obs>0.8 bin 0 in all 100 resamples,
+reported with the rule-of-three bound (<=23%) rather than the bootstrap's
+overconfident [0,0] at n=13. Files: bootstrap_prox.csv, bootstrap_sel.csv,
+bootstrap_ci.csv; cover figure scripts/fig_depmap_calibration.py.

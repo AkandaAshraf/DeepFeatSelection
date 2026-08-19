@@ -127,8 +127,10 @@ the same thing?* Using DepMap 24Q4 (1,103 cancer cell lines × 17,716 genes,
 39 million gene pairs):
 
 > **The calibration curve rises — redundancy multiplies the odds of
-> interventional equivalence ~40-fold — but the ceiling is ~18% at best, and
-> at the most extreme redundancy observed, 0 of 13 pairs were equivalent.**
+> interventional equivalence roughly 43-fold (95% CI 18–77) — but the ceiling
+> is about 17% (95% CI 8–31), and at the most extreme redundancy observed,
+> 0 of 13 pairs were equivalent (a count that only rules out rates above
+> ~1 in 4).** Intervals are gene-level bootstrap, B=100, per the protocol.
 
 Supporting findings:
 
