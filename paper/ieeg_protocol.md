@@ -98,3 +98,14 @@ appears. Confirmatory subjects are drawn from the remaining cohort with
 channel tables read by scripts that select name and type columns only;
 channel tables are never opened with shell tools again (rule added to the
 ledger).
+
+## Montage amendment (2026-08-17, declared before any SOZ label was opened)
+
+The three-way montage comparison is complete (ledger, same date). Primary
+montage for the confirmatory analysis: BIPOLAR (G3 pass on all six gate
+subjects; structurally cancels the shared reference and far-field volume
+conduction; most selective maps). RAW is the sensitivity arm; CAR is dropped
+after producing the cohort's only stationarity failure and its largest ghost
+maxima. Confirmatory inclusion requires a G3-clean bipolar gate for the
+subject's segment. All prior declarations, including the P-S1..P-S3
+predictions and the NIH1 quarantine, stand unchanged.

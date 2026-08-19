@@ -1197,3 +1197,33 @@ base rate 0.42% [0.37, 0.47]; ceiling (r_obs 0.60-0.70 pooled) 17.4%
 reported with the rule-of-three bound (<=23%) rather than the bootstrap's
 overconfident [0,0] at n=13. Files: bootstrap_prox.csv, bootstrap_sel.csv,
 bootstrap_ci.csv; cover figure scripts/fig_depmap_calibration.py.
+
+## iEEG montage comparison: CAR loses, bipolar wins on control grounds (2026-08-17)
+
+`scripts/ieeg_gate.py` cohort run: 6 interictal subjects (ds003876) x 3
+montage arms, ExpOutput/ieeg_gate_cohort.csv. Rule 22 vindicated by the
+full table:
+
+- CAR, the conventional default, is empirically the WORST arm: the only G3
+  stationarity failure in the cohort (NIH1), the largest ghost maxima (mean
+  0.099 vs ~0.03 for raw and bipolar), and near-zero donor qualification.
+  Retired as a candidate.
+- BIPOLAR passes G3 on all six subjects, produces the most selective maps
+  (mean fraction of channels above threshold 0.53 vs 0.78 raw - volume
+  conduction partially cancelled, which is its job), and engages the donor
+  rule with no fallback on NIH4 and NIH5.
+- RAW shows the highest saturation (NIH2 32% of channels above 0.9) but the
+  least selective maps (frac-above ~0.78 and up to 1.00), consistent with a
+  smooth shared reference inflating both self-predictability and apparent
+  drivenness together.
+
+Clean-gated arms (G3 pass AND donor rule engaged): NIH2-raw, NIH4-raw,
+NIH4-bipolar, NIH5-bipolar. NIH4 is clean on both non-CAR montages.
+
+DECLARED NOW, before any SOZ label is opened, as an amendment to
+paper/ieeg_protocol.md: the confirmatory P-S1/P-S2/P-S3 analysis uses
+BIPOLAR as the primary montage (structural cancellation of the identified
+confound class, universal G3 pass, most selective maps), with RAW as the
+labelled sensitivity arm and CAR dropped. Confirmatory inclusion = G3 pass
+on the primary montage; the depletion test runs on ranks as declared.
+NIH1 remains quarantined (gate/exploratory only).
