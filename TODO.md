@@ -34,15 +34,12 @@ something finished to disseminate.
 
 - [ ] ORCID: create, link to arXiv + bioRxiv, claim the four name spellings
 - [ ] Zenodo DOI per release of the repository
-- [ ] Licence review: the aim is "free for any use that serves people,
-      commercial use allowed, harm excluded". Existing implementations of
-      this idea: Hippocratic License 3.0, Do No Harm License (the
-      ethical-source family). Known cost: they are not OSI-open, many
-      institutions' legal teams will not touch use-restricted code, and
-      adoption friction works against the discoverability goal; the paper is
-      already stamped CC BY 4.0 on bioRxiv. Also note CC BY is unusual for
-      CODE — consider dual licensing (code Apache-2.0/MIT, text CC BY).
-      Decision deliberately deferred; no relicensing before it is made.
+- [x] Licence decided (2026-08-17): code Apache-2.0, text CC BY 4.0, intent
+      in a non-binding ETHICS.md. Ethical-source licences (Hippocratic 3.0,
+      Do No Harm) were rejected because they are not OSI-open and the
+      institutions most likely to apply this clinically cannot accept
+      use-restricted terms — the restriction would have cost the goal it
+      expressed. Apache over MIT for the explicit patent grant.
 - [ ] pip-installable `mace` package with a five-line worked example — the
       compounding discoverability item (agreed: should exist)
 - [ ] one-page HTML how-to for the author's personal site, linking package,

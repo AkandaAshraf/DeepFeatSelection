@@ -404,3 +404,15 @@ docker compose run --rm cpu        --n-models 50    # CPU only
 [UCI Heart Disease, Cleveland](https://archive.ics.uci.edu/ml/datasets/Heart+Disease).
 303 rows, 13 attributes, 6 rows dropped for missing values, leaving 297. Any CSV
 in the same layout works via `--data` and `--attributes`.
+
+## Licence
+
+Code (`scripts/`, `mace/`, `deepfeatselect/`, `tests/`) is licensed under
+**Apache-2.0**; the paper, protocols, ledger and prose are **CC BY 4.0**,
+matching the preprint as deposited. See [LICENSE](LICENSE),
+[LICENSE-CC-BY-4.0](LICENSE-CC-BY-4.0) and [NOTICE](NOTICE).
+
+Both are deliberately permissive so that clinical and academic institutions
+can actually use this. What the work is *for*, and what would count as a
+misuse of it, is stated separately and without binding force in
+[ETHICS.md](ETHICS.md).

@@ -1,0 +1,18 @@
+DeepFeatSelection / MACE
+Copyright 2026 Akanda Wahid-Ul-Ashraf
+
+This product includes software developed as personal, unfunded research.
+
+Licensing is split by content type:
+
+  * Software (everything under scripts/, mace/, deepfeatselect/, tests/, and
+    all other source code) is licensed under the Apache License, Version 2.0.
+    See LICENSE.
+
+  * The paper, protocols, ledger, figures and prose documentation (paper/,
+    FINDINGS.md, README.md and other text) are licensed under the Creative
+    Commons Attribution 4.0 International License, matching the preprint as
+    deposited. See LICENSE-CC-BY-4.0.
+
+Where a file could fall under either, the Apache License applies to the code
+it contains and CC BY 4.0 to the prose it contains.

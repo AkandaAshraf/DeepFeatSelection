@@ -9,6 +9,8 @@ description = "Neural-network feature selection via learnable per-feature gates"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 authors = [{ name = "Akanda Ashraf", email = "akandaashraf@outlook.com" }]
+license = "Apache-2.0"
+license-files = ["LICENSE", "LICENSE-CC-BY-4.0", "NOTICE"]
 dependencies = [
     "tensorflow>=2.17,<2.21",
     "pandas>=2.2",
