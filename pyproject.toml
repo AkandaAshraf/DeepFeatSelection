@@ -19,12 +19,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+mace = ["torch>=2.2"]
 
 [project.scripts]
 deepfeatselect = "deepfeatselect.cli:main"
+mace-scan = "mace.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["deepfeatselect*"]
+include = ["deepfeatselect*", "mace*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

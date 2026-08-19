@@ -216,6 +216,7 @@ rules; each was purchased with a concrete mistake, ours included.
   [`paper/causal_detection_log.md`](paper/causal_detection_log.md).
 - All datasets are public and fetched by the scripts; none are redistributed
   here.
+- Archived releases: [doi:10.5281/zenodo.21988145](https://doi.org/10.5281/zenodo.21988145).
 
 This work is personal, unfunded, and unconnected to any employment. Its aim
 is that the measurements above be *useful* — which is why the failures are

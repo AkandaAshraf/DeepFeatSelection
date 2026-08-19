@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software or its findings, please cite it via the DOI."
+title: "DeepFeatSelection: MACE and the redundancy-calibration studies"
+authors:
+  - family-names: "Wahid-Ul-Ashraf"
+    given-names: "Akanda"
+doi: 10.5281/zenodo.21988145
+date-released: 2026-08-17
+url: "https://github.com/AkandaAshraf/DeepFeatSelection"
+license: CC-BY-4.0

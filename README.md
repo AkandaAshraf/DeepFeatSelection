@@ -1,5 +1,7 @@
 # DeepFeatSelection
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21988145.svg)](https://doi.org/10.5281/zenodo.21988145)
+
 Feature selection by putting a learnable, non-negative gate in front of every
 input feature, training a network end to end, and reading the gates back as
 importances.
@@ -44,6 +46,30 @@ invisible by design. It reaches precision 0.95 at 28% recall: it finds the
 strongly driven variables and stays quiet about the rest, so **a variable's
 absence from the result is not evidence that it is autonomous.** Validity is
 established down to n ≈ 2,000 samples.
+
+### Run it on your own data
+
+```bash
+pip install -e .[mace]
+```
+
+```python
+import numpy as np, mace
+X = np.load("recording.npy")      # (timepoints, channels), n >= 2000
+result = mace.scan(X)
+print(result.summary())             # gate verdicts, ghost panel, top channels
+result.to_frame().to_csv("drivenness.csv")
+```
+
+Or from the shell: `mace-scan data.csv --out drivenness.csv`.
+
+The scan refuses to be quiet about its own validity: every result carries the
+three-gate report (length, saturation, stationarity), the donor-filtered ghost
+panel that sets the detection threshold, and the standing reminders — sources
+are invisible by design, and absence from the result is not evidence a channel
+is autonomous. If the ghost panel says the segment is non-stationary, believe
+it and discard the segment; that rule is written from experience recorded in
+the ledger.
 
 ### Reproducing the results
 

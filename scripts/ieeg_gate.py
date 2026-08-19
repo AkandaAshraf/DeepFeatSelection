@@ -92,21 +92,46 @@ def read_edf(path: Path):
     return out, [lab[i] for i in keep_ch], fs
 
 
+def norm_label(l: str) -> str:
+    """EDF labels look like "EEG RAI1-G2" / "POL RAI1"; the tsv says "RAI1"."""
+    l = l.replace("POL ", "").replace("EEG ", "").strip()
+    return l.split("-")[0].strip()
+
+
 def good_channels(sub: str, labels: list[str]) -> list[int]:
     """Indices of SEEG data channels. Reads ONLY name and type columns."""
     tsv = pd.read_csv(DATA / f"sub-{sub}_channels.tsv", sep="\t",
                       usecols=lambda c: c in ("name", "type"))
     want = set(tsv[tsv.type.str.upper().isin(["SEEG", "ECOG"])].name)
-
-    def norm(l: str) -> str:
-        # EDF labels look like "EEG RAI1-G2" / "POL RAI1"; the tsv says "RAI1".
-        l = l.replace("POL ", "").replace("EEG ", "").strip()
-        return l.split("-")[0].strip()
-
-    return [i for i, l in enumerate(labels) if norm(l) in want or l in want]
+    return [i for i, l in enumerate(labels)
+            if norm_label(l) in want or l in want]
 
 
-def preprocess(x: np.ndarray, fs: float, car: bool):
+def montage(x: np.ndarray, labels: list[str], mode: str):
+    """raw: as recorded. car: common average. bipolar: within-shaft adjacent
+    contact differences (RAI2-RAI1), the standard SEEG local derivation that
+    cancels both the shared reference and far-field volume conduction."""
+    if mode == "car":
+        return x - x.mean(1, keepdims=True), list(labels)
+    if mode == "raw":
+        return x, list(labels)
+    import re as _re
+    shafts: dict[str, list[tuple[int, int]]] = {}
+    for i, l in enumerate(labels):
+        m = _re.match(r"([A-Za-z']+)(\d+)$", l)
+        if m:
+            shafts.setdefault(m.group(1), []).append((int(m.group(2)), i))
+    cols, labs = [], []
+    for shaft, contacts in sorted(shafts.items()):
+        contacts.sort()
+        for (n1, i1), (n2, i2) in zip(contacts, contacts[1:]):
+            if n2 == n1 + 1:
+                cols.append(x[:, i2] - x[:, i1])
+                labs.append(f"{shaft}{n2}-{shaft}{n1}")
+    return np.stack(cols, axis=1), labs
+
+
+def preprocess(x: np.ndarray, labels: list[str], fs: float, mode: str):
     T = (x.shape[0] // DECIM) * DECIM
     x = x[:T].reshape(-1, DECIM, x.shape[1]).mean(1)      # decimate
     fs2 = fs / DECIM
@@ -114,11 +139,10 @@ def preprocess(x: np.ndarray, fs: float, car: bool):
     mid = x.shape[0] // 2
     x = x[mid - seg // 2: mid + seg // 2]
     # guard: drop flat or broken channels before any statistics
-    sd = x.std(0)
-    alive = sd > 1e-6
+    alive = x.std(0) > 1e-6
     x = x[:, alive]
-    if car:
-        x = x - x.mean(1, keepdims=True)
+    labels = [l for l, a in zip(labels, alive) if a]
+    x, labels = montage(x, labels, mode)
     x = np.diff(x, axis=0)                                # first difference
     x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
     # a channel can go degenerate only after differencing (clipped/held DACs)
@@ -239,15 +263,23 @@ def arm(x: np.ndarray, tag: str) -> dict:
 
 def main() -> int:
     print(f"device: {DEV}")
-    for sub in SUBJECTS:
+    subs = sorted(f.name.split("_")[0][4:]
+                  for f in DATA.glob("sub-*_run-01_ieeg.edf")
+                  if (DATA / f"{f.name.split('_')[0]}_channels.tsv").exists())
+    print(f"cohort: {subs}")
+    rows = []
+    for sub in subs:
         x, labels, fs = read_edf(DATA / f"sub-{sub}_run-01_ieeg.edf")
         idx = good_channels(sub, labels)
         x = x[:, idx]
+        labels_n = [norm_label(labels[i]) for i in idx]
         print(f"\n{BAR}\n[sub-{sub}]  {x.shape[1]} data channels, fs={fs:.0f} Hz, "
               f"{x.shape[0]/fs:.0f} s total")
-        for car in (True, False):
-            xp, fs2 = preprocess(x, fs, car)
-            r = arm(xp, "CAR" if car else "raw-ref")
+        for mode in ("car", "raw", "bipolar"):
+            xp, fs2 = preprocess(x, labels_n, fs, mode)
+            r = arm(xp, mode)
+            r["sub"] = sub
+            rows.append(r)
             print(f"  [{r['tag']:8s}] n={r['n']}  "
                   f"self-R2 med {r['self_med']:.3f} max {r['self_max']:.3f} "
                   f"frac>0.9 {r['self_f90']:.2f} "
@@ -257,6 +289,12 @@ def main() -> int:
             print(f"             excess: top {r['ex_top']:+.4f} top5 {r['ex_top5']} "
                   f"channels>ghostmax: {r['n_above_gmax']}/{r['V']}  "
                   f"({r['secs']}s)")
+    out = pd.DataFrame([{k: v for k, v in r.items() if k != "ex_top5"}
+                        for r in rows])
+    dest = Path("ExpOutput/ieeg_gate_cohort.csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(dest, index=False)
+    print(f"\nwrote {dest}")
     return 0
 
 
