@@ -26,10 +26,21 @@ UA = {"User-Agent": "Mozilla/5.0"}
 def fetch(url: str, dest: Path, min_size: int) -> str:
     if dest.exists() and dest.stat().st_size > min_size:
         return "skip"
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=120) as r:
-        dest.write_bytes(r.read())
-    return "ok" if dest.stat().st_size > min_size else "SMALL"
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=120) as r,                     open(dest, "wb") as f:
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            if dest.stat().st_size > min_size:
+                return "ok"
+        except Exception as exc:
+            print(f"  retry {attempt+1}: {exc}", flush=True)
+            time.sleep(5)
+    return "FAILED"
 
 
 def main() -> int:

@@ -266,9 +266,21 @@ def main() -> int:
     subs = sorted(f.name.split("_")[0][4:]
                   for f in DATA.glob("sub-*_run-01_ieeg.edf")
                   if (DATA / f"{f.name.split('_')[0]}_channels.tsv").exists())
-    print(f"cohort: {subs}")
-    rows = []
+    print(f"cohort: {len(subs)} subjects {subs}")
+    # Resumable: each (subject, montage) row is written as it completes, so an
+    # interruption costs one arm rather than the whole cohort. A 29-subject
+    # cohort is hours of GPU and the first attempt was lost to a power cut.
+    dest = Path("ExpOutput/ieeg_gate_cohort.csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    done, rows = set(), []
+    if dest.exists():
+        rows = pd.read_csv(dest).to_dict("records")
+        done = {(r["sub"], r["tag"]) for r in rows}
+        print(f"resuming: {len(done)} arms already complete")
     for sub in subs:
+        if all((sub, m) in done for m in ("car", "raw", "bipolar")):
+            print(f"[sub-{sub}] complete, skipping")
+            continue
         x, labels, fs = read_edf(DATA / f"sub-{sub}_run-01_ieeg.edf")
         idx = good_channels(sub, labels)
         x = x[:, idx]
@@ -276,10 +288,16 @@ def main() -> int:
         print(f"\n{BAR}\n[sub-{sub}]  {x.shape[1]} data channels, fs={fs:.0f} Hz, "
               f"{x.shape[0]/fs:.0f} s total")
         for mode in ("car", "raw", "bipolar"):
+            if (sub, mode) in done:
+                continue
             xp, fs2 = preprocess(x, labels_n, fs, mode)
             r = arm(xp, mode)
             r["sub"] = sub
             rows.append(r)
+            pd.DataFrame([{k: v for k, v in q.items() if k != "ex_top5"}
+                          for q in rows]).to_csv(dest, index=False)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             print(f"  [{r['tag']:8s}] n={r['n']}  "
                   f"self-R2 med {r['self_med']:.3f} max {r['self_max']:.3f} "
                   f"frac>0.9 {r['self_f90']:.2f} "
@@ -289,12 +307,7 @@ def main() -> int:
             print(f"             excess: top {r['ex_top']:+.4f} top5 {r['ex_top5']} "
                   f"channels>ghostmax: {r['n_above_gmax']}/{r['V']}  "
                   f"({r['secs']}s)")
-    out = pd.DataFrame([{k: v for k, v in r.items() if k != "ex_top5"}
-                        for r in rows])
-    dest = Path("ExpOutput/ieeg_gate_cohort.csv")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    out.to_csv(dest, index=False)
-    print(f"\nwrote {dest}")
+    print(f"cohort table: {dest} ({len(rows)} arms)")
     return 0
 
 

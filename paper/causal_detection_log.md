@@ -1286,3 +1286,35 @@ single knockout precisely because they are redundant.
 24. Calibration needs cohort size. Below a few dozen samples the observational
     axis inflates (here 35x in the top bin at n=18) and the curve flattens;
     a subgroup calibration is not a small version of the pan-cohort one.
+
+## iEEG confirmatory cohort gated: 29 subjects, bipolar 29/29 (2026-08-17)
+
+Full ds003876 interictal cohort fetched (29 subjects with both EDF and
+channel table; the remaining site prefixes use different task names in their
+filenames and were not retrieved). 87 arms, ExpOutput/ieeg_gate_cohort.csv.
+The first attempt was lost to a power cut at subject 8; the gate is now
+resumable, writing each (subject, montage) row as it completes.
+
+The montage declared primary BEFORE any label was opened holds at cohort
+scale:
+
+  montage   G3 pass   donor rule engaged   mean ghost max   mean frac above
+  bipolar     29/29          10                 0.031            0.58
+  raw         28/29          15                 0.070            0.71
+  car         25/29           6                 0.130            0.42
+
+Bipolar is the only montage that passes the stationarity gate on every
+subject, and it retains the smallest ghost maxima. CAR again fails most often
+(4 subjects), confirming the six-subject finding at scale. Raw engages the
+donor rule most often but produces the least selective maps.
+
+Median bipolar channels retained: 113. Median self-R2 max: 0.972.
+
+CONFIRMATORY COHORT (bipolar, G3 clean, NIH1 excluded by the standing
+quarantine): 28 subjects. Of these, 10 are theory-licensed in the strong
+sense (donor rule engaged, no fallback): NIH4, NIH5, PY18N002, PY18N007,
+PY18N013, rns003, rns004, rns005, rns006, rns013. The pre-registered analysis
+will report the full 28 as primary and the 10 as the licensed-subset
+sensitivity arm, both declared here before any SOZ column is read.
+
+No seizure-onset, resection or outcome column has been read at any point.
