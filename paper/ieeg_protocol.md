@@ -109,3 +109,47 @@ after producing the cohort's only stationarity failure and its largest ghost
 maxima. Confirmatory inclusion requires a G3-clean bipolar gate for the
 subject's segment. All prior declarations, including the P-S1..P-S3
 predictions and the NIH1 quarantine, stand unchanged.
+
+## Analysis specification (2026-08-20, declared before any label was opened)
+
+The predictions were frozen before download; the montage was chosen on gate
+evidence alone. Neither anticipated how a BIPOLAR derivation inherits a
+contact-level label, so those rules are fixed here, before the soz, epz and
+rz columns are read for the first time.
+
+Label inheritance. A bipolar channel SHAFTm-SHAFTn spans two contacts. It is
+counted SOZ if EITHER constituent contact is marked soz, because a
+derivation touching the onset zone is not a clean non-SOZ observation. The
+same rule applies to rz (resection) and epz (early propagation). Declared
+now because the permissive rule works AGAINST P-S1: it moves borderline
+channels into the SOZ group, diluting any depletion effect.
+
+P-S1 test. Per subject, a one-sided Mann-Whitney U on per-channel excess,
+SOZ ranked BELOW non-SOZ. Ranks, not thresholds, so the result does not
+depend on where the driven-core cut is placed. Effect size is the rank
+biserial correlation. Subjects with fewer than 3 SOZ or 3 non-SOZ bipolar
+channels are excluded and the exclusion reported. Pooling across subjects is
+Stouffer's z weighted by sqrt(number of channels). A per-subject sign test
+on the direction of the effect is reported alongside, as it assumes less.
+Secondary, threshold-based: the proportion of SOZ vs non-SOZ channels above
+the subject's own ghost-panel threshold.
+
+P-S2 (WEAK). Among non-SOZ channels only: those on a shaft that carries at
+least one SOZ contact (adjacent, spread territory) versus those on shafts
+with none (distant). Same one-sided rank test, adjacent ranked ABOVE
+distant. Reported as weak whatever it shows.
+
+P-S3 (EXPLORATORY). Per-subject P-S1 effect sizes split by surgical outcome
+from participants.tsv, success versus failure under the file's own coding,
+compared with a rank test. Subgroup sizes are unknown at declaration.
+
+Arms. Bipolar is confirmatory. Raw reference is the sensitivity arm and is
+reported whatever it shows. CAR is not run: it failed the gate on four
+subjects.
+
+Multiplicity. Three predictions, each with one primary test. P-S1 is the
+confirmatory result; P-S2 and P-S3 carry their declared weak/exploratory
+status and are not corrected against P-S1.
+
+Cohort. The 28 G3-clean bipolar subjects fixed by the gate. NIH1 remains
+quarantined. No subject may be added or removed after this point.
