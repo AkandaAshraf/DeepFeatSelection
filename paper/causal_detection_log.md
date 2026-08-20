@@ -1351,3 +1351,58 @@ Rule added:
     by linspace do not compare equal to their decimal labels, and the failure
     is silent: a selection that matches half of what it claims still returns
     a plausible number.
+
+## iEEG confirmatory SOZ study: labels opened, mixed result (2026-08-20)
+
+Stage 1 scanned all 28 confirmatory subjects with channel labels but no
+label column read. Stage 2 opened soz/epz/rz and participants.tsv for the
+first time and applied the tests fixed in commit 67571af, before any label
+was seen. `scripts/ieeg_soz_confirmatory.py`, outputs in ExpOutput/ieeg_soz.
+
+### P-S1 (confirmatory, bipolar): PASSES its declared test
+
+Stouffer z = +5.107, p = 1.6e-07 one-sided, 26 subjects (2 excluded for the
+declared group-size minimum). Driven-core membership: SOZ 51.7% vs non-SOZ
+61.2%. Median rank-biserial +0.172.
+
+Robustness, run because the pooled z and the sign test disagreed:
+leave-one-out never breaks it (worst case, dropping NIH8, z = +4.39), and
+dropping the top 5 contributors still leaves z = +2.05, p = 0.020. So the
+result is NOT an artefact of one or two channel-rich subjects; it degrades
+gracefully, as a distributed effect should.
+
+But it is heterogeneous. 17 of 26 subjects show depletion (sign test
+p = 0.084, not significant), and two subjects show clear REVERSAL: NIH4
+(rbc -0.473) and NIH5 (rbc -0.242).
+
+### The declared robustness checks do NOT corroborate it
+
+  raw-reference sensitivity arm (P-S1): z = -0.640, p = 0.74. NULL. Dropping
+    its top contributors drives it further negative. The arm was declared
+    precisely to test P-S1's robustness to montage, and P-S1 does not
+    survive it.
+  P-S2 (WEAK): bipolar z = -1.995, p = 0.977 - failed and REVERSED. Raw
+    z = +3.960, p = 3.8e-05 - significant in the PREDICTED direction.
+  P-S3 (EXPLORATORY): prediction was weaker depletion in surgical failures.
+    Observed the opposite: failure median rbc +0.256 (n=17), success +0.022
+    (n=9). Failed, reversed.
+
+### Verdict
+
+The pre-registered primary test passed, and passed a robustness check it was
+not required to pass. It is not corroborated: the sensitivity arm is null
+and both secondary predictions failed, one of them reversed. Each montage
+supports a DIFFERENT one of the two predictions and neither supports both -
+which is what preprocessing-driven structure looks like, not what a
+biological effect looks like.
+
+Recorded as SUGGESTIVE, NOT ESTABLISHED. No claim that MACE's source
+blindness is confirmed on clinical data may be made from this. The montage
+dependence is now the primary open question, not the p-value.
+
+Rule added:
+
+26. When two preprocessing choices each support a different one of your
+    predictions, and neither supports both, suspect the preprocessing before
+    the biology. A pre-registered primary arm passing while its declared
+    sensitivity arm returns null is a warning, not a technicality.
