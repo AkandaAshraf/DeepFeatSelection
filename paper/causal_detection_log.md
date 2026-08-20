@@ -1406,3 +1406,58 @@ Rule added:
     predictions, and neither supports both, suspect the preprocessing before
     the biology. A pre-registered primary arm passing while its declared
     sensitivity arm returns null is a warning, not a technicality.
+
+## Why bipolar and raw disagree: they are not the same measurement (2026-08-20)
+
+DIAGNOSTIC, exploratory, run after the confirmatory tests were recorded.
+`scripts/ieeg_montage_diagnostic.py`, 28 subjects, no rescanning.
+
+The hypothesis under test was mine and it was the convenient one: that the
+shared reference SATURATES the raw arm so its null is uninformative rather
+than contradictory. It is only partly supported, and a stronger explanation
+displaced it.
+
+  D1 dispersion. Raw carries 26% MORE per-channel variance than bipolar
+     (SD 0.079 vs 0.062), not merely a level shift, though its median excess
+     is 4.5x higher (+0.071 vs +0.016). A pure level shift cannot change
+     ranks, so this alone would not explain a null rank test.
+  D2 saturation. Raw puts 89.9% of channels above threshold against 65.0%
+     for bipolar. Partial support for the saturation story.
+  D3 separation. SOZ vs non-SOZ, in within-subject SD units: bipolar median
+     d = +0.453, positive in 22 of 26 subjects; raw median d = -0.079,
+     positive in 9 of 25. The bipolar separation is more consistent than the
+     rank test suggested (22/26 vs 17/26); the raw arm has nothing.
+  D4 agreement. DECISIVE. Correlating each bipolar derivation against the
+     mean of its own two constituent contacts in raw gives a median Spearman
+     rho of +0.078 (range -0.551 to +0.628). The two montages rank the same
+     tissue almost INDEPENDENTLY of one another.
+
+Conclusion. The arms do not measure the same quantity. A bipolar derivation
+is a difference of adjacent contacts and is dominated by the local gradient;
+a referenced contact is dominated by the shared reference and far field.
+Near-zero agreement is therefore expected BY CONSTRUCTION, which means the
+raw arm was never a valid sensitivity check on P-S1. It was a different
+measurement, not the same measurement under different preprocessing. Its
+null neither corroborates nor contradicts the bipolar result.
+
+This does NOT establish P-S1. It replaces one objection with another. The
+raw null is no longer evidence against the finding, but drivenness on iEEG
+is now shown to be montage-determined to the point where two standard
+derivations rank channels independently, so any claim must name its spatial
+scale. The bipolar finding reads as a LOCAL-FIELD phenomenon, invisible in
+the referenced signal.
+
+Status unchanged: SUGGESTIVE, NOT ESTABLISHED. What is needed is a genuine
+sensitivity arm at the same spatial scale - a different local derivation
+(e.g. Laplacian, or bipolar with alternate contact pairings) - not a
+different spatial scale.
+
+Rules added:
+
+27. A sensitivity arm must vary the analysis choice while holding the
+    measured quantity fixed. Two preprocessing pipelines that produce nearly
+    uncorrelated orderings of the same channels are two measurements, and
+    disagreement between them is uninformative rather than damning.
+28. Check that a control and its target correlate at all before treating
+    the control's null as evidence. We ran a 28-subject study before
+    establishing that its two arms measured the same thing; they did not.
