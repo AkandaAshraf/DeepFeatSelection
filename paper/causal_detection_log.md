@@ -1461,3 +1461,20 @@ Rules added:
 28. Check that a control and its target correlate at all before treating
     the control's null as evidence. We ran a 28-subject study before
     establishing that its two arms measured the same thing; they did not.
+
+## B=1000 bootstrap precision check: pre-registered intervals hold (2026-08-20)
+
+Declared before running (previous entry). Result, prox axis, float-safe
+pooling over r2 0.60-0.70:
+
+              B=100 (pre-registered)      B=1000 (precision check)
+  base rate   0.42% [0.37, 0.47]          0.42% [0.37, 0.48]
+  ceiling     17.0% [ 9.7, 27.3]          17.2% [10.6, 25.4]
+  lift        39.3x [23.0, 64.8]          40.8x [25.2, 60.9]
+
+Point estimates reproduce; intervals tighten modestly, as expected when the
+percentile bounds move from ~2.5 to ~25 order statistics. No material
+disagreement, so per the declared rule the pre-registered B=100 intervals
+remain primary and the B=1000 run is reported alongside them in the
+manuscript's Methods. Wall-clock 51 min on the laptop GPU shared with other
+work.
