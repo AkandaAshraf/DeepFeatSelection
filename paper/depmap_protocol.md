@@ -283,3 +283,16 @@ be high for complex pairs) AND the negative control to both axes.
 The headline question splits accordingly:
   P(e_prox > 0.8 | r_obs > 0.8)  - same phenotype given redundancy
   P(e_sel  > 0.5 | r_obs > 0.8)  - same selective pattern given redundancy
+
+## Post-hoc precision check on the bootstrap (declared 2026-08-20)
+
+The pre-registration fixed B = 100 gene-level bootstrap replicates, and the
+published intervals use that value. A 95% percentile interval from 100
+replicates places its bounds on roughly the 2.5th and 97.5th order
+statistics, which is coarse; an adversarial read of the manuscript flagged
+it. B = 1000 is therefore run as a POST-HOC PRECISION CHECK, declared here
+before it is run and reported alongside the pre-registered B = 100 rather
+than replacing it. Outputs are written to separate files (suffix _b1000) so
+both remain available. If the two disagree materially, both are reported and
+the disagreement is the finding; the pre-registered value is not discarded
+in favour of whichever looks better.

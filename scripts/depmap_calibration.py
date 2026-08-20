@@ -140,7 +140,11 @@ def joint_hist(ez: np.ndarray, kz: np.ndarray, keep: np.ndarray,
          else torch.as_tensor(weights[idx], dtype=torch.float32, device=DEV))
     re_edges = torch.as_tensor(R_EDGES, device=DEV)
     ee_edges = torch.as_tensor(E_EDGES, device=DEV)
-    hist = torch.zeros((len(R_EDGES) - 1) * (len(E_EDGES) - 1), device=DEV)
+    # float64 accumulator: the lowest-redundancy bin holds ~36M pairs, well
+    # past float32's exact-integer limit of 2^24, where repeated +1 stalls and
+    # the count silently undercounts.
+    hist = torch.zeros((len(R_EDGES) - 1) * (len(E_EDGES) - 1), device=DEV,
+                       dtype=torch.float64)
     for s in range(0, G, CHUNK):
         e_blk = E[:, s:s + CHUNK]
         r = (e_blk.T @ E) / (n - 1)          # (c, G) expression corr
@@ -155,7 +159,7 @@ def joint_hist(ez: np.ndarray, kz: np.ndarray, keep: np.ndarray,
         c = e_blk.shape[1]
         rows = torch.arange(s, s + c, device=DEV)
         wpair[torch.arange(c, device=DEV), rows] = 0.0
-        hist.scatter_add_(0, flat.reshape(-1), wpair.reshape(-1))
+        hist.scatter_add_(0, flat.reshape(-1), wpair.reshape(-1).double())
     return hist.reshape(len(R_EDGES) - 1, len(E_EDGES) - 1).cpu().numpy() / 2
 
 
@@ -178,7 +182,11 @@ def prox_hist(ez: np.ndarray, k_raw: np.ndarray, keep: np.ndarray,
           else torch.as_tensor(weights[idx], dtype=torch.float32, device=DEV))
     re_edges = torch.as_tensor(R_EDGES, device=DEV)
     ee_edges = torch.as_tensor(E_EDGES, device=DEV)
-    hist = torch.zeros((len(R_EDGES) - 1) * (len(E_EDGES) - 1), device=DEV)
+    # float64 accumulator: the lowest-redundancy bin holds ~36M pairs, well
+    # past float32's exact-integer limit of 2^24, where repeated +1 stalls and
+    # the count silently undercounts.
+    hist = torch.zeros((len(R_EDGES) - 1) * (len(E_EDGES) - 1), device=DEV,
+                       dtype=torch.float64)
     for s0 in range(0, G, CHUNK):
         e_blk = E[:, s0:s0 + CHUNK]
         r = (e_blk.T @ E) / (n - 1)
@@ -192,7 +200,7 @@ def prox_hist(ez: np.ndarray, k_raw: np.ndarray, keep: np.ndarray,
         w = wv[s0:s0 + e_blk.shape[1], None] * wv[None, :]
         c = e_blk.shape[1]
         w[torch.arange(c, device=DEV), torch.arange(s0, s0 + c, device=DEV)] = 0
-        hist.scatter_add_(0, flat.reshape(-1), w.reshape(-1))
+        hist.scatter_add_(0, flat.reshape(-1), w.reshape(-1).double())
     return hist.reshape(len(R_EDGES) - 1, len(E_EDGES) - 1).cpu().numpy() / 2
 
 
@@ -213,6 +221,10 @@ def curve_from_hist(h: np.ndarray, tau: float = None) -> pd.DataFrame:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--boot", action="store_true")
+    ap.add_argument("--boot-b", type=int, default=BOOT_B,
+                    help="bootstrap replicates; the pre-registered "
+                         "value is 100, larger values are reported as "
+                         "a post-hoc precision check")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     log(f"device: {DEV}")
@@ -407,7 +419,9 @@ def main() -> int:
     if args.boot:
         t0 = time.time()
         sel_curves, prox_curves = [], []
-        for b in range(BOOT_B):
+        B = args.boot_b
+        sfx = "" if B == BOOT_B else f"_b{B}"
+        for b in range(B):
             brng = np.random.default_rng(SEED + 1 + b)
             w = np.bincount(brng.integers(0, len(genes), len(genes)),
                             minlength=len(genes)).astype(np.float32)
@@ -418,10 +432,10 @@ def main() -> int:
                                  tau=0.8)
             cp["boot"] = b
             prox_curves.append(cp)
-            if (b + 1) % 20 == 0:
-                log(f"  bootstrap {b+1}/{BOOT_B} ({time.time()-t0:.0f}s)")
-        pd.concat(sel_curves).to_csv(OUT / "bootstrap_sel.csv", index=False)
-        pd.concat(prox_curves).to_csv(OUT / "bootstrap_prox.csv", index=False)
+            if (b + 1) % 100 == 0:
+                log(f"  bootstrap {b+1}/{B} ({time.time()-t0:.0f}s)")
+        pd.concat(sel_curves).to_csv(OUT / f"bootstrap_sel{sfx}.csv", index=False)
+        pd.concat(prox_curves).to_csv(OUT / f"bootstrap_prox{sfx}.csv", index=False)
 
         # CI summary on the headline quantities
         bp = pd.concat(prox_curves)
@@ -446,7 +460,7 @@ def main() -> int:
         top = bp[bp.r_lo >= 0.80].groupby("boot").apply(
             lambda g: (g.pairs * g.p_equiv).sum() / max(g.pairs.sum(), 1))
         lift = ceil / base
-        ci.to_csv(OUT / "bootstrap_ci.csv", index=False)
+        ci.to_csv(OUT / f"bootstrap_ci{sfx}.csv", index=False)
         log(f"base rate     {base.median():.5f} "
             f"[{base.quantile(.025):.5f}, {base.quantile(.975):.5f}]")
         log(f"ceiling(.60-.70) {ceil.median():.4f} "
@@ -455,7 +469,7 @@ def main() -> int:
             f"[{lift.quantile(.025):.1f}, {lift.quantile(.975):.1f}]")
         log(f"top bin r>0.8 {top.median():.4f} "
             f"[{top.quantile(.025):.4f}, {top.quantile(.975):.4f}]")
-        log(f"bootstrap done ({time.time()-t0:.0f}s, B={BOOT_B})")
+        log(f"bootstrap done ({time.time()-t0:.0f}s, B={B})")
     return 0
 
 
