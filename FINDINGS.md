@@ -15,7 +15,7 @@ DepMap study below.
 
 ---
 
-## Part 1 — The MACE method ([paper](paper/excess_paper.pdf), under bioRxiv screening)
+## Part 1 — The MACE method ([paper](paper/excess_paper.pdf), preprint, not peer reviewed)
 
 ### 1. Drivenness can be scanned at previously impossible scale
 
@@ -207,8 +207,8 @@ rules; each was purchased with a concrete mistake, ours included.
 
 ## Provenance
 
-- Paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf) — submitted to
-  bioRxiv 15 Aug 2026 (screening in progress); CC BY 4.0.
+- Paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf) — preprint,
+  not peer reviewed. CC BY 4.0.
 - Pre-registrations: [`paper/validation_protocol.md`](paper/validation_protocol.md),
   [`paper/depmap_protocol.md`](paper/depmap_protocol.md),
   [`paper/ieeg_protocol.md`](paper/ieeg_protocol.md).

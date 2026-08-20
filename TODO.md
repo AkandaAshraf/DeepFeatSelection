@@ -21,7 +21,7 @@ something finished to disseminate.
 
 ## Dissemination (after results, priority order)
 
-- [ ] Bluesky + comp-neuro mailing list announcement once the bioRxiv DOI is
+- [ ] Bluesky + comp-neuro mailing list announcement once the paper DOI is
       live — identified as the fastest route to the audience that actually
       uses whole-brain data
 - [ ] LinkedIn post (drafted; waiting on the DOI so the first link unfurls)
@@ -32,7 +32,7 @@ something finished to disseminate.
 
 ## Infrastructure / legacy
 
-- [ ] ORCID: create, link to arXiv + bioRxiv, claim the four name spellings
+- [ ] ORCID: create, link to arXiv + Zenodo, claim the four name spellings
 - [ ] Zenodo DOI per release of the repository
 - [x] Licence decided (2026-08-17): code Apache-2.0, text CC BY 4.0, intent
       in a non-binding ETHICS.md. Ethical-source licences (Hippocratic 3.0,
@@ -44,5 +44,5 @@ something finished to disseminate.
       compounding discoverability item (agreed: should exist)
 - [ ] one-page HTML how-to for the author's personal site, linking package,
       paper and repo; fuller documentation later
-- [ ] bioRxiv v2 batch: byline spacing, drop "draft" from the date line,
+- [ ] Manuscript v2 batch: byline spacing, drop "draft" from the date line,
       remaining literature items above

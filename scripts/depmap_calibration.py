@@ -160,7 +160,8 @@ def joint_hist(ez: np.ndarray, kz: np.ndarray, keep: np.ndarray,
 
 
 def prox_hist(ez: np.ndarray, k_raw: np.ndarray, keep: np.ndarray,
-              gene_perm: np.ndarray | None = None) -> np.ndarray:
+              gene_perm: np.ndarray | None = None,
+              weights: np.ndarray | None = None) -> np.ndarray:
     """r_obs bin x e_prox bin histogram (A8).
 
     e_prox = 2<ka,kb>/(<ka,ka>+<kb,kb>) on RAW uncentred Chronos, so the
@@ -173,6 +174,8 @@ def prox_hist(ez: np.ndarray, k_raw: np.ndarray, keep: np.ndarray,
     n = E.shape[0]
     G = E.shape[1]
     norms = (K * K).sum(0)
+    wv = (torch.ones(G, device=DEV) if weights is None
+          else torch.as_tensor(weights[idx], dtype=torch.float32, device=DEV))
     re_edges = torch.as_tensor(R_EDGES, device=DEV)
     ee_edges = torch.as_tensor(E_EDGES, device=DEV)
     hist = torch.zeros((len(R_EDGES) - 1) * (len(E_EDGES) - 1), device=DEV)
@@ -186,7 +189,7 @@ def prox_hist(ez: np.ndarray, k_raw: np.ndarray, keep: np.ndarray,
         b = torch.bucketize(prox.clamp(-1.024, 1.024), ee_edges) - 1
         flat = (a.clamp(0, len(R_EDGES) - 2) * (len(E_EDGES) - 1)
                 + b.clamp(0, len(E_EDGES) - 2))
-        w = torch.ones_like(prox)
+        w = wv[s0:s0 + e_blk.shape[1], None] * wv[None, :]
         c = e_blk.shape[1]
         w[torch.arange(c, device=DEV), torch.arange(s0, s0 + c, device=DEV)] = 0
         hist.scatter_add_(0, flat.reshape(-1), w.reshape(-1))
@@ -403,20 +406,52 @@ def main() -> int:
     # ---- phase C: gene bootstrap ------------------------------------------
     if args.boot:
         t0 = time.time()
-        curves = []
+        sel_curves, prox_curves = [], []
         for b in range(BOOT_B):
             brng = np.random.default_rng(SEED + 1 + b)
             w = np.bincount(brng.integers(0, len(genes), len(genes)),
                             minlength=len(genes)).astype(np.float32)
-            hb = joint_hist(ez_c, kz_c, keep, weights=w)
-            cb = curve_from_hist(hb)
+            cb = curve_from_hist(joint_hist(ez_c, kz_c, keep, weights=w))
             cb["boot"] = b
-            curves.append(cb)
-            if (b + 1) % 10 == 0:
-                log(f"  bootstrap {b+1}/{BOOT_B} "
-                    f"({(time.time()-t0)/60:.1f} min)")
-        pd.concat(curves).to_csv(OUT / "bootstrap_curves.csv", index=False)
-        log(f"bootstrap done ({(time.time()-t0)/60:.1f} min)")
+            sel_curves.append(cb)
+            cp = curve_from_hist(prox_hist(ez_c, k_np, keep, weights=w),
+                                 tau=0.8)
+            cp["boot"] = b
+            prox_curves.append(cp)
+            if (b + 1) % 20 == 0:
+                log(f"  bootstrap {b+1}/{BOOT_B} ({time.time()-t0:.0f}s)")
+        pd.concat(sel_curves).to_csv(OUT / "bootstrap_sel.csv", index=False)
+        pd.concat(prox_curves).to_csv(OUT / "bootstrap_prox.csv", index=False)
+
+        # CI summary on the headline quantities
+        bp = pd.concat(prox_curves)
+        rows = []
+        for lo, g in bp.groupby("r_lo"):
+            rows.append({
+                "r_lo": lo,
+                "p_lo2.5": float(g.p_equiv.quantile(0.025)),
+                "p_med": float(g.p_equiv.quantile(0.5)),
+                "p_hi97.5": float(g.p_equiv.quantile(0.975)),
+            })
+        ci = pd.DataFrame(rows)
+        # base rate and ceiling per replicate
+        base = bp.groupby("boot").apply(
+            lambda g: (g.pairs * g.p_equiv).sum() / g.pairs.sum())
+        ceil = bp[bp.r_lo.isin([0.60, 0.65])].groupby("boot").apply(
+            lambda g: (g.pairs * g.p_equiv).sum() / max(g.pairs.sum(), 1))
+        top = bp[bp.r_lo >= 0.80].groupby("boot").apply(
+            lambda g: (g.pairs * g.p_equiv).sum() / max(g.pairs.sum(), 1))
+        lift = ceil / base
+        ci.to_csv(OUT / "bootstrap_ci.csv", index=False)
+        log(f"base rate     {base.median():.5f} "
+            f"[{base.quantile(.025):.5f}, {base.quantile(.975):.5f}]")
+        log(f"ceiling(.60-.70) {ceil.median():.4f} "
+            f"[{ceil.quantile(.025):.4f}, {ceil.quantile(.975):.4f}]")
+        log(f"lift          {lift.median():.1f}x "
+            f"[{lift.quantile(.025):.1f}, {lift.quantile(.975):.1f}]")
+        log(f"top bin r>0.8 {top.median():.4f} "
+            f"[{top.quantile(.025):.4f}, {top.quantile(.975):.4f}]")
+        log(f"bootstrap done ({time.time()-t0:.0f}s, B={BOOT_B})")
     return 0
 
 
