@@ -437,7 +437,11 @@ def main() -> int:
         # base rate and ceiling per replicate
         base = bp.groupby("boot").apply(
             lambda g: (g.pairs * g.p_equiv).sum() / g.pairs.sum())
-        ceil = bp[bp.r_lo.isin([0.60, 0.65])].groupby("boot").apply(
+        # float-safe bin selection: R_EDGES stores 0.60 as 0.6000000000000001,
+        # so .isin([0.60, 0.65]) silently matched the 0.65 bin only and the
+        # pooled ceiling was reported from half the pairs it claimed.
+        sel = (bp.r_lo >= 0.60 - 1e-9) & (bp.r_lo < 0.70 - 1e-9)
+        ceil = bp[sel].groupby("boot").apply(
             lambda g: (g.pairs * g.p_equiv).sum() / max(g.pairs.sum(), 1))
         top = bp[bp.r_lo >= 0.80].groupby("boot").apply(
             lambda g: (g.pairs * g.p_equiv).sum() / max(g.pairs.sum(), 1))

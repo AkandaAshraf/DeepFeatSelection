@@ -127,15 +127,17 @@ the same thing?* Using DepMap 24Q4 (1,103 cancer cell lines × 17,716 genes,
 39 million gene pairs):
 
 > **The calibration curve rises — redundancy multiplies the odds of
-> interventional equivalence roughly 43-fold (95% CI 18–77) — but the ceiling
-> is about 17% (95% CI 8–31), and at the most extreme redundancy observed,
+> interventional equivalence about 39-fold (95% CI 23–65) — but the ceiling
+> is about 17% (95% CI 10–27), and at the most extreme redundancy observed,
 > 0 of 13 pairs were equivalent (a count that only rules out rates above
-> ~1 in 4).** Intervals are gene-level bootstrap, B=100, per the protocol.
+> ~1 in 4).** The ceiling pools the r² 0.60–0.70 bins; intervals are
+> gene-level bootstrap, B=100, per the protocol.
 
 Supporting findings:
 
-- **Tissue identity fakes redundancy:** lineage correction removes ~40% of
-  apparent high-redundancy pairs. Uncorrected co-expression partly measures
+- **Tissue identity fakes redundancy:** lineage correction removes 56% of
+  apparent high-redundancy pairs (r² >= 0.6); the fraction removed grows with
+  redundancy, from 37% at r² >= 0.4 to about 70% at r² >= 0.7. Uncorrected co-expression partly measures
   "these are both lung lines".
 - **Correlation of knockout profiles is the wrong equivalence measure for
   essential genes:** canonical same-complex pairs (e.g. PSMA1–PSMB5) score
@@ -145,7 +147,7 @@ Supporting findings:
   is reported as failed.
 
 *What it means for you:* choosing a perturbation target by expression
-similarity is evidence-informed guessing — a ~40× lift on a sub-1% base rate.
+similarity is evidence-informed guessing — a ~39x lift on a sub-1% base rate.
 Interchangeable-looking genes are, four times out of five or worse, *not*
 interchangeable under intervention.
 

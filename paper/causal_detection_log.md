@@ -1318,3 +1318,36 @@ will report the full 28 as primary and the 10 as the licensed-subset
 sensitivity arm, both declared here before any SOZ column is read.
 
 No seizure-onset, resection or outcome column has been read at any point.
+
+## Two published DepMap numbers corrected (2026-08-20)
+
+Re-deriving every quoted number from its output file, before writing the
+short paper, caught two errors in figures already published in FINDINGS.md.
+Neither was fabricated; both are the same failure - a number whose stated
+definition did not match how it was computed.
+
+1. FLOAT BIN SELECTION. R_EDGES stores the 0.60 edge as 0.6000000000000001,
+   so the bootstrap CI's `.isin([0.60, 0.65])` matched the 0.65 bin ONLY
+   while the label claimed the pooled 0.60-0.70 range. The published
+   "ceiling about 17% (95% CI 8-31), lift 43x (18-77)" is exactly
+   reproducible as the 0.65 bin alone (222 pairs). Correctly pooled over
+   0.60-0.70 (911 pairs): ceiling 17.0% [9.7, 27.3], lift 39.3x
+   [23.0, 64.8]. The point estimate barely moves; the interval tightens, as
+   it must with four times the pairs. Fixed with a tolerance-based mask.
+
+2. THRESHOLD MISMATCH. "Lineage correction removes ~40% of apparent
+   high-redundancy pairs" was computed at a lower redundancy threshold than
+   the surrounding prose implied. Removal is threshold-dependent: 37% at
+   r2>=0.4, 42% at >=0.5, 56% at >=0.6, ~70% at >=0.7. FINDINGS.md now
+   quotes 56% and names the threshold.
+
+`scripts/depmap_paper_numbers.py` re-derives every DepMap number from the
+output files and is the audit gate for the short paper, matching the
+companion paper's 37/37 gate.
+
+Rule added:
+
+25. Never select a histogram bin by floating-point equality. Bin edges built
+    by linspace do not compare equal to their decimal labels, and the failure
+    is silent: a selection that matches half of what it claims still returns
+    a plausible number.
