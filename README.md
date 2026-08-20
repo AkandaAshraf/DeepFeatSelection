@@ -18,7 +18,7 @@ result in this repository — including the negative ones — in plain language.
 independent line of work on identifying which variables of a large dynamical
 system are driven by the system. See
 [MACE](#mace-detecting-driven-variables-in-large-dynamical-systems) below, or go
-straight to the paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf).
+straight to [FINDINGS.md](FINDINGS.md), which summarises every result.
 
 ---
 
@@ -30,7 +30,7 @@ feature-selection tool above: given many simultaneously recorded time series,
 **which variables are driven by the rest of the system, and which evolve
 autonomously?**
 
-📄 **Paper: [`paper/excess_paper.pdf`](paper/excess_paper.pdf)**
+📄 **Manuscript under peer review; preprint to follow**
 
 The statistic is the gain in one-step predictability of a variable when a
 learned low-dimensional code of the entire remaining system is added to a
