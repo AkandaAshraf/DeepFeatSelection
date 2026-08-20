@@ -88,3 +88,6 @@ Data/ieeg876/
 # manuscript on the preprint server and the protocols tracked here.
 paper/biorxiv/
 paper/abstract_plain.txt
+paper/excess_paper.tex
+paper/depmap_paper.tex
+paper/tmlr/
