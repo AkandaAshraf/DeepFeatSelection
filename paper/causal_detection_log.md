@@ -1670,3 +1670,68 @@ Rule added:
     one channel-naming convention. An arm that returns "nothing to test"
     should be treated as a bug report until proven otherwise, never as a
     null.
+
+## P-S1 FAILED TO REPLICATE on the held-out cohort (2026-08-20)
+
+Pre-registered at 93a95be before any held-out recording was downloaded.
+10 subjects, task-interictalawake, ds003876. All 10 passed the G3 gate.
+`scripts/ieeg_replication.py`, ExpOutput/ieeg_replication/.
+
+RESULT AGAINST THE DECLARED PREDICTIONS:
+
+  P-R1  bipolar pooled z > 0, p < 0.05     ACTUAL z = -1.455, p = 0.927
+                                           FAILED, and in the wrong direction
+  P-R2  median rank-biserial 0.10 to 0.30  ACTUAL +0.008          FAILED
+  P-R3  core gap 5 to 18 points, SOZ lower ACTUAL -4.1 pts, SOZ HIGHER
+                                                                  FAILED
+  P-R4  both same-scale arms positive      laplacian +0.497 (p=0.31),
+                                           bipolar_skip -2.100    FAILED
+  P-R5  P-S2 negative                      +0.035 / +0.361 / +1.295
+                                                                  FAILED
+
+Also: bipolar_skip FAILED the validity gate on this cohort (median rho with
+bipolar 0.218, below the declared 0.30) where it passed at 0.590 in
+discovery, so its P-S1 is uninformative rather than contradictory. Laplacian
+passed at 0.321, barely, against 0.643 in discovery.
+
+VERDICT, by the criterion fixed in advance: FAILED TO REPLICATE.
+
+Power is not an adequate explanation. The predicted z was +3.2 given the
+discovery effect size and n=10; the observed z is -1.455. An effect of the
+discovered magnitude would have shown positive even with 8-9 testable
+subjects. The point estimate is not merely small, it is on the wrong side of
+zero on two of three arms.
+
+CONSEQUENCE, as declared: the discovery result is DOWNGRADED. P-S1 was
+recorded as "corroborated across derivations" earlier today on the strength
+of two post-hoc same-scale arms. That status is withdrawn. The honest
+statement is now:
+
+  P-S1 was significant in one cohort of 26 subjects, survived post-hoc
+  same-scale sensitivity arms in that cohort, and DID NOT REPLICATE in 10
+  held-out subjects of the same dataset and condition. It should not be
+  described as an established finding, and no claim that MACE's source
+  blindness is demonstrated on clinical data can rest on it.
+
+NO FURTHER COHORT WILL BE SOUGHT, as declared. The two cohorts differ in
+recording site (discovery: NIH, PY, rns; held-out: jh, pt, umf), which is a
+plausible source of heterogeneity - and running a site-stratified reanalysis
+of the discovery cohort now would be exactly the post-hoc subgroup hunt this
+pre-registration exists to forbid. It is not run. If site heterogeneity is
+to be tested it must be pre-registered as its own study on data not yet
+examined.
+
+WHAT THIS COST AND WHAT IT SAVED. Roughly a day of compute and analysis. It
+saved publishing a false positive: the discovery result was one write-up
+away from being claimed as a clinically anchored validation of MACE's
+designed blindness.
+
+Rules added:
+
+66. A within-cohort sensitivity arm is not a replication. Three derivations
+    of the same recordings agreed with each other and all three were wrong
+    about held-out subjects. Agreement among analyses of one dataset
+    measures analytic robustness, not generalisation.
+67. Pre-register the replication before the discovery result is written up,
+    not after. Had this been run a day later, the discovery finding would
+    already have been in a manuscript.
