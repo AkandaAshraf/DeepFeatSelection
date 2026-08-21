@@ -1478,3 +1478,38 @@ disagreement, so per the declared rule the pre-registered B=100 intervals
 remain primary and the B=1000 run is reported alongside them in the
 manuscript's Methods. Wall-clock 51 min on the laptop GPU shared with other
 work.
+
+## Two citation author lists were wrong in the submitted manuscript (2026-08-20)
+
+Verification of the three citations flagged as sourced-from-search rather
+than read found two errors. Both were REAL papers with FABRICATED author
+lists - plausible names attached to genuine titles, which is the specific
+failure mode that made verification necessary.
+
+  WRONG: Pacini C, Duncan E, Goncalves E, Garnett MJ. The present and future
+         of the Cancer Dependency Map. Nature Reviews Cancer. 2024.
+  RIGHT: Arafeh R, Shibue T, Dempster JM, Hahn WC, Vazquez F. Nature Reviews
+         Cancer. 2025;25(1):59-73. (Pacini and Garnett authored a different
+         2024 paper, on clinically informed target prioritisation.)
+
+  WRONG: Parvin S, Ramirez-Labrada A, Aumann S, Lu X. Targeting synthetic
+         lethal paralogs in cancer. Trends in Cancer. 2023;9(5):397-409.
+  RIGHT: Ryan CJ, Mehta I, Kebabci N, Adams DJ. Same title, journal, volume
+         and pages.
+
+Verified correct on checking: Boyle EA, Pritchard JK, Greenleaf WJ (Mol Syst
+Biol 2018;14:e8594) and Ito T, Young MJ, Li R et al. (Nat Genet
+2021;53:1664-1672).
+
+The second error is the more embarrassing: the misattributed review is by
+Colm Ryan, who was suggested to the journal as a reviewer for this
+manuscript. Corrected locally; the submitted version carries the errors and
+the editor is being notified.
+
+Rule added:
+
+62. A citation obtained from a search result is unverified until the title,
+    journal, volume AND author list have been checked against the publisher
+    record. Titles and journals are usually right in search summaries;
+    author lists are where the fabrication happens, and they are the part a
+    specialist reader notices first.
