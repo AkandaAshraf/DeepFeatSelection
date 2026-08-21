@@ -124,3 +124,62 @@ than assumed.
 If D5 also fails, duplication does not manufacture drivenness in either
 regime and the method is robust to it, which is a stronger result than the
 one this experiment set out to find.
+
+## Extension result: source blindness fails when saturation fails, and the
+## G3 gate does not catch it
+
+k = 2 copies, copy-noise 0.05, observation noise added to move the
+self-baseline off ceiling. Three seeds each.
+
+  obs   self-R2  satur   dup-iso  plain  SOURCE  driven  ghost_max  ghost_med  G3
+  0.0    0.998    0.89     0.00    0.00   0.00    0.24     0.0015    -0.0000  PASS
+  0.1    0.644    0.03     0.20    0.03   0.20    0.06     0.0472    -0.0008  PASS
+  0.3    0.132    0.00     0.07    0.10   0.23    0.04     0.1221    -0.0110  PASS
+  0.6    0.012    0.00     0.13    0.03   0.03    0.04     0.0732    -0.0018  PASS
+
+### D5: partially holds, and is the smaller finding
+
+At obs 0.1 duplicated isolated channels are flagged at 0.20 against 0.03 for
+plain ones. At higher noise the difference disappears into general
+degradation. Duplication is a hazard, but a modest one and only in a band.
+
+### The larger finding: SOURCE BLINDNESS IS CONDITIONAL ON SATURATION
+
+Source false positives run 0.00 -> 0.20 -> 0.23 -> 0.03 as the self-baseline
+falls from 0.998 to 0.012. Individual cells reach 0.40 and 0.50.
+
+Source blindness held at EXACTLY 0.000 across all 51 cells of the boundary
+map, where every channel saturated, and was recorded there as the method's
+most robust property. It is not a property of the method. It is a property of
+the SATURATED REGIME. Off ceiling, up to half the genuine sources are flagged
+as driven.
+
+This is the practical content of Proposition 1's premise, and it is sharper
+than the paper states. The paper says the ghost's guarantee is licensed only
+where the self-baseline saturates. This experiment says something stronger:
+where it does not saturate, the central claim - that sources are invisible by
+design - fails too.
+
+### D6: the ghost rises but the GATE does not fire
+
+ghost_max rises 30- to 80-fold, from 0.0015 to 0.047-0.122. So the panel does
+respond. But the DECLARED GATE is on the ghost MEDIAN (<= 0.005), and the
+median stays clean: -0.0008, -0.0110, -0.0018. Every one of the nine noisy
+cells PASSES G3, including the cell where 50% of sources are flagged.
+
+The gate is watching the wrong statistic for this failure. The panel's
+median is unmoved because most surrogates are unaffected; the damage shows
+in its spread and its maximum.
+
+### Consequence for the published deployments
+
+The worm calcium-imaging scan reports 0 of 1,276 channels reaching the
+saturation threshold. That is the regime where source blindness fails here.
+The companion paper already declines per-neuron claims on that data and
+treats the ghost as an empirical meter rather than a theorem; this result
+supports that caution and gives it a mechanism.
+
+No change to the gate is made on the strength of this. A gate that watched
+the ghost spread rather than its median would need its own pre-registration,
+and choosing a statistic after seeing which one would have caught a failure
+is the move this project refuses.

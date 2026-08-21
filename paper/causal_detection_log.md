@@ -1809,3 +1809,56 @@ Rules added:
     implies. If the fault were an extreme order statistic, less extreme
     statistics would be steadier; they were not, which refuted the diagnosis
     without needing any new data.
+
+## Source blindness is conditional on saturation, and G3 misses the failure
+## (2026-08-20)
+
+paper/duplicate_channel_protocol.md, scripts/duplicate_channel.py.
+
+The experiment was designed to test whether duplicating a channel
+manufactures drivenness. D1 FAILED on saturated systems: flag rate 0.00
+everywhere, because an isolated logistic channel's own history predicts it
+almost exactly and the excess has no headroom. A declared extension added
+observation noise to move the self-baseline off ceiling.
+
+  obs   self-R2   dup-iso  plain  SOURCE flagged  ghost_max  ghost_med  G3
+  0.0    0.998     0.00    0.00       0.00         0.0015    -0.0000   PASS
+  0.1    0.644     0.20    0.03       0.20         0.0472    -0.0008   PASS
+  0.3    0.132     0.07    0.10       0.23         0.1221    -0.0110   PASS
+  0.6    0.012     0.13    0.03       0.03         0.0732    -0.0018   PASS
+
+TWO FINDINGS, the second much larger than the one sought.
+
+1. Duplication is a modest hazard in a band: 0.20 vs 0.03 at obs 0.1 only.
+
+2. SOURCE BLINDNESS IS NOT A PROPERTY OF THE METHOD. It is a property of the
+   saturated regime. Source false positives go from 0.000 to 0.20-0.23, with
+   individual cells at 0.40 and 0.50, as the self-baseline falls. The
+   boundary map recorded 0.000 across 51 cells and called it the most robust
+   property measured; every one of those cells was saturated.
+
+AND THE GATE DOES NOT CATCH IT. ghost_max rises 30-80x, so the panel
+responds - but the declared G3 gate is on the ghost MEDIAN, which stays
+clean. All nine noisy cells PASS G3, including one flagging 50% of sources.
+The gate watches the wrong statistic for this failure: the median is unmoved
+because most surrogates are unaffected, and the damage appears in the spread.
+
+This sharpens Proposition 1's premise. The paper says the ghost's guarantee
+is licensed only under saturation; this says that without saturation the
+central claim - sources invisible by design - fails as well. The worm scan
+reports 0 of 1,276 channels saturating, which is exactly this regime; the
+paper's existing refusal to make per-neuron claims there now has a mechanism.
+
+No gate change is made. Choosing a statistic after seeing which one would
+have caught a failure is the move this project refuses; it needs its own
+pre-registration.
+
+Rules added:
+
+71. A property measured only inside a regime is a property OF that regime
+    until tested outside it. Source blindness read as 0.000 across 51 cells
+    and was a fact about saturation, not about the method.
+72. A gate is only as good as the statistic it watches. G3 watches the ghost
+    median and passed every scan in which half the sources were being
+    flagged, because the median is insensitive to the failure while the
+    spread is not.
