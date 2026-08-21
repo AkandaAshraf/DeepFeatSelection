@@ -5,11 +5,14 @@ something finished to disseminate.
 
 ## Studies (first)
 
-- [ ] DepMap calibration phase B results -> read against the four
+- [x] DepMap calibration phase B results -> read against the four
       pre-registered predictions (paper/depmap_protocol.md)
-- [ ] DepMap bootstrap CIs (phase C, B=100, gene-level)
-- [ ] TNBC arm (declared underpowered; secondary to pan-cancer)
-- [ ] `r_obs(A|rest)` many-to-one arm on the shortlist
+- [x] DepMap bootstrap CIs (B=100 pre-registered; B=1000 precision
+      check confirms them)
+- [x] TNBC arm - run and reported as underpowered, as declared; the
+      definition failed its own positive control first and was replaced
+- [x] `r_obs(A|rest)` many-to-one arm - answered in the negative
+      (AUC 0.614 panel vs 0.607 best-pair)
 - [ ] Mutant phenotyping on IMMOBILISED worm datasets (freely-moving line
       closed with a negative result; see ledger 2026-08-16)
 - [ ] Literature items still needing the author's eyes: Kato 2015 Fig. 5B
@@ -40,9 +43,27 @@ something finished to disseminate.
       institutions most likely to apply this clinically cannot accept
       use-restricted terms — the restriction would have cost the goal it
       expressed. Apache over MIT for the explicit patent grant.
-- [ ] pip-installable `mace` package with a five-line worked example — the
+- [x] pip-installable `mace` package with a five-line worked example — the
       compounding discoverability item (agreed: should exist)
 - [ ] one-page HTML how-to for the author's personal site, linking package,
       paper and repo; fuller documentation later
 - [ ] Manuscript v2 batch: byline spacing, drop "draft" from the date line,
       remaining literature items above
+
+## Added 2026-08-20
+
+- [ ] iEEG: a GENUINE same-scale sensitivity arm for P-S1 (Laplacian, or
+      bipolar with alternate contact pairings). The raw arm is not one:
+      it correlates with bipolar at rho = 0.078, so it measures a different
+      quantity and its null is uninformative (ledger, rules 27-28). Until
+      this exists, the SOZ result stays suggestive, not established.
+- [ ] PLOS: check submission status; confirm the Publication Fee Assistance
+      application attached at initial submission (it cannot be added later).
+- [ ] Verify by eye the citations sourced from search rather than read:
+      Thompson 2021 author list, Pacini 2024 review details, De Kegel 2026
+      preprint.
+- [ ] LinkedIn article: update to the corrected numbers (ceiling 17.0%
+      [9.7, 27.3], lift 39x, lineage removal 56% at r2>=0.6) and add the
+      De Kegel/Ryan positioning before posting.
+- [ ] Colab notebook: fill in the DepMap download URLs and run it end to end
+      once, to confirm it works from a cold start.
