@@ -176,6 +176,11 @@ def run_cell(n, V, coupling, redundancy, seed):
     ghosts = np.array(ghosts)
     thr = max(0.0, float(ghosts.max()))
 
+    np.savez_compressed(
+        OUT / f"raw_n{n}_V{V}_c{coupling}_r{redundancy}_s{seed}.npz",
+        excess=excess, ghosts=ghosts, is_driven=is_driven,
+        is_source=is_source, self_r2=self_r2)
+
     flagged = excess > thr
     tp = int((flagged & is_driven).sum())
     return {

@@ -1772,3 +1772,40 @@ Rule added:
     A synthetic system small enough to iterate on quickly is small enough to
     invert the answer: here the toy size made the readout look like the
     binding constraint when at real scale it contributes under a fifth.
+
+## Threshold rule tested; our own defect claim refuted (2026-08-20)
+
+Pre-registered in paper/threshold_rule_protocol.md. Five decision rules
+evaluated on identical scans and identical ghost panels from the boundary
+map's 51 cells.
+
+The boundary map found recall correlating -0.44 with ghost_max and we called
+the max-based threshold a defect: one unlucky surrogate setting the bar. The
+test refutes that. Recall variability at the centre: MAX 0.105, Q99 0.115,
+Q95 0.118, Q90 0.148. MAX is the LEAST variable non-degenerate rule.
+MEAN3SD is more stable still at 0.050 but has precision 0.000 - it flags
+nothing.
+
+The logic that settles it: if the instability came from the extremeness of
+the maximum, quantiles would be more stable. They are less stable. So the
+whole panel shifts between scans and the maximum tracks a real property of
+each scan. The threshold is working: a high null level means a noisy scan
+and the bar correctly rises.
+
+Q95 and Q90 buy recall (0.22 -> 0.28 -> 0.36) and flag up to 20% of genuine
+SOURCES in the worst cell. Disqualified by T4, declared before the run.
+
+VERDICT: MAX stands, better justified than before - the only rule tested
+that is non-degenerate, source-preserving and least variable at once. The
+boundary map's low-recall regions are a real limit of the method, not an
+artefact of its decision rule.
+
+Rules added:
+
+69. Fix the decision criterion before comparing alternatives, and make it
+    multi-criteria. Had the criterion been "most recall", Q90 would have won
+    and broken source blindness - the property the method exists on.
+70. When a diagnosis of instability is offered, test it by the mechanism it
+    implies. If the fault were an extreme order statistic, less extreme
+    statistics would be steadier; they were not, which refuted the diagnosis
+    without needing any new data.
