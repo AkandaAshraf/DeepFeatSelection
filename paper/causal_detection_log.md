@@ -1605,3 +1605,68 @@ Rule added:
     requires conditioning (screening off a confounder) rather than merely
     predicting cannot be amortised that way. Check which of the two a
     proposed statistic needs before designing for linear cost.
+
+## Same-scale sensitivity arms CORROBORATE P-S1 (2026-08-20)
+
+Declared before running (commit 8af14c0), including the arms, the validity
+gate, the threshold and what would count as corroboration or as failure.
+28 subjects, both new arms scanned with no subject losing an arm.
+
+VALIDITY GATE FIRST, as declared. Median per-subject Spearman with the
+confirmatory bipolar arm, channels matched by shared contacts:
+
+  laplacian     +0.643   IQR [+0.546, +0.760]   PASS (threshold 0.30)
+  bipolar_skip  +0.590   IQR [+0.477, +0.753]   PASS
+  raw           +0.012   IQR [-0.193, +0.320]   FAIL - uninformative
+
+Raw's failure reproduces the earlier diagnostic (+0.078 by a different
+matching) and settles it: raw never was a sensitivity arm.
+
+P-S1 ON THE ARMS THAT PASSED:
+
+  arm            Stouffer z        p        direction   sign p    median rbc
+  bipolar (conf)   +5.107   1.6e-07     17/26     0.084      +0.172
+  bipolar_skip     +4.569   2.4e-06     19/26     0.014      +0.216
+  laplacian        +4.185   1.4e-05     16/26     0.164      +0.198
+
+Driven-core membership, SOZ vs non-SOZ: bipolar 0.517/0.612, bipolar_skip
+0.499/0.635, laplacian 0.534/0.601.
+
+BOTH ARMS MEET THE DECLARED CORROBORATION CRITERION (pass the gate, pooled z
+positive at p < 0.05). The bipolar_skip arm is STRONGER than the
+confirmatory arm on the conservative test: its sign test reaches p = 0.014
+(19/26) where the confirmatory arm's did not (p = 0.084, 17/26), and its
+effect size is larger (+0.216 vs +0.172).
+
+P-S2 remains negative and reversed on all three same-scale arms
+(-0.004 to -0.059), consistent across derivations. Its earlier significance
+on the raw arm is now attributable to that arm measuring a different
+quantity.
+
+A BUG FOUND AND FIXED MID-ANALYSIS. The first run reported the laplacian arm
+as having no testable subject. The cause was the contact parser: laplacian
+channels are named SHAFTn_lap and the parser only understood the bipolar
+SHAFTm-SHAFTn form, so no laplacian channel could ever match a SOZ label and
+every subject fell below the group-size minimum. Fixed to return the centre
+contact and its two neighbours, which is the declared permissive rule
+applied to a three-contact derivation. This was an implementation defect,
+not a choice made after seeing results: the rule it implements was declared
+before the arms ran.
+
+STATUS CHANGE. P-S1 moves from SUGGESTIVE to CORROBORATED ACROSS
+DERIVATIONS. Three derivations that agree with one another on channel
+ordering (rho 0.59-0.64) agree on the depletion; the one derivation that
+disagrees measures something else and is excluded on a criterion fixed in
+advance. What is NOT established: the effect remains modest (median rank
+biserial ~0.2, roughly a 10-13 point gap in driven-core membership), the
+labels were already open when these arms were declared, so this is a
+post-hoc robustness check rather than confirmation, and P-S3's outcome
+anchor still fails in the reverse direction.
+
+Rule added:
+
+65. A sensitivity arm needs its own implementation check. The laplacian arm
+    silently produced no testable subject because a parser understood only
+    one channel-naming convention. An arm that returns "nothing to test"
+    should be treated as a bug report until proven otherwise, never as a
+    null.

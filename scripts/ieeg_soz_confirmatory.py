@@ -129,10 +129,25 @@ def preprocess_labelled(x, labels, fs, mode):
 # ---------------------------------------------------------------- stage 2
 
 def contacts_of(channel: str) -> list[str]:
-    """Bipolar 'RAI2-RAI1' -> both contacts; a raw name -> itself."""
+    """Contacts a channel is built from.
+
+    Bipolar 'RAI2-RAI1' -> both contacts. Laplacian 'RAI3_lap' -> the centre
+    contact and its two neighbours, since the derivation spans all three.
+    Raw name -> itself. The declared label rule is permissive: a derivation
+    counts as SOZ if ANY constituent contact is marked, which works against
+    the depletion P-S1 predicts.
+    """
+    channel = channel.strip()
+    if channel.endswith("_lap"):
+        stem = channel[:-4]
+        m = re.match(r"([A-Za-z']+)(\d+)$", stem)
+        if not m:
+            return [stem]
+        sh, n = m.group(1), int(m.group(2))
+        return [f"{sh}{n-1}", f"{sh}{n}", f"{sh}{n+1}"]
     if "-" in channel:
         return [p.strip() for p in channel.split("-")]
-    return [channel.strip()]
+    return [channel]
 
 
 def shaft_of(contact: str) -> str:
