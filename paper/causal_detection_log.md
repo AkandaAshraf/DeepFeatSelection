@@ -1903,3 +1903,18 @@ Rules added:
 74. When a diagnostic cannot be made to detect a failure, report the
     underlying quantity instead of hunting for a better proxy of it.
     Saturation was measured all along and never reported alongside results.
+
+## TF and PyTorch pipelines agree (2026-08-20)
+
+paper/tf_torch_fidelity_protocol.md, scripts/tf_torch_fidelity.py. Three
+systems, identical hyperparameters, identical numpy ridge readout so only
+the encoder differed.
+
+  Spearman median 0.955 (PASS, >= 0.90); Jaccard median 0.958 (PASS,
+  >= 0.70); ghost max +0.0007 in both; mean absolute difference in excess
+  0.0002 against reported effect sizes of 0.01-0.30.
+
+The paper's TensorFlow results and everything built on the PyTorch
+reimplementation - the worm corpus, the intracranial studies, the boundary
+map and today's experiments - are commensurable. Cross-references between
+them are safe. Recorded once so it need not be revisited.

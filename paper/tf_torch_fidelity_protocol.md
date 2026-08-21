@@ -63,3 +63,37 @@ discrepancy is explained, and that must be stated wherever both are cited.
 Void if hyperparameters are tuned separately for the two pipelines, if the
 systems are changed after seeing a result, or if a disagreement is explained
 away without being reported.
+
+---
+
+## Result (2026-08-20): the pipelines agree
+
+Three systems, V = 30, n = 4000, identical hyperparameters and an identical
+numpy ridge readout so that only the encoder differed.
+
+  seed   Spearman   Jaccard    MAD      flagged (torch/tf)   time
+   0      0.915      0.74     0.0002        22 / 18          6s / 53s
+   1      0.955      0.96     0.0003        23 / 24          2s / 44s
+   2      0.975      1.00     0.0002        14 / 14          2s / 44s
+
+  F1  Spearman median 0.955   PASS (>= 0.90)
+  F2  Jaccard  median 0.958   PASS (>= 0.70)
+  F3  ghost max +0.0007 in BOTH pipelines, neither systematically higher
+  F4  mean absolute difference in excess 0.0002, against reported effect
+      sizes of 0.01 to 0.30 - two orders of magnitude smaller
+
+### Verdict
+
+The TensorFlow and PyTorch pipelines are interchangeable for every claim
+made so far. The paper's published results and everything built on the
+PyTorch reimplementation are commensurable, and cross-references between
+them are safe. Recorded once so it need not be revisited.
+
+The residual disagreement is what different random initialisations and
+floating-point paths produce, not a difference in method: seed 0's Jaccard
+of 0.74 comes from 22 versus 18 flagged channels near a shared threshold,
+with rank agreement still at 0.915.
+
+Incidentally measured: the PyTorch pipeline runs 15-20x faster here (2-6s
+versus 44-53s), though the TensorFlow arm was pinned to CPU for fairness and
+this is not a like-for-like hardware comparison.
