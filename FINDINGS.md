@@ -169,10 +169,40 @@ Two design findings with general value:
 - Stationarity is segment-by-segment: one subject's segment failed the ghost
   gate and was discarded by rule.
 
-A pre-registered study is on file ([protocol](paper/ieeg_protocol.md)) testing
-whether the clinically annotated seizure-onset zone — a *source*, which MACE
-is blind to by design — is depleted from the driven core, anchored to
-surgical outcomes. Predictions were frozen before any label was opened.
+### 8b. That pre-registered study ran, and it did not replicate
+
+The study on file ([protocol](paper/ieeg_protocol.md)) tested whether the
+clinically annotated seizure-onset zone — a *source*, which MACE is blind to
+by design — is depleted from the driven core. Predictions were frozen before
+any label was opened. It is reported here in full because the outcome is
+negative.
+
+**Discovery cohort (28 subjects).** The primary test passed: SOZ channels
+were depleted from the driven core, pooled z = +5.107, p = 1.6×10⁻⁷. It
+survived leave-one-out and the removal of the five most influential
+subjects. Two same-scale sensitivity arms, declared after the labels were
+open and so explicitly post-hoc, both agreed (laplacian z = +4.185,
+bipolar-skip z = +4.569).
+
+**Held-out cohort (10 subjects, same dataset, same condition).** A
+[replication protocol](paper/ieeg_replication_protocol.md) with five
+quantitative predictions was committed before any held-out recording was
+downloaded. **All five failed.** The primary arm gave z = −1.455 (p = 0.93)
+against a predicted +3.2 — in the wrong direction — with a driven-core gap
+of −4.1 points where +5 to +18 was predicted. Power does not explain it: the
+estimate is on the wrong side of zero.
+
+**Status: not an established finding.** No claim that MACE's source blindness
+is demonstrated on clinical data rests on this. As declared in advance, no
+further cohort was sought to rescue it, and a site-stratified reanalysis was
+explicitly declined as the post-hoc subgroup hunt the pre-registration exists
+to forbid.
+
+*What it means for you:* three derivations of one dataset agreed with each
+other and all three were wrong about held-out subjects. **Agreement among
+analyses of one cohort measures analytic robustness, not generalisation.**
+The replication cost about a day and prevented a false positive from being
+published as a clinically anchored validation.
 
 ---
 
