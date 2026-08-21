@@ -176,3 +176,80 @@ second is not available in recorded data, which is the whole difficulty.
 The four-quadrant map (inflow x outflow) remains the right *shape* for an
 answer. This particular outflow is not the right statistic to put on the
 second axis.
+
+---
+
+## What the literature says (deep-research pass, 2026-08-20)
+
+A five-angle survey with adversarial verification of each claim (100 agents
+completed, 3 verification agents lost to connection errors). Two findings
+change how the rejection above should be read.
+
+### 1. Nobody has linear cost in V, and the one apparent exception is padding
+
+Across every method whose primary source survived verification -- Amortized
+Causal Discovery, neural Granger causality (cMLP/cLSTM/cRNN), PCMCI/PCMCI+,
+oCSE, Large Causal Models -- **none achieves sub-quadratic cost in the number
+of variables.** ACD's encoder propagates over a fully connected graph
+emitting a directed latent per ordered pair, Theta(V^2) per forward pass;
+neural Granger fits p networks each over all p pasts; PCMCI computes
+N^2*tau_max p-values by construction; oCSE loops over every remaining node
+per added parent per target.
+
+Critically, **"amortized" in this literature indexes over samples, not over
+variables.** ACD trains one model that infers graphs for previously unseen
+samples without refitting -- the saving is per-dataset optimisation, not
+per-pair enumeration.
+
+The single reported case of runtime "independent of input dimensionality"
+(Large Causal Models) is constant only because inputs are padded to a frozen
+Vmax = 12, with a head whose dominant term is Theta(Vmax^2 * l_max).
+
+So the niche MACE occupies -- a per-variable score at linear cost -- is
+genuinely unoccupied, and the survey also notes that **none of these methods
+produces a per-variable source score at all**: source status has to be read
+off row/column asymmetries of an inferred edge tensor.
+
+### 2. The common-driver problem is the field's problem, not just ours
+
+ACD, neural Granger causality, LCM and PCMCI/PCMCI+ **all assume causal
+sufficiency**. Where the driver is unobserved, a sink carrying a lagged proxy
+of it is reported as a link and -- for lagged pairs, where time order forces
+orientation -- as a directed source->sink edge. That is exactly the error our
+outflow made. oCSE's proved no-false-positive property is likewise
+conditional on a Markov assumption over the *observed* node set.
+
+Only LPCMCI, in the FCI family, has an output space able to represent an
+unobserved common driver: the PAG's bidirected edge. It screens by marking
+X<->Y rather than by resolving a unique source -- that is, the honest answer
+it can give is "these two share something unmeasured", not "this one is the
+source".
+
+### 3. Why our dual failed where PCMCI would not have
+
+This is the part worth keeping. In our synthetic system the driver **was
+observed** -- the sources were channels in the system. PCMCI conditions on
+the actual candidate drivers and would have screened the sink correctly.
+Our outflow conditioned on the *code*, a 16-dimensional lossy compression,
+and a bottleneck is by construction not a sufficient statistic for the state.
+Residual driver information leaked into the sink's increment.
+
+That exposes an asymmetry between the original statistic and its dual:
+
+- **Excess works at linear cost** because the conditioning set is the
+  variable's OWN history, which is exact and complete. The code enters only
+  as an additive predictor, and needs to be a useful summary, not a
+  sufficient statistic.
+- **Outflow needs the code to BE the conditioning set**, because screening
+  off the common driver is the whole job. A lossy bottleneck cannot do that.
+
+**Linear cost and common-driver screening are therefore in tension, and the
+tension is structural rather than an implementation defect.** Screening
+requires conditioning on the candidate drivers themselves, which is what
+forces O(V^2); amortising through a shared compressed code is precisely what
+gives up the completeness screening requires.
+
+That is the barrier a second attempt has to address, and it is not a small
+one. It is also a defensible reason for MACE to remain a drivenness detector
+and to keep saying so plainly, rather than reaching for a source claim it
+cannot support.

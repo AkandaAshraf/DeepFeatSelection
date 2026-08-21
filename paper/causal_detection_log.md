@@ -1557,3 +1557,51 @@ Rule added:
     on the confound its own companion paper attributes to a competitor
     method. The catalogue of known failures is a design constraint, not just
     a discussion section.
+
+## Literature check on the rejected dual: the barrier is structural (2026-08-20)
+
+Five-angle deep-research survey with adversarial verification per claim (100
+agents completed, 3 verification agents lost to connection errors). Full
+write-up in paper/source_detection_note.md. Three results bear on today's
+rejection.
+
+1. NOBODY HAS LINEAR COST IN V. ACD, neural Granger causality, PCMCI/PCMCI+,
+   oCSE and Large Causal Models all enumerate on the order of V^2 candidate
+   directed links; their efficiency comes from cheaper tests, not fewer.
+   "Amortized" in this literature indexes over SAMPLES, not variables. The
+   one runtime reported as independent of dimensionality (LCM) is constant
+   because inputs are padded to a frozen Vmax = 12 with a head dominated by
+   Theta(Vmax^2 * l_max). None of these methods produces a per-variable
+   source score at all: source status is read off asymmetries of an edge
+   tensor.
+
+2. THE COMMON-DRIVER PROBLEM IS THE FIELD'S PROBLEM. ACD, neural GC, LCM and
+   PCMCI/PCMCI+ all assume causal sufficiency; with an unobserved driver, a
+   sink proxying it is reported as a directed source->sink edge - the exact
+   error our outflow made. Only LPCMCI can represent an unobserved common
+   driver, via the PAG's bidirected edge, and it screens by marking X<->Y
+   rather than resolving a source.
+
+3. WHY OURS FAILED WHERE PCMCI WOULD NOT HAVE. In our synthetic system the
+   driver WAS observed, so PCMCI - conditioning on the actual candidate
+   drivers - would have screened the sink correctly. We conditioned on the
+   CODE, a 16-dimensional lossy compression, which is not a sufficient
+   statistic for the state, so driver information leaked into the sink's
+   increment.
+
+The asymmetry this exposes is worth keeping: excess works at linear cost
+because its conditioning set is the variable's own history, exact and
+complete, with the code entering only as an additive predictor. Outflow needs
+the code to BE the conditioning set, because screening the common driver is
+the whole job, and a bottleneck cannot serve. LINEAR COST AND COMMON-DRIVER
+SCREENING ARE IN TENSION, STRUCTURALLY. That reframes this morning's result
+from a design error to a run-in with a real barrier, and it is a defensible
+reason for MACE to remain a drivenness detector that says so plainly.
+
+Rule added:
+
+64. Amortising through a compressed shared representation buys linear cost by
+    giving up completeness of the conditioning set. Any statistic whose job
+    requires conditioning (screening off a confounder) rather than merely
+    predicting cannot be amortised that way. Check which of the two a
+    proposed statistic needs before designing for linear cost.
