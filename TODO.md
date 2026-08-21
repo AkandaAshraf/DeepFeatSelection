@@ -52,11 +52,19 @@ something finished to disseminate.
 
 ## Added 2026-08-20
 
-- [ ] iEEG: a GENUINE same-scale sensitivity arm for P-S1 (Laplacian, or
-      bipolar with alternate contact pairings). The raw arm is not one:
-      it correlates with bipolar at rho = 0.078, so it measures a different
-      quantity and its null is uninformative (ledger, rules 27-28). Until
-      this exists, the SOZ result stays suggestive, not established.
+- [x] iEEG same-scale sensitivity arms: DONE, and the line is closed.
+      Laplacian and bipolar-skip were declared in advance, both cleared the
+      validity gate (rho 0.64 / 0.59 vs raw's 0.01) and both corroborated
+      P-S1 in the discovery cohort. A pre-registered replication on 10
+      held-out subjects then FAILED on all five predictions, with the
+      primary arm in the wrong direction. Per the declaration, no further
+      cohort is sought and the discovery result is withdrawn. See
+      FINDINGS.md 8b and the ledger.
+- [ ] OPTIONAL, only if it can be pre-registered on unexamined data: the two
+      iEEG cohorts differ by recording site (NIH/PY/rns vs jh/pt/umf). A
+      site-heterogeneity study would have to be declared as its own
+      hypothesis on data not yet looked at. Running it on the existing
+      cohorts would be the post-hoc subgroup hunt already declined.
 - [ ] PLOS: check submission status; confirm the Publication Fee Assistance
       application attached at initial submission (it cannot be added later).
 - [ ] Verify by eye the citations sourced from search rather than read:
