@@ -110,7 +110,10 @@ def good_channels(sub: str, labels: list[str]) -> list[int]:
 def montage(x: np.ndarray, labels: list[str], mode: str):
     """raw: as recorded. car: common average. bipolar: within-shaft adjacent
     contact differences (RAI2-RAI1), the standard SEEG local derivation that
-    cancels both the shared reference and far-field volume conduction."""
+    cancels both the shared reference and far-field volume conduction.
+    laplacian and bipolar_skip: same-scale sensitivity derivations declared
+    in paper/ieeg_protocol.md - a local Laplacian, and the same difference
+    operator at twice the contact spacing."""
     if mode == "car":
         return x - x.mean(1, keepdims=True), list(labels)
     if mode == "raw":
@@ -124,10 +127,24 @@ def montage(x: np.ndarray, labels: list[str], mode: str):
     cols, labs = [], []
     for shaft, contacts in sorted(shafts.items()):
         contacts.sort()
-        for (n1, i1), (n2, i2) in zip(contacts, contacts[1:]):
-            if n2 == n1 + 1:
-                cols.append(x[:, i2] - x[:, i1])
-                labs.append(f"{shaft}{n2}-{shaft}{n1}")
+        if mode == "laplacian":
+            # x_n - (x_{n-1} + x_{n+1})/2, both neighbours required; ends of
+            # a shaft have no such pair and are dropped.
+            by_n = dict(contacts)
+            for n, i in contacts:
+                if n - 1 in by_n and n + 1 in by_n:
+                    cols.append(x[:, i]
+                                - 0.5 * (x[:, by_n[n - 1]] + x[:, by_n[n + 1]]))
+                    labs.append(f"{shaft}{n}_lap")
+            continue
+        step = 2 if mode == "bipolar_skip" else 1
+        by_n = dict(contacts)
+        for n, i in contacts:
+            if n + step in by_n:
+                cols.append(x[:, by_n[n + step]] - x[:, i])
+                labs.append(f"{shaft}{n + step}-{shaft}{n}")
+    if not cols:
+        return x[:, :0], []
     return np.stack(cols, axis=1), labs
 
 

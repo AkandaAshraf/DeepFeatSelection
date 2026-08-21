@@ -36,6 +36,8 @@ from ieeg_gate import (  # noqa: E402  pipeline reused verbatim
 OUT = Path("ExpOutput/ieeg_soz")
 QUARANTINED = {"NIH1"}
 MIN_GROUP = 3          # declared: fewer than 3 in either group -> excluded
+# arms scanned in stage 1; the same-scale pair was declared post-hoc
+ARMS = ("bipolar", "raw", "laplacian", "bipolar_skip")
 
 
 def confirmatory_subjects() -> list[str]:
@@ -52,12 +54,17 @@ def scan() -> int:
     print(f"cohort: {len(subs)} subjects\ndevice: {DEV}")
     for sub in subs:
         dest = OUT / f"excess_{sub}.csv"
+        todo = list(ARMS)
         if dest.exists():
-            print(f"[{sub}] done, skipping")
-            continue
+            have = set(pd.read_csv(dest).arm.unique())
+            todo = [a for a in ARMS if a not in have]
+            if not todo:
+                print(f"[{sub}] all {len(ARMS)} arms present, skipping")
+                continue
+            print(f"[{sub}] adding {todo}")
         t0 = time.time()
         try:
-            scan_one(sub, dest, t0)
+            scan_one(sub, dest, t0, todo)
         except RuntimeError as exc:
             # The GPU is shared with the desktop; when VRAM is short cuBLAS
             # fails mid-run. Skip and continue: the loop is resumable, and a
@@ -68,15 +75,20 @@ def scan() -> int:
     return 0
 
 
-def scan_one(sub: str, dest: Path, t0: float) -> None:
+def scan_one(sub: str, dest: Path, t0: float, arms=None) -> None:
     if True:
+        arms = list(arms or ARMS)
         x, labels, fs = read_edf(DATA / f"sub-{sub}_run-01_ieeg.edf")
         idx = good_channels(sub, labels)
         x = x[:, idx]
         labels_n = [norm_label(labels[i]) for i in idx]
         rows = []
-        for mode in ("bipolar", "raw"):
+        for mode in arms:
             xp, names, _ = preprocess_labelled(x, labels_n, fs, mode)
+            if xp.shape[1] < 8:
+                print(f"[{sub}] {mode}: only {xp.shape[1]} channels, skipped",
+                      flush=True)
+                continue
             r = arm(xp, mode, return_channels=True)
             import torch
             if torch.cuda.is_available():
@@ -85,8 +97,11 @@ def scan_one(sub: str, dest: Path, t0: float) -> None:
                 rows.append({"sub": sub, "arm": mode, "channel": name,
                              "excess": ex, "self_r2": sr,
                              "threshold": max(0.0, r["g_max"])})
-        pd.DataFrame(rows).to_csv(dest, index=False)
-        print(f"[{sub}] {len(rows)} channel-rows "
+        new = pd.DataFrame(rows)
+        if dest.exists():
+            new = pd.concat([pd.read_csv(dest), new], ignore_index=True)
+        new.to_csv(dest, index=False)
+        print(f"[{sub}] +{len(rows)} rows ({len(new)} total) "
               f"({time.time()-t0:.0f}s)", flush=True)
 
 
@@ -194,7 +209,7 @@ def test() -> int:
     all_rows = pd.concat([pd.read_csv(f) for f in files])
     outcome = load_outcomes()
 
-    for armname in ("bipolar", "raw"):
+    for armname in ARMS:
         print("\n" + "=" * 74)
         print(f"ARM: {armname}"
               f"{'   [CONFIRMATORY]' if armname == 'bipolar' else '   [sensitivity]'}")
