@@ -1862,3 +1862,44 @@ Rules added:
     median and passed every scan in which half the sources were being
     flagged, because the median is insensitive to the failure while the
     spread is not.
+
+## The ghost panel cannot protect against loss of source blindness
+## (2026-08-20)
+
+paper/gate_statistic_protocol.md, scripts/gate_statistic.py. 30 fresh-seed
+scans, 18 good and 12 bad, each candidate calibrated to 89% specificity so
+none could win by rejecting more.
+
+  MEDIAN sens 0.00   MAX 0.00   P95 0.00   IQR 0.08   STD 0.33
+
+G1 HELD: the incumbent median rejects none of the twelve bad scans.
+
+G2 HELD, and corrected us. The duplicate-channel run showed ghost_max rising
+30-80 fold in failing cells and we read that as evidence a max-based gate
+would catch the failure. On fresh seeds MAX has sensitivity 0.00. Per scan
+it is often the wrong way round: at obs 0.3 the BAD scan has ghost_max
++0.0033 and the GOOD scan +0.1171. An aggregate difference in means is not a
+classifier and we treated it as one.
+
+By the declared rule STD qualifies (+0.33 over the median, above the 0.20
+bar) and is eligible for confirmation on a held-out process. But 0.33 is a
+minority: two-thirds of scans flagging up to half the genuine sources would
+still pass. That is not protection.
+
+CONCLUSION: no statistic of the ghost panel reaches usable sensitivity for
+this failure. The panel tests stationarity, which is its purpose; it does
+not test the saturation premise and cannot be made to. Saturation must be
+reported DIRECTLY - the self-baseline R2 is already computed for every
+channel at no extra cost, and a low value should disqualify source-blindness
+claims. No gate change is adopted here; that needs its own pre-registration
+on held-out data, since testing it on the motivating data would repeat the
+error just corrected.
+
+Rules added:
+
+73. An aggregate difference in means is not a classifier. Ghost_max differed
+    30-80 fold between failing and clean cells in aggregate and had exactly
+    zero per-scan discriminating power on fresh seeds.
+74. When a diagnostic cannot be made to detect a failure, report the
+    underlying quantity instead of hunting for a better proxy of it.
+    Saturation was measured all along and never reported alongside results.

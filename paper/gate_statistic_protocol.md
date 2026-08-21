@@ -88,3 +88,69 @@ separately.
 
 Void if the candidate set, the bad-scan definition, the matched-specificity
 procedure or the decision rule are altered after any result is seen.
+
+---
+
+## Result (2026-08-20)
+
+30 scans on fresh seeds 10-14 across observation noise 0.0-0.5: 18 good,
+12 BAD (source false-positive rate above 0.05).
+
+At matched specificity - each threshold set to reject exactly 10% of good
+scans:
+
+  statistic   threshold   specificity   SENSITIVITY
+  MEDIAN        0.0009       0.89          0.00
+  MAX           0.1392       0.89          0.00
+  P95           0.1201       0.89          0.00
+  IQR           0.0828       0.89          0.08
+  STD           0.0788       0.89          0.33
+
+### G1 held: MEDIAN is worst, at zero sensitivity
+
+The incumbent gate statistic rejects NONE of the twelve bad scans at 89%
+specificity. That confirms the defect the duplicate-channel experiment
+found.
+
+### G2 held: spread beats MAX - and MAX fails completely
+
+STD reaches 0.33; MAX reaches 0.00. This corrects our own motivating
+observation. The duplicate-channel run showed ghost_max rising 30- to
+80-fold in the failing cells, and we read that as evidence a max-based gate
+would catch the failure. On fresh seeds it does not discriminate at all.
+
+The per-scan data show why: at obs 0.3 the BAD scan (seed 13) has
+ghost_max +0.0033 while the GOOD scan (seed 14) has +0.1171 - the wrong way
+round. The 30-80x rise was an AGGREGATE effect across cells and carries no
+per-scan discriminating power. An aggregate difference in means is not a
+classifier, and we treated it as one.
+
+### The decision, and the honest headline
+
+By the declared rule, STD qualifies: sensitivity 0.33 against MEDIAN's 0.00
+is a gain of +0.33, above the required 0.20. It is therefore eligible for
+confirmation on a held-out generating process, which has not been run.
+
+But the protocol's G3 clause also applies, and it is the more important
+finding: 0.33 is a MINORITY. Two-thirds of scans in which up to half the
+genuine sources are flagged would still pass a STD-based gate at 90%
+specificity. That is not protection.
+
+CONCLUSION: THE GHOST PANEL DOES NOT PROTECT AGAINST LOSS OF SOURCE
+BLINDNESS. No statistic of it reaches usable sensitivity. The panel tests
+stationarity, which is what it was designed for; it does not test whether
+the saturation premise holds, and it cannot be made to.
+
+The implication the protocol stated in advance stands: saturation must be
+checked DIRECTLY rather than inferred from the panel. The self-baseline R2
+is already computed for every channel in every scan, at no additional cost.
+Reporting it alongside every result - and treating a low value as
+disqualifying for source-blindness claims - is the fix, and it needs no new
+statistic.
+
+### No gate change is adopted here
+
+STD is eligible, not adopted. Whether a saturation criterion should be a
+formal gate is a separate question requiring its own pre-registration on a
+held-out generating process; testing it on the data that motivated it would
+repeat the error corrected above.
