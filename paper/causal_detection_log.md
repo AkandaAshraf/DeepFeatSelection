@@ -1918,3 +1918,46 @@ The paper's TensorFlow results and everything built on the PyTorch
 reimplementation - the worm corpus, the intracranial studies, the boundary
 map and today's experiments - are commensurable. Cross-references between
 them are safe. Recorded once so it need not be revisited.
+
+## Perturb-seq: the richer phenotype gives a LOWER ceiling (2026-08-20)
+
+Pre-registered in paper/perturbseq_protocol.md before the data was read.
+K562 genome-scale Perturb-seq pseudo-bulk, 11,258 perturbations x 8,248
+genes; universe 6,950 genes, 24.1M pairs. Observational axis held fixed at
+the DepMap definition so only the phenotype changed. On-target transcripts
+removed from both vectors of every pair, as declared.
+
+CONTROLS, which gate the study:
+  positive  253 CORUM same-complex pairs, median cosine +0.271, 49.0% above
+            threshold
+  negative  921 random pairs, median +0.005, 0.43% above threshold
+  ghost     permuted labels collapse the positive control to +0.006, 1.6%
+  separation +0.486; POSITIVE CONTROL PASSES, study is not void
+
+RESULT at the declared calibration (tau chosen so the base rate matches
+DepMap's 0.42%; tau=0.2 gives 0.424%):
+
+  PERTURB-SEQ  ceiling 4.0%   lift 9.4x
+  DEPMAP       ceiling 17.0%  lift 39.3x
+
+PS2 declared no direction and all three outcomes were informative. The
+answer is LOWER. The DepMap ceiling was not depressed by its growth-only
+phenotype; measured on the whole transcriptomic response, redundant-looking
+genes are LESS often equivalent - about one in twenty-five rather than one
+in six.
+
+Interpretation: growth is low-dimensional, so two genes can hit the same
+proliferation number by unrelated routes. The transcriptome does not
+collapse that way, and pairs that matched on growth separate once the full
+response is visible. The DepMap figure is an UPPER bound.
+
+CONSEQUENCE FOR THE SUBMISSION: no correction required. The paper's caution
+is reinforced, and its declared limitation - that growth-only phenotyping
+might understate equivalence - is now measured and runs the other way.
+
+Rule added:
+
+75. A limitation should be measured, not just declared. The submitted paper
+    named its growth-only phenotype as the thing that might be distorting
+    the headline; measuring it took one evening and showed the distortion
+    ran opposite to the direction assumed.
