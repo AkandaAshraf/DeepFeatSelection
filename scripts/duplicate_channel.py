@@ -38,7 +38,7 @@ SEEDS = (0, 1, 2)
 N_DUP_TARGETS = 5      # isolated channels given copies
 
 
-def make_system(k, noise, seed):
+def make_system(k, noise, seed, obs_noise=0.0):
     """Drivers, driven channels, isolated channels, plus k copies of some
     isolated channels. Copies are appended and excluded from all truth sets."""
     rng = np.random.default_rng(seed)
@@ -71,6 +71,8 @@ def make_system(k, noise, seed):
                 cols.append((x[:, q] + noise * rng.standard_normal(N))[:, None])
     xx = np.concatenate(cols, axis=1)
     xx = xx + 0.005 * rng.standard_normal(xx.shape)
+    if obs_noise:
+        xx = xx + obs_noise * rng.standard_normal(xx.shape)
 
     Vt = xx.shape[1]
     is_source = np.zeros(Vt, bool)
@@ -127,6 +129,7 @@ def scan(x, seed):
             for c in codes]))
 
     excess = np.array([excess_of(feats[q], lead[:, q]) for q in range(Vt)])
+    globals()['LAST_SELF_R2'] = self_r2
     rng = np.random.default_rng(seed + 4242)
     qual = np.where(self_r2 > DONOR_R2)[0]
     pool = np.arange(Vt) if len(qual) < MIN_DONORS else qual
@@ -145,16 +148,22 @@ def main() -> int:
     print("duplicated vs plain isolated channels; both coupled to nothing\n")
     rows = []
     t0 = time.time()
-    cells = [(k, nz) for k in K_VALUES for nz in
+    cells = [(k, nz, 0.0) for k in K_VALUES for nz in
              (NOISE_VALUES if k else (0.0,))]
-    for k, nz in cells:
+    # declared extension: move the self-baseline off ceiling
+    cells += [(2, 0.05, ob) for ob in (0.1, 0.3, 0.6)]
+    for k, nz, ob in cells:
         for seed in SEEDS:
-            x, is_src, is_drv, is_cp, dup_t, plain = make_system(k, nz, seed)
+            x, is_src, is_drv, is_cp, dup_t, plain = make_system(k, nz, seed, ob)
             ex, gh = scan(x, seed)
             thr = max(0.0, float(gh.max()))
             fl = ex > thr
+            sr = globals().get("LAST_SELF_R2")
             rows.append({
-                "k": k, "noise": nz, "seed": seed, "channels": x.shape[1],
+                "k": k, "noise": nz, "obs_noise": ob, "seed": seed,
+                "channels": x.shape[1],
+                "saturation": float((sr > 0.9).mean()) if sr is not None else float("nan"),
+                "self_r2_iso": float(np.median(sr[plain])) if sr is not None else float("nan"),
                 "flag_dup_iso": float(fl[dup_t].mean()),
                 "flag_plain_iso": float(fl[plain].mean()),
                 "excess_dup_iso": float(np.median(ex[dup_t])),
@@ -165,10 +174,11 @@ def main() -> int:
                 "ghost_med": float(np.median(gh)),
                 "threshold": thr,
             })
-            print(f"  k={k} noise={nz:<5} seed={seed}  "
+            print(f"  k={k} cn={nz:<5} obs={ob:<4} s={seed}  "
                   f"dup-iso flagged {rows[-1]['flag_dup_iso']:.2f}  "
                   f"plain-iso {rows[-1]['flag_plain_iso']:.2f}  "
                   f"src {rows[-1]['flag_source']:.2f}  "
+                  f"selfR2 {rows[-1]['self_r2_iso']:.3f}  "
                   f"ghost {rows[-1]['ghost_max']:+.4f}", flush=True)
     d = pd.DataFrame(rows)
     d.to_csv(OUT / "duplicate_channel.csv", index=False)

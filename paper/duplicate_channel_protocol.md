@@ -73,3 +73,54 @@ robustness result and is reported as such.
 
 Void if the design, the noise levels or the predictions are altered after any
 result is seen.
+
+---
+
+## Result (2026-08-20): D1 FAILED. No hazard - but only because the
+## self-baseline saturates.
+
+Flag rate for duplicated isolated channels: 0.00 in every cell, at every k
+(1, 2, 4 copies) and every noise level (0.01, 0.05, 0.20). Plain isolated
+channels: also 0.00. Sources: 0.00. Ghost flat throughout (max +0.0017 to
++0.0021, unchanged by duplication).
+
+D1 predicted the hazard and it did not appear.
+
+### Why not, and why that limits the test
+
+Excess is the GAIN over the self-baseline. On coupled logistic maps an
+isolated channel's own history predicts its next step almost perfectly - the
+map is deterministic and a degree-3 polynomial of three lags represents it
+exactly. The self-baseline is therefore at ceiling and there is NO HEADROOM
+for the code to add anything, whatever the code contains. A perfect copy in
+the code cannot inflate an excess that has nowhere to go.
+
+So the mechanism that blocks the hazard is SATURATION - the very condition
+Proposition 1 requires. Where the self-baseline saturates, duplication is
+harmless.
+
+That is a reassuring result and a narrow one. It says nothing about the
+regime where the self-baseline does NOT saturate, and that regime is most of
+real data: 0 of 1,276 worm calcium channels reached the saturation threshold
+in the companion paper. The experiment as designed tested only the safe case.
+
+### Declared extension, before running it
+
+An OBSERVATION NOISE axis is added so that the self-baseline is moved off
+ceiling deliberately:
+
+    observed = channel + obs_noise * standard normal
+    obs_noise: 0.0, 0.1, 0.3, 0.6
+
+with k = 2 copies at copy-noise 0.05 held fixed. Self-baseline R2 is recorded
+per cell so that the flag rate can be read against actual saturation rather
+than assumed.
+
+  D5  The hazard appears once the self-baseline is off ceiling: duplicated
+      isolated channels are flagged more often than plain ones at high
+      obs_noise, and the effect grows as saturation falls.
+  D6  The ghost stays clean regardless, so it still fails to catch it.
+
+If D5 also fails, duplication does not manufacture drivenness in either
+regime and the method is robust to it, which is a stronger result than the
+one this experiment set out to find.
