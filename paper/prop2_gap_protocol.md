@@ -72,3 +72,61 @@ description and no change is made. Either outcome is reported.
 
 Void if the estimators or predictions are altered after any result is seen,
 or if the ghost check is dropped.
+
+---
+
+## Result (2026-08-20)
+
+`scripts/prop2_gap.py` (single system) and `scripts/prop2_gap_sweep.py`
+(scale sweep). Ghost passes throughout.
+
+### Single system, V = 14
+
+  affine +0.0060, interact +0.0082, oracle +0.0089
+  total gap 33.1% of oracle
+  READOUT share 76.8%, COMPRESSION share 23.2%
+  ghost: affine +0.0016 -> interact +0.0026, PASS
+  cost: 51 -> 147 features per channel (2.9x), independent of V
+
+Taken alone this says the estimator should be changed: most of the gap is
+recoverable, the ghost stays clean, and the extra features do not grow with
+V so linear cost survives.
+
+### But it does not survive the scale sweep
+
+Bottleneck fixed at 32 throughout, as in the deployed method.
+
+  V     gap       readout share   compression share
+   14   +0.0029       76.8%            23.2%
+   30   +0.0053       14.0%            86.0%
+   60   +0.0039        7.9%            92.1%
+  100   +0.0022       19.4%            80.6%
+
+The readout share collapses from 77% at V = 14 to 8-19% at V = 60-100. This
+was PREDICTED IN ADVANCE and stated in the script before it ran: the
+bottleneck is fixed while the system grows, so the binding constraint
+migrates from the readout to the compression.
+
+V = 14 is the unrepresentative case. With 14 channels at E = 3 the embedding
+is 42-dimensional and a 32-dimensional code barely compresses at all, so
+almost nothing is lost to the bottleneck and the readout is the only thing
+left to blame. That regime is not where MACE operates.
+
+### Verdict
+
+DO NOT CHANGE THE ESTIMATOR. At the scales the method is built for, roughly
+80-92% of the gap is information the bottleneck never carried, which no
+readout can recover. Paying 2.9x per-channel readout width to chase the
+remaining 8-19% is a bad trade.
+
+Proposition 2's lower-bound language stands, and this experiment says
+something the paper did not: the bound is loose mainly because of
+COMPRESSION, not because of the affine readout. The lever that would tighten
+it is bottleneck width, not readout richness - and widening the bottleneck
+costs encoder capacity and training time for every channel at once, rather
+than 2.9x on a cheap per-channel ridge.
+
+Had this been run only at V = 14 - the natural size for a quick synthetic
+check - it would have produced a confident recommendation to change the
+estimator in a paper currently under review. The scale sweep was the whole
+experiment.

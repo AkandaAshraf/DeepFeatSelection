@@ -1735,3 +1735,40 @@ Rules added:
 67. Pre-register the replication before the discovery result is written up,
     not after. Had this been run a day later, the discovery finding would
     already have been in a manuscript.
+
+## Proposition 2's gap is COMPRESSION, not readout (2026-08-20)
+
+Pre-registered in paper/prop2_gap_protocol.md before the experiment existed.
+Four estimators: base, affine (as implemented), interact (bilinear own-lags
+x code), oracle (full uncompressed state of all other channels). The gap
+decomposes as readout share (interact - affine) and compression share
+(oracle - interact).
+
+At V = 14 the answer looks actionable: 76.8% readout, 23.2% compression,
+ghost clean, cost 2.9x per channel and independent of V. That would say the
+estimator should be changed and the paper's bound tightened.
+
+The scale sweep, with the bottleneck fixed at 32 as deployed:
+
+  V=14: readout 76.8%   V=30: 14.0%   V=60: 7.9%   V=100: 19.4%
+
+The readout share collapses. This was stated as the expectation IN THE
+SCRIPT before it ran: a fixed bottleneck against a growing system moves the
+binding constraint from readout to compression. At V = 14 the embedding is
+42-dimensional and a 32-dimensional code barely compresses, so the readout
+is the only thing left to blame - an artefact of the toy size, not a
+property of the method.
+
+VERDICT: DO NOT CHANGE THE ESTIMATOR. At deployment scale 80-92% of the gap
+is information the bottleneck never carried. The finding worth keeping is
+that Proposition 2's bound is loose mainly because of compression, so the
+lever is bottleneck width, not readout richness - and that lever is
+expensive in a different place, hitting encoder capacity for all channels
+rather than a cheap per-channel ridge.
+
+Rule added:
+
+68. Test a proposed improvement at deployment scale before recommending it.
+    A synthetic system small enough to iterate on quickly is small enough to
+    invert the answer: here the toy size made the readout look like the
+    binding constraint when at real scale it contributes under a fifth.
