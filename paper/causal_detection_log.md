@@ -1513,3 +1513,47 @@ Rule added:
     record. Titles and journals are usually right in search summaries;
     author lists are where the fabrication happens, and they are the part a
     specialist reader notices first.
+
+## Source-detection complement: derived, gated, REJECTED (2026-08-20)
+
+paper/source_detection_note.md, scripts/source_outflow_gate.py.
+
+MACE is blind to sources by design, which is why the iEEG study had to be
+framed around SOZ depletion rather than detection. Proposed dual: outflow(q)
+= what q's history adds to predicting the rest-of-system code, beyond that
+code's own history, with q masked out of the code. Linear in V because the
+masked autoencoder is already trained with channels missing, so masking at
+inference is in-distribution and needs no retraining.
+
+Predictions were written down before the gate ran. Outcome:
+
+  S2 ghost      PASS after a fix (see below): +0.0040
+  S3 maturity   PASS: +0.0054 / +0.0051 / +0.0064 at 5 / 15 / 40 epochs, no
+                decay, so it is not a difference-based importance score
+  S1 separation FAIL: source +0.0060, isolated +0.0037, sink +0.0062
+
+A first implementation scored source, isolated and ghost identically at
++0.026. The baseline held one time point of the code while the added term
+held three lags plus polynomials, so every channel gained by supplying
+temporal depth. The GHOST is what exposed it: a channel coupled to nothing
+cannot have real outflow, so an equal score was diagnostic. Fixed by giving
+the baseline a delay embedding of the code.
+
+The surviving failure is structural. Sinks score as high as sources because
+a sink's history proxies its driver's history, so the statistic reports
+shared-driver correlation as outflow - the mediated-false-positive failure
+this project already documented for PCMCI, reached from the other side. Not
+fixable by thresholds: the confound is in the estimand.
+
+REJECTED as formulated, not carried to real data. The inflow x outflow
+quadrant map remains the right shape; this outflow is the wrong second axis.
+
+Rule added:
+
+63. When proposing a dual to an existing statistic, check first whether the
+    dual reproduces a failure mode already catalogued for the original.
+    Leave-one-out on a trained model was rejected on paper as a
+    difference-based importance score; the surviving candidate then failed
+    on the confound its own companion paper attributes to a competitor
+    method. The catalogue of known failures is a design constraint, not just
+    a discussion section.
