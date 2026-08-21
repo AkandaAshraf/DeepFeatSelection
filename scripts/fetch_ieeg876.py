@@ -17,8 +17,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "Data" / "ieeg876"
+TASK = "interictal"          # overridden by --task for the replication
 BASE = ("https://s3.amazonaws.com/openneuro.org/ds003876/sub-{s}/"
-        "ses-extraoperative/ieeg/sub-{s}_ses-extraoperative_task-interictal_"
+        "ses-extraoperative/ieeg/sub-{s}_ses-extraoperative_task-{task}_"
         "run-01_ieeg{ext}")
 UA = {"User-Agent": "Mozilla/5.0"}
 
@@ -44,25 +45,29 @@ def fetch(url: str, dest: Path, min_size: int) -> str:
 
 
 def main() -> int:
-    subs = sys.argv[1:] or ["NIH3", "NIH4", "NIH5", "NIH6"]
+    args = sys.argv[1:]
+    task = TASK
+    if args and args[0].startswith("--task="):
+        task = args.pop(0).split("=", 1)[1]
+    subs = args or ["NIH3", "NIH4", "NIH5", "NIH6"]
     ROOT.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     for s in subs:
-        for ext, name, floor in ((".edf", f"sub-{s}_run-01_ieeg.edf", 10_000_000),
+        for ext, name, floor in ((".edf", f"sub-{s}_{task}_run-01_ieeg.edf", 10_000_000),
                                  ("", "", 0)):
             if not name:
                 continue
-            print(s, fetch(BASE.format(s=s, ext=ext), ROOT / name, floor),
+            print(s, fetch(BASE.format(s=s, task=task, ext=ext), ROOT / name, floor),
                   flush=True)
         for suffix, floor in (("channels.tsv", 500), ("ieeg.json", 100)):
-            url = BASE.format(s=s, ext="").replace(
+            url = BASE.format(s=s, task=task, ext="").replace(
                 "_ieeg", f"_{suffix.split('.')[0]}") \
-                if suffix == "channels.tsv" else BASE.format(s=s, ext=".json")
+                if suffix == "channels.tsv" else BASE.format(s=s, task=task, ext=".json")
             # channels.tsv URL differs from the EDF stem
             if suffix == "channels.tsv":
                 url = ("https://s3.amazonaws.com/openneuro.org/ds003876/"
                        f"sub-{s}/ses-extraoperative/ieeg/sub-{s}_"
-                       "ses-extraoperative_task-interictal_run-01_channels.tsv")
+                       f"ses-extraoperative_task-{task}_run-01_channels.tsv")
             print(s, suffix,
                   fetch(url, ROOT / f"sub-{s}_{suffix}", floor), flush=True)
     print(f"done in {time.time()-t0:.0f}s")
