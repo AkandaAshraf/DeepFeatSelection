@@ -153,3 +153,56 @@ status and are not corrected against P-S1.
 
 Cohort. The 28 G3-clean bipolar subjects fixed by the gate. NIH1 remains
 quarantined. No subject may be added or removed after this point.
+
+
+## Same-scale sensitivity arms for P-S1 (declared 2026-08-20, POST-HOC)
+
+STATUS OF THIS DECLARATION. The SOZ labels are already open. Nothing below
+can be confirmatory, and it is not offered as such. This is a post-hoc
+robustness check, declared in full before it is run so that the definitions
+cannot be tuned against a known answer. The pre-registered result stands as
+recorded whatever this produces.
+
+WHY. The declared raw-reference sensitivity arm turned out not to be a
+sensitivity arm at all: it correlates with bipolar at a median Spearman rho
+of 0.078 across the 28 subjects, so it measures a different quantity (a
+referenced far-field signal rather than a local gradient) and its null is
+uninformative about P-S1 (ledger, rules 27-28). A real sensitivity arm must
+vary the derivation while holding the spatial scale fixed.
+
+THE ARMS, fixed now.
+
+  LAPLACIAN. For contact n on a shaft, x_n - (x_{n-1} + x_{n+1}) / 2, using
+  the two immediately adjacent contacts on the same shaft. Contacts at
+  either end of a shaft, and contacts whose neighbours are absent or were
+  dropped by the variance guard, are excluded. Channel label: SHAFTn_lap.
+
+  BIPOLAR-SKIP. x_{n+2} - x_n on the same shaft: the same difference
+  operator as the confirmatory arm at twice the contact spacing. Label:
+  SHAFTn+2-SHAFTn. This varies the spacing while keeping the derivation.
+
+VALIDITY GATE, applied BEFORE any P-S1 test on these arms. Each arm is
+mapped to the bipolar channels sharing its contacts and the per-subject
+Spearman correlation of excess is computed. An arm counts as same-scale,
+and therefore as a legitimate sensitivity check, only if its median
+correlation with bipolar across subjects exceeds 0.30. An arm failing this
+gate is reported as failing it and its P-S1 result is NOT interpreted as
+evidence either way - the same treatment the raw arm now receives.
+
+THE TEST, unchanged from the pre-registration. One-sided Mann-Whitney on
+per-channel excess, SOZ ranked below non-SOZ, per subject; Stouffer's z
+weighted by sqrt(channels); sign test reported alongside; the same
+minimum-group-size exclusion of 3.
+
+WHAT COUNTS AS WHAT, fixed now.
+
+  CORROBORATION: an arm passes the validity gate AND its pooled z is
+  positive with p < 0.05 one-sided.
+  FAILURE TO CORROBORATE: an arm passes the validity gate and its pooled z
+  is not positive at p < 0.05. This would be substantive evidence against
+  the bipolar result and will be reported as such, in the abstract of any
+  write-up, not buried.
+  UNINFORMATIVE: an arm fails the validity gate.
+
+No further arms will be added after these two. If both fail to corroborate,
+the P-S1 finding is downgraded from suggestive to unsupported in the ledger.
