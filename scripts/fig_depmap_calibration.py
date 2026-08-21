@@ -45,6 +45,17 @@ tail_upper = 3.0 / n_tail * 100          # rule of three
 
 base_rate = float((curve.pairs * curve.p_equiv).sum() / curve.pairs.sum()) * 100
 
+# Pooled ceiling CI over the r2 0.60-0.70 bins, computed here from the
+# bootstrap replicates rather than hardcoded: the previous label was a
+# literal string and survived a correction to the underlying number.
+# Float-safe bin mask - the 0.60 edge is stored as 0.6000000000000001.
+_bp = pd.read_csv(OUT / "bootstrap_prox.csv")
+_sel = _bp[(_bp.r_lo >= 0.60 - 1e-9) & (_bp.r_lo < 0.70 - 1e-9)]
+_per = _sel.groupby("boot").apply(
+    lambda g: (g.pairs * g.p_equiv).sum() / g.pairs.sum(), include_groups=False)
+CEIL, CLO, CHI = (float(_per.median()), float(_per.quantile(0.025)),
+                  float(_per.quantile(0.975)))
+
 fig, ax = plt.subplots(figsize=(12.0, 6.44), dpi=200)
 fig.patch.set_facecolor(SURF)
 ax.set_facecolor(SURF)
@@ -73,7 +84,7 @@ ax.annotate(f"base rate {base_rate:.2f}%", xy=(0.015, base_rate),
 
 # ceiling annotation
 pk = np.argmax(y)
-ax.annotate("ceiling ≈ 17%\n[8, 31] 95% CI",
+ax.annotate(f"ceiling ≈ {CEIL*100:.0f}%\n[{CLO*100:.0f}, {CHI*100:.0f}] 95% CI",
             xy=(x[pk], y[pk]), xytext=(0.36, 20.5), fontsize=11, color=INK,
             arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8,
                             shrinkA=2, shrinkB=4))
@@ -93,7 +104,7 @@ ax.set_ylabel("% of pairs with the same knockout effect", fontsize=12,
 ax.set_title("Genes that look interchangeable usually aren’t",
              fontsize=17, color=INK, loc="left", y=1.10, fontweight="bold")
 ax.text(0, 1.045, "P(same knockout phenotype | expression redundancy) — "
-        "39M gene pairs, 1,103 cancer cell lines (DepMap 24Q4), "
+        "43.9M gene pairs, 1,103 cancer cell lines (DepMap 24Q4), "
         "95% gene-bootstrap band",
         transform=ax.transAxes, fontsize=10.5, color=INK2)
 

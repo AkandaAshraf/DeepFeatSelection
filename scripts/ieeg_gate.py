@@ -208,7 +208,7 @@ def train_codes(zs: np.ndarray, v: int, tr: slice) -> list[np.ndarray]:
     return codes
 
 
-def arm(x: np.ndarray, tag: str) -> dict:
+def arm(x: np.ndarray, tag: str, return_channels: bool = False) -> dict:
     t0 = time.time()
     emb = embed(x)
     n = emb.shape[0]
@@ -258,7 +258,11 @@ def arm(x: np.ndarray, tag: str) -> dict:
                 ex_top=float(np.sort(excess)[-1]),
                 ex_top5=np.sort(excess)[-5:][::-1].round(4).tolist(),
                 n_above_gmax=int((excess > max(0.0, ghosts.max())).sum()),
-                secs=round(time.time() - t0, 1))
+                secs=round(time.time() - t0, 1),
+                # per-channel vectors for the confirmatory SOZ analysis; the
+                # gate itself stores summaries only
+                **(dict(excess=excess, self_r2=self_r2)
+                   if return_channels else {}))
 
 
 def main() -> int:
