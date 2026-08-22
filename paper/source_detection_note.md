@@ -443,3 +443,49 @@ further claim. No real recording has been touched.
 The honest status: the statistic is unconfounded, correctly signed, and
 strong enough to use in the strong-coupling regime on synthetic data. That
 is a reopened line, not a working method.
+
+---
+
+## Maturity check at working coupling (declared 2026-08-22, before running)
+
+The reopening rests on couplings 0.5-0.7, and the maturity check that
+originally licensed the statistic was run at 0.35 - in the regime where the
+statistic does not work. It has to be repeated where it does.
+
+### Why this could still kill the line
+
+Mechanism 1 of the companion paper: difference-based importance scores rise,
+peak and COLLAPSE as a model matures and learns alternative routes to
+redundant information. Outflow was argued not to be such a score, because it
+is a conditional-information increment rather than a model-attribution
+difference, and at coupling 0.35 it did not decay (+0.0054, +0.0051, +0.0064
+at 5, 15, 40 epochs).
+
+But at strong coupling the sink carries a strong proxy of its driver. A
+maturing encoder has more opportunity to route around the source through
+that proxy, which is exactly the condition under which Mechanism 1 bites.
+The earlier check was run where that pressure is weakest.
+
+### What is tested, fixed now
+
+Epochs in {5, 15, 25, 40, 80} at coupling 0.5 and 0.7, b = 64, three seeds.
+
+  M1  Source outflow does NOT decay with epochs at either coupling. Flat or
+      rising is a pass.
+  M2  The source-sink gap does not close with epochs. This is the specific
+      Mechanism 1 signature here: the encoder learning to reach the system
+      through the sink rather than the source.
+  M3  The ghost stays clean at every epoch count. A longer-trained encoder
+      has more capacity to fit the surrogate.
+  M4  NO PREDICTION on the shape. Rising, flat, or peaked-then-stable are all
+      passes; only a decay toward zero fails.
+
+### The rule, fixed now
+
+If M1 or M2 fails at either coupling, outflow IS a difference-based
+importance score in disguise, the reopening is withdrawn, and the line is
+closed permanently - this is the third and final test of it.
+
+If both hold, the statistic survives its own paper's principal failure mode
+in the regime where it works, and the next step is real data rather than
+another synthetic variant.
