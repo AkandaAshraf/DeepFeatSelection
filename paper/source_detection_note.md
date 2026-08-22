@@ -305,3 +305,44 @@ not a working statistic.
 If R2 fails at every width, this is recorded as CONFIRMED REJECTED: the
 barrier is the confound, not the compression, and the deep-research
 conclusion stands.
+
+### Retry result (2026-08-22): rejection CONFIRMED, but the diagnosis was wrong
+
+Median over three seeds:
+
+  b      source    sink      isolated   src-sink gap   ghost
+   16   +0.0064   +0.0062    +0.0037      +0.0011     +0.0047
+   32   +0.0021   +0.0006    -0.0001      +0.0016     +0.0004
+   64   +0.0015   -0.0003    -0.0006      +0.0021     -0.0005
+  128   +0.0012   -0.0003    -0.0006      +0.0015     -0.0006
+
+**CAPACITY DID FIX THE CONFOUND.** That is the substantive correction. The
+original failure was sinks scoring as high as sources - +0.0062 against
++0.0060 at b = 16, indistinguishable. By b = 64 sinks have fallen to
+-0.0003 and isolated channels to -0.0006, while sources remain positive at
++0.0015. The source-sink gap is positive in 3 of 3 seeds at every width from
+b = 32 upward, against 2 of 3 at b = 16.
+
+So the mechanism we named was right: a lossy code let driver information
+leak into a sink's increment, and a sufficient code stops it. The
+deep-research conclusion - that linear cost and confounder screening are
+structurally in tension - is too strong as stated. The tension relaxes when
+the code is given the width the method needs anyway.
+
+**AND THE STATISTIC IS STILL NOT USABLE, for a different reason.** The
+declared bar was a source-sink gap above 0.01. The best achieved is +0.0021
+at b = 64, five times smaller. Sources sit at +0.0015 against a ghost of
+-0.0005: a margin of about 0.002, which is real and consistent but far too
+small to survive the noise of any real recording. The published excess
+effects that MACE reports are 0.01 to 0.30; this is an order of magnitude
+below the bottom of that range.
+
+VERDICT: REJECTION CONFIRMED, by the rule declared before running. But the
+reason has changed from "the statistic is confounded" to "the statistic is
+unconfounded and too weak". Those are different failures and only the second
+now stands.
+
+What this does not settle: whether the weak signal is fundamental or an
+artefact of this system's coupling strength of 0.3. A source that drives
+harder should produce more outflow. That is a separate experiment and is not
+run here; the rejection stands until it is.

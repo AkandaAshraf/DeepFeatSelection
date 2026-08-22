@@ -1961,3 +1961,45 @@ Rule added:
     named its growth-only phenotype as the thing that might be distorting
     the headline; measuring it took one evening and showed the distortion
     ran opposite to the direction assumed.
+
+## Source-detection retry at capacity: confound fixed, statistic still weak
+## (2026-08-22)
+
+Declared in paper/source_detection_note.md before running.
+scripts/source_outflow_capacity.py, b in {16, 32, 64, 128}, three seeds.
+
+  b      source    sink     isolated   src-sink   ghost
+   16   +0.0064  +0.0062    +0.0037    +0.0011   +0.0047
+   32   +0.0021  +0.0006    -0.0001    +0.0016   +0.0004
+   64   +0.0015  -0.0003    -0.0006    +0.0021   -0.0005
+  128   +0.0012  -0.0003    -0.0006    +0.0015   -0.0006
+
+THE CONFOUND WAS CAPACITY, and our original diagnosis was right. The failure
+was sinks scoring as high as sources (+0.0062 vs +0.0060) at b=16. By b=64
+sinks fall to -0.0003 and isolated to -0.0006 while sources stay positive,
+with the gap positive in 3/3 seeds at every b from 32 up.
+
+This CORRECTS the deep-research conclusion. That pass argued linear cost and
+confounder screening are structurally in tension because amortising through
+a bottleneck surrenders completeness. Too strong: the tension relaxes once
+the code is given the width the method needs anyway (b of order 2V), and the
+sink confound disappears.
+
+THE REJECTION STILL STANDS, for a different reason. The declared bar was a
+source-sink gap above 0.01; the best is +0.0021 at b=64. Sources sit at
++0.0015 against a ghost of -0.0005 - a margin of 0.002, real and consistent
+but an order of magnitude below the 0.01-0.30 range of effects MACE reports
+on real data. The statistic is now unconfounded and too weak, which is a
+different failure from the one recorded on Thursday.
+
+Not settled: whether the weakness is fundamental or an artefact of this
+system's coupling of 0.3. A harder-driving source should produce more
+outflow. Not run; the rejection stands until it is.
+
+Rule added:
+
+76. Re-test a rejection when its stated mechanism stops applying. This one
+    was rejected because the code was lossy; when a separate experiment
+    showed the code must be nearly as wide as its input anyway, the stated
+    mechanism no longer held and the retry changed the diagnosis even though
+    the verdict survived.
