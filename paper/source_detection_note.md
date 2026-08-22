@@ -346,3 +346,43 @@ What this does not settle: whether the weak signal is fundamental or an
 artefact of this system's coupling strength of 0.3. A source that drives
 harder should produce more outflow. That is a separate experiment and is not
 run here; the rejection stands until it is.
+
+---
+
+## Coupling sweep (declared 2026-08-22, before running)
+
+The retry left one question open and it decides the line. At coupling 0.3
+the source-sink confound is gone but sources sit only 0.002 above the ghost.
+Either that margin is a property of the statistic, in which case the line is
+dead, or it scales with how hard sources actually drive, in which case the
+detector works wherever driving is strong.
+
+### What is tested, fixed now
+
+coupling in {0.05, 0.15, 0.30, 0.50, 0.70}, at b = 64 (the width that gave
+the cleanest source-sink separation), three seeds. Everything else as in the
+retry.
+
+  C1  Source outflow grows with coupling. If it is flat, the weak signal is
+      intrinsic and the statistic is dead regardless of the system.
+  C2  DECISIVE. Source outflow clears the ghost by at least 0.01 - the bar
+      declared for the retry - at some coupling. That is the margin below
+      which no real recording could use this.
+  C3  Sinks stay near zero as coupling rises. This is the risk: a harder
+      driver means the sink carries a stronger proxy of it, so the confound
+      that capacity fixed could return at strong coupling. If the source-sink
+      gap closes again as coupling grows, the statistic works only in a band.
+  C4  The ghost stays clean throughout.
+
+### The rule, fixed now
+
+The line is REOPENED only if C2 and C3 and C4 all hold at some coupling: a
+margin over the ghost above 0.01, sinks still separated, ghost clean.
+
+If C2 fails at every coupling, the line is CLOSED and recorded as such -
+the statistic is unconfounded, correctly signed, and too weak to use, and no
+further variant will be tried.
+
+Note the tension between C2 and C3 is the real question. Strong coupling
+should raise the source signal AND strengthen the sink's proxy of it. Which
+grows faster is not known and is what this measures.
