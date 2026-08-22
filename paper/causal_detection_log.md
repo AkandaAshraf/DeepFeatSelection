@@ -2076,3 +2076,45 @@ ALL SYNTHETIC. No real recording touched. The next step is a real dataset
 with known sources, pre-registered - and on this project's own record the
 iEEG result passed every synthetic and within-cohort check before failing
 replication, so that step should be expected to be the hard one.
+
+## Chamber source test: UNINFORMATIVE, the system is sampled too slowly
+## (2026-08-22)
+
+Pre-registered in paper/chamber_source_protocol.md before any statistic
+touched the data. Causal chamber wind tunnel, 28 runs, actuators hatch/pot_1
+/pot_2 known as sources by construction.
+
+PROTOCOL ERROR DISCLOSED: the document says runs are 1,016 samples, written
+after inspecting only the first file. They are 1,016 to 320,000, median
+10,000; 27 of 28 are above the validated floor. No prediction was affected.
+
+RESULT: null. Source outflow -0.0005 vs sensor -0.0004 per run, gap positive
+in 13 of 28 runs which is chance; concatenated arm the same. Ghost clean.
+
+DECLARED DIAGNOSTIC FIRES: sensor self-baseline R2 median 0.993 to 0.998,
+against a declared near-synchrony threshold of 0.95. Ten of thirteen sensors
+are essentially deterministic from their own history - rpm 0.998, pressures
+0.998-0.999, load 0.997. The chamber settles faster than it is sampled, so
+the system state already encodes the actuator and the actuator's history
+adds nothing beyond it.
+
+VERDICT: UNINFORMATIVE. No claim either way. Outflow has not been shown to
+work on real data and has not been shown to fail. The test did not happen.
+
+This is the least satisfying of the three outcomes declared in advance and
+the correct one. Without the diagnostic declared beforehand, the same null
+would have been readable either as a failure of the statistic or as an
+excuse for one.
+
+NOT RUN: three sensors are not synchronous (mic 0.003, signal_1 0.200,
+signal_2 0.226). Restricting to them after seeing which failed the
+diagnostic is the post-hoc subgroup hunt this project refuses. It needs its
+own pre-registration specifying the subset from the diagnostic before any
+outflow is computed.
+
+Rule added:
+
+78. Check the sampling rate against the system's settling time before
+    choosing a dataset to test a lagged-influence statistic on. A system
+    that reaches equilibrium within one sample carries no lagged influence
+    to detect, however well its ground truth is known.

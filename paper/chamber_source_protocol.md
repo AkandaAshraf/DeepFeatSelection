@@ -92,3 +92,75 @@ the test is uninformative rather than negative.
 Void if the ground-truth assignment is changed after seeing a result, if
 only one arm is reported, or if the synchrony diagnostic is invoked without
 being computed.
+
+---
+
+## Result (2026-08-22): UNINFORMATIVE, by the rule declared in advance
+
+### A protocol error to disclose first
+
+This document states "28 random-walk runs of 1,016 samples". That is wrong.
+It was written after inspecting only the first file. The runs are 1,016 to
+320,000 samples, median 10,000, total 891,016: 27 of 28 are comfortably
+ABOVE the validated floor, not below it. The two-arm design was therefore
+unnecessary, though harmless. No prediction was affected; the premise
+describing the data was simply inaccurate.
+
+### The result is null
+
+  PER-RUN (28 runs)     source outflow -0.0005   sensor outflow -0.0004
+                        gap -0.0000, positive in 13 of 28 runs - chance
+  CONCATENATED          source outflow -0.0002   sensor outflow +0.0002
+                        gap -0.0004
+  ghost                 -0.0007 and -0.0013, clean
+
+CH2 fails: actuator outflow does not exceed sensor outflow and does not
+clear the ghost by the 0.01 bar.
+
+### The declared diagnostic fires
+
+Sensor self-baseline R2, median over sensors:
+
+  single run, n = 10,000        0.9930
+  five runs concatenated        0.9980
+
+Both far above the 0.95 threshold declared for near-synchrony. Per sensor on
+the concatenated data:
+
+  rpm_in 0.998   rpm_out 0.998   load_in 0.997   load_out 0.998
+  pressure_upwind 0.998   pressure_downwind 0.999   pressure_ambient 0.999
+  pressure_intake 0.999   current_in 0.898   current_out 0.896
+  mic 0.003   signal_1 0.200   signal_2 0.226
+
+Ten of thirteen sensors are essentially deterministic from their own history
+at this sampling rate. The chamber settles faster than it is sampled, so the
+system state at time t already encodes the actuator setting at time t and
+the actuator's history adds nothing beyond it.
+
+### Verdict
+
+By the rule fixed before running: CH2 fails AND the sensors are
+near-synchronous, so this is UNINFORMATIVE. NO CLAIM EITHER WAY. The
+statistic has not been shown to work on real data, and it has not been shown
+to fail. The test did not happen.
+
+That is the least satisfying of the three declared outcomes and it is the
+correct one. Had the diagnostic not been declared in advance, this null
+would have been readable as either a failure of the statistic or an excuse
+for one.
+
+### What is NOT done here
+
+Three sensors are not synchronous - mic (0.003), signal_1 (0.200) and
+signal_2 (0.226). Restricting the analysis to those three after seeing which
+ones failed the diagnostic is precisely the post-hoc subgroup hunt this
+project refuses. It is not run. If it is worth doing it needs its own
+pre-registration, and the honest version would pre-specify the
+non-synchronous subset from the diagnostic BEFORE computing any outflow.
+
+### What the next dataset needs
+
+A real system sampled FAST relative to its own dynamics, so that a driven
+variable's own history does not already determine its next value. The
+chamber is a good apparatus and the wrong sampling rate. Higher-rate chamber
+recordings, if they exist, would test the same structure properly.
