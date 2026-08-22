@@ -489,3 +489,47 @@ closed permanently - this is the third and final test of it.
 If both hold, the statistic survives its own paper's principal failure mode
 in the regime where it works, and the next step is real data rather than
 another synthetic variant.
+
+### Maturity result (2026-08-22): SURVIVES
+
+b = 64, three seeds, median over seeds.
+
+  COUPLING 0.5                          COUPLING 0.7
+  epochs   src     sink    gap          epochs   src     sink    gap
+     5   0.0046  0.0027  0.0044            5   0.0052  0.0066 -0.0013
+    15   0.0108  0.0027  0.0081           15   0.0081  0.0066  0.0068
+    25   0.0100  0.0027  0.0098           25   0.0099  0.0062  0.0070
+    40   0.0091  0.0022  0.0090           40   0.0078  0.0048  0.0077
+    80   0.0087  0.0015  0.0072           80   0.0066  0.0054  0.0064
+
+  M1 source does not decay   PASS at both couplings
+  M2 gap does not close      PASS at both couplings
+  M3 ghost clean             PASS, max |0.0019|
+
+The shape is rise-then-plateau, not rise-then-collapse. Source outflow peaks
+around 15-25 epochs and settles slightly below the peak rather than
+returning toward zero: 0.0046 -> 0.0108 -> 0.0087 at coupling 0.5. That is
+the signature of an estimator converging, not of Mechanism 1.
+
+The sink behaves as it should under training. At coupling 0.5 sink outflow
+FALLS with epochs (0.0027 -> 0.0015) while the source rises, so the gap
+widens rather than narrowing - the opposite of what a difference-based
+importance score would do. At coupling 0.7 the untrained encoder starts with
+the gap NEGATIVE (-0.0013 at 5 epochs, sinks above sources) and training
+fixes it. An immature code cannot separate them; a trained one can.
+
+That is the third and final declared test and outflow has passed it.
+
+### Status after three tests
+
+The statistic is unconfounded (capacity retry), strong enough to use above
+coupling ~0.5 (coupling sweep), and not a difference-based importance score
+in that regime (this test). It is complementary to MACE's own inflow, which
+collapses to synchrony at exactly the couplings where outflow starts to work.
+
+Everything above is synthetic coupled logistic maps. NO REAL RECORDING HAS
+BEEN TOUCHED, and the honest next step is a real dataset with known sources,
+pre-registered, not another synthetic variant. On the evidence of this
+project's own history - the iEEG result passed every synthetic and
+within-cohort check and then failed replication - that step should be
+expected to be the hard one.

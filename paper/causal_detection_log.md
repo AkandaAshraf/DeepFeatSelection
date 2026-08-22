@@ -2045,3 +2045,34 @@ Rule added:
 77. A statistic rejected as too weak may have been measured only where it is
     weak. This one was killed at coupling 0.3 and works at 0.5; the regime
     was a parameter of our synthetic system, not of the world.
+
+## Source detection survives the maturity check (2026-08-22)
+
+Declared before running; third and final test.
+scripts/source_outflow_maturity.py, b=64, epochs {5,15,25,40,80} at
+coupling 0.5 and 0.7, three seeds.
+
+  coupling 0.5   src 0.0046 -> 0.0108 -> 0.0087 across 5 to 80 epochs
+                 sink 0.0027 -> 0.0015 (FALLS)
+                 gap 0.0044 -> 0.0072 (WIDENS)
+  coupling 0.7   src 0.0052 -> 0.0099 -> 0.0066
+                 gap -0.0013 at 5 epochs -> +0.0064 at 80
+
+M1, M2, M3 all PASS at both couplings. The shape is rise-then-plateau, not
+rise-then-collapse: outflow peaks near 15-25 epochs and settles slightly
+below, which is an estimator converging rather than Mechanism 1.
+
+The sink is the informative part. At coupling 0.5 sink outflow FALLS with
+training while the source rises, so the gap widens - the opposite of a
+difference-based importance score. At 0.7 the untrained encoder starts with
+the gap NEGATIVE (sinks above sources) and training fixes it: an immature
+code cannot separate them, a trained one can.
+
+STATUS: unconfounded, usable above coupling ~0.5, not Mechanism 1 in that
+regime, and complementary to inflow which collapses to synchrony exactly
+where outflow begins to work.
+
+ALL SYNTHETIC. No real recording touched. The next step is a real dataset
+with known sources, pre-registered - and on this project's own record the
+iEEG result passed every synthetic and within-cohort check before failing
+replication, so that step should be expected to be the hard one.
