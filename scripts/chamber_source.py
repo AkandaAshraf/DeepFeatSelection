@@ -119,7 +119,7 @@ def main() -> int:
         OUT / "chamber_source.csv", index=False)
 
     # ---- the declared synchrony diagnostic -----------------------------
-    from source_outflow_gate import E, embed, poly3, ridge_r2
+    from source_outflow_gate import E, embed, poly2, ridge_r2
     z = (xc - xc.mean(0)) / (xc.std(0) + 1e-12)
     emb = embed(z)
     m = emb.shape[0]
@@ -129,8 +129,8 @@ def main() -> int:
     zs = np.clip((emb - mu) / sd, -20, 20).astype(np.float32)
     lead = zs[:, [j * E for j in range(len(COLS))]]
     self_r2 = np.array([
-        ridge_r2(poly3(zs[:, q * E:(q + 1) * E])[tr_i], lead[tr_i + 1, q],
-                 poly3(zs[:, q * E:(q + 1) * E])[te_i], lead[te_i + 1, q])
+        ridge_r2(poly2(zs[:, q * E:(q + 1) * E])[tr_i], lead[tr_i + 1, q],
+                 poly2(zs[:, q * E:(q + 1) * E])[te_i], lead[te_i + 1, q])
         for q in range(len(COLS))])
     sen_self = float(np.median(self_r2[len(SOURCES):]))
     print(f"\nSYNCHRONY DIAGNOSTIC (declared): sensor self-R2 median "
@@ -141,7 +141,9 @@ def main() -> int:
     print("\nVERDICT (declared before running)")
     ch2 = (d1.margin.median() >= BAR and d1.gap.median() > 0
            and d2["margin"] >= BAR and d2["gap"] > 0)
-    ch3 = abs(d1.ghost_out.median()) <= 0.02 and abs(d2["ghost_out"]) <= 0.02
+    # CH3 as REGISTERED: ghost panel median <= 0.005 (was coded 0.02)
+    ch3 = (abs(d1.ghost_out.median()) <= 0.005
+           and abs(d2["ghost_out"]) <= 0.005)
     ch4 = (d1.gap.median() > 0) == (d2["gap"] > 0)
     print(f"  CH2 margin >= {BAR} and actuators above sensors, BOTH arms: "
           f"{'PASS' if ch2 else 'FAIL'}")

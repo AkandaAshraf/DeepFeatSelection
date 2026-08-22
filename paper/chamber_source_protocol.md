@@ -164,3 +164,127 @@ A real system sampled FAST relative to its own dynamics, so that a driven
 variable's own history does not already determine its next value. The
 chamber is a good apparatus and the wrong sampling rate. Higher-rate chamber
 recordings, if they exist, would test the same structure properly.
+
+---
+
+## Amendment (2026-08-22, same day): the result above is VOID
+
+An adversarial audit of the write-up immediately above found that its verdict
+rests on a diagnostic that does not discriminate, applied to a dataset that
+does not match this pre-registration. Every number in the Result section
+stands as computed; what it was taken to mean does not. Diagnostics below
+train no autoencoder and produce no outflow value.
+
+### V1  The 0.95 synchrony threshold does not separate the two cases
+
+The same diagnostic, same code path, run on the SYNTHETIC systems where
+outflow demonstrably works:
+
+  coupling   sink self-R2   outflow margin over ghost   diagnostic says
+  0.05         0.9865              0.0003               near-synchronous
+  0.35         0.9694              0.0019               near-synchronous
+  0.50         0.9586              0.0107  CLEARS BAR   near-synchronous
+  0.70         0.9348              0.0103  CLEARS BAR   not synchronous
+
+At coupling 0.50 the statistic clears the 0.01 bar that REOPENED this line,
+and the diagnostic calls that same system near-synchronous. A threshold that
+fires where the method works cannot license the inference "near-synchronous,
+therefore the test did not happen".
+
+The rule was applied exactly as written, so nothing was chosen after the
+fact. The rule itself was miscalibrated: because high self-R2 is generic in
+smooth or densely sampled data, the UNINFORMATIVE branch absorbs nearly
+every real dataset and the FAILS branch was close to unreachable. A
+pre-registration whose decisive negative outcome cannot be reached is not a
+pre-registration of anything.
+
+### V2  Ground truth is invalid in 10 of the 28 runs
+
+In all ten loads_hatch_mix runs, pot_1 and pot_2 are EXACTLY constant
+(sd = 0). Two of the three declared sources are not sources there; they are
+constants. Standardisation maps them to all-zero columns, so their outflow
+is identically zero and the median over three sources is exactly zero by
+construction. The saved output confirms it: src_outflow = +0.000000 in all
+ten.
+
+Those ten runs supply 8 of the 13 "positive" gaps. The headline "positive in
+13 of 28 runs, chance" is arithmetic over a set in which ten runs cannot
+produce anything else.
+
+On the 18 runs where all three sources actually vary:
+
+  gap median -0.00057, positive in 5 of 18
+
+which is worse for the statistic than the number reported, not better. The
+correction does not rescue anything; it removes an artefact that happened to
+flatter the null.
+
+### V3  The dataset is not the dataset this document describes
+
+Not "28 random-walk runs". Three families:
+
+  actuators_random_walk    16 runs   151,016 samples
+  loads_hatch_mix          10 runs   100,000 samples   (pot_1, pot_2 constant)
+  regime_jumps              2 runs   640,000 samples
+
+The two regime-jump runs are 71.8% of the concatenated arm, which is one of
+the two arms this protocol requires to agree. That arm is therefore mostly
+an experiment family this pre-registration never mentions. The chronological
+60/20/20 split also puts train and test in different regimes there: hatch
+self-R2 is 0.000 on regime_jumps_single.
+
+The earlier disclosure, that run lengths were misdescribed, understated this.
+The composition was wrong, not just the lengths.
+
+### V4  The mechanism given for the null is backwards
+
+Actuator self-R2 was never reported. It is 0.9986, 0.9989, 0.9919 - as high
+as the sensors'. The actuators are driven by nothing inside the chamber, so
+their near-perfect self-prediction cannot be the system "already encoding"
+them. It is dense sampling of a slowly moving random walk.
+
+High self-R2 is therefore a signature of oversampling, and the Result
+section's reading - "the chamber settles faster than it is sampled" - does
+not follow. Its prescription, that the next dataset be sampled FAST relative
+to its dynamics, is backwards: this one already is. What is needed is a
+driver that moves enough per sample to leave novelty in the target, which is
+a property of the excitation, not of the sampling rate alone.
+
+### V5  Code does not implement the registered protocol
+
+  CH3 is registered at ghost panel median <= 0.005; scripts/chamber_source.py
+      tests <= 0.02, four times looser. The outcome is unaffected (ghost was
+      0.0007 and 0.0013) but the committed gate is not the registered one.
+  scripts/chamber_source.py:122 imports poly3, which does not exist in
+      source_outflow_gate. The committed script CRASHES at the diagnostic;
+      the reported self-R2 numbers came from a separate ad-hoc run using
+      poly2. A committed artefact cannot reproduce a reported number.
+  The per-sensor table is labelled "concatenated data" but the figure beside
+      it says five runs concatenated - not the 28-run concatenation the
+      verdict rule refers to.
+  CH1 is never evaluated anywhere.
+
+### V6  The configuration is below the capacity at which outflow works
+
+The chamber ran b = 32 at V = 17 including the ghost, about 2V. Every
+synthetic test that reopened this line - the capacity retry, the coupling
+sweep, the maturity check - ran b = 64 at V = 16, about 4V. The real-data
+test used half the relative code width of the tests that established the
+statistic. The bottleneck study showed capacity is the binding constraint on
+detection, so this null is confounded with under-capacity and cannot be read
+as a property of the data.
+
+### Corrected status
+
+VOID, not uninformative. The dataset does not satisfy this document's own
+description of it, the declared ground truth fails in ten of twenty-eight
+runs, and the analysis ran below the capacity at which the statistic is known
+to work. No verdict of any kind is supported, and "uninformative" is itself a
+claim - that physics excused the method - which the evidence does not carry.
+
+What a valid test needs, fixed now so it cannot be chosen later: one
+experiment family, every declared source actually varying in every run,
+b = 4V matching the tests that reopened the line, a split that does not cross
+a regime boundary, and a fitness-for-purpose check on the DATA - is there any
+lagged driver-to-target information at this sampling rate at all - decided
+BEFORE the statistic is run and reported whatever it says.

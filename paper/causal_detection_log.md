@@ -2118,3 +2118,47 @@ Rule added:
     choosing a dataset to test a lagged-influence statistic on. A system
     that reaches equilibrium within one sample carries no lagged influence
     to detect, however well its ground truth is known.
+
+CORRECTION, same day: the chamber result above is VOID, not uninformative.
+An adversarial audit found the verdict rests on a diagnostic that does not
+discriminate, applied to a dataset that does not match the pre-registration.
+Full amendment in paper/chamber_source_protocol.md.
+
+  - the 0.95 synchrony threshold fires on the synthetic system at coupling
+    0.50, where outflow clears the 0.01 bar that reopened this line (sink
+    self-R2 0.9586). A threshold that fires where the method works cannot
+    license "near-synchronous, therefore no test happened".
+  - pot_1 and pot_2 are exactly constant in 10 of 28 runs, so source outflow
+    is identically zero there by construction; those runs supply 8 of the 13
+    reported positives. On the 18 valid runs the gap is positive in 5/18 -
+    worse than reported, not better.
+  - the data is three experiment families, not 28 random-walk runs; two
+    regime-jump runs are 71.8% of the concatenated arm.
+  - actuator self-R2 (0.999, never reported) is as high as the sensors', so
+    high self-R2 here is oversampling, not settling. The "sample faster"
+    prescription was backwards.
+  - CH3 registered at 0.005, coded at 0.02; chamber_source.py imports a
+    poly3 that does not exist, so the committed script cannot reproduce the
+    reported diagnostic; CH1 was never evaluated.
+  - ran at b = 2V, half the relative width of every test that reopened the
+    line, so the null is confounded with under-capacity.
+
+Rules added:
+
+79. A pre-registered escape hatch must be calibrated against a system where
+    the method is known to WORK before it is trusted to excuse a null. If the
+    diagnostic fires there too, it does not discriminate, and invoking it is a
+    claim rather than a check.
+
+80. Verify that every declared ground-truth variable actually varies in every
+    run before treating runs as replicates. A constant column is not a source;
+    it is a zero that the statistic cannot help but reproduce.
+
+81. Describe a dataset from all of its files, not from the first one and not
+    from the directory name. Composition - how many experiment families, how
+    the samples are distributed across them - is part of the pre-registration,
+    and getting it wrong invalidates arms that depend on pooling.
+
+82. Run a real-data test at the configuration the method was shown to work at.
+    A null obtained below that capacity is confounded and carries no
+    information about the data.
