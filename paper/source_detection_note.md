@@ -253,3 +253,55 @@ That is the barrier a second attempt has to address, and it is not a small
 one. It is also a defensible reason for MACE to remain a drivenness detector
 and to keep saying so plainly, rather than reaching for a source claim it
 cannot support.
+
+---
+
+## Retry at sufficient capacity (declared 2026-08-22, before running)
+
+The bottleneck experiment changed the premise this rejection rested on.
+
+The rejection above diagnosed the cause precisely: outflow conditions on the
+CODE, and a 16-dimensional code is not a sufficient statistic for the state,
+so residual driver information leaks into a sink's increment and the sink
+scores like a source. The literature pass then argued the barrier was
+structural - linear cost and confounder screening in tension, because
+amortising through a bottleneck surrenders the completeness screening needs.
+
+Both arguments assumed a TIGHT bottleneck. The width experiment
+(paper/bottleneck_protocol.md) finds MACE needs b of order 2V regardless -
+a compression of only 1.5x against the 3V delay embedding. If the code must
+be nearly as wide as the input anyway, it is close to sufficient, and the
+tension may be much smaller than argued.
+
+The original run used b = 16 at V = 15, where the new rule gives b ~ 32. It
+was under-provisioned by about a factor of two, in precisely the way that
+produces the failure observed.
+
+### What is tested, fixed now
+
+The identical gate (S1 separation, S2 ghost, S3 maturity) at b in
+{16, 32, 64, 128}, three seeds, with b = 16 retained as the published
+reference point.
+
+  R1  Sources separate from ISOLATED channels at sufficient b. The original
+      gap was +0.0023 and failed.
+  R2  THE DECISIVE ONE. Sources separate from SINKS. The original failure
+      was sinks (+0.0062) scoring as high as sources (+0.0060). If capacity
+      was the cause, this gap opens as b grows. If it stays closed at
+      b = 128, the confounding is structural as the literature suggests and
+      the rejection stands permanently.
+  R3  The ghost stays near zero at every width, as it did at b = 16 after
+      the baseline-depth fix.
+  R4  NO PREDICTION on whether any width makes the statistic usable.
+      Separation appearing is necessary, not sufficient; it would still need
+      the maturity check and a real-data test.
+
+### The rule, fixed now
+
+The rejection is lifted only if R2 holds AND R3 holds. A source-sink gap
+that appears without the ghost staying clean is a capacity-enabled artefact,
+not a working statistic.
+
+If R2 fails at every width, this is recorded as CONFIRMED REJECTED: the
+barrier is the confound, not the compression, and the deep-research
+conclusion stands.
