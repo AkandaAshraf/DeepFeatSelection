@@ -386,3 +386,60 @@ further variant will be tried.
 Note the tension between C2 and C3 is the real question. Strong coupling
 should raise the source signal AND strengthen the sink's proxy of it. Which
 grows faster is not known and is what this measures.
+
+### Coupling sweep result (2026-08-22): LINE REOPENED
+
+b = 64, three seeds, median over seeds:
+
+  coupling   source    sink     ghost    margin   src-sink gap   sink inflow
+    0.05    -0.0004  -0.0007  -0.0007   +0.0003     +0.0003       +0.0013
+    0.15    +0.0000  -0.0006  -0.0011   +0.0010     +0.0006       +0.0045
+    0.30    +0.0009  -0.0003  -0.0006   +0.0019     +0.0016       +0.0113
+    0.50    +0.0100  +0.0027  -0.0008   +0.0107     +0.0098       +0.0118
+    0.70    +0.0099  +0.0062  -0.0012   +0.0103     +0.0070       +0.0176
+
+  C1 HOLDS  source outflow grows about 25-fold from coupling 0.05 to 0.70.
+            The weak signal was NOT intrinsic.
+  C2 HOLDS  the margin over the ghost clears the 0.01 bar at coupling 0.50
+            (+0.0107) and 0.70 (+0.0103).
+  C3 HOLDS  sinks stay separated at every coupling, positive in 3/3 seeds
+            throughout, and the gap GROWS with coupling rather than closing.
+  C4 HOLDS  maximum absolute ghost over all cells is 0.0013.
+
+The risk C3 named did not materialise. Stronger driving raises the source
+signal FASTER than it strengthens the sink's proxy of that driver - though
+the first sign of the predicted return appears at 0.70, where sink outflow
+rises to +0.0062 and the gap narrows from +0.0098 to +0.0070. The statistic
+would be expected to fail at couplings beyond those tested.
+
+### The complementarity, which was not anticipated
+
+The boundary map measured MACE's own recall against coupling and found it
+flat at 0.18-0.22 through coupling 0.35 and COLLAPSING to 0.06 at 0.50 -
+synchrony, where the driven channel locks to its driver so its own history
+predicts it and the inflow excess vanishes.
+
+Outflow clears its bar at exactly 0.50 and above.
+
+The two statistics are complementary in precisely the regime where each
+fails. Where coupling is weak, inflow detects driven channels and outflow
+has no signal. Where coupling is strong, inflow collapses to synchrony and
+outflow separates sources. Neither covers the whole range; together they
+cover more of it than either alone, and the crossover sits near coupling
+0.5.
+
+That is a substantive result about the pair of statistics, not about either
+one, and it was not predicted.
+
+### What is NOT established
+
+Synthetic coupled logistic maps only. The margin at coupling 0.5 is +0.0107
+against a bar of 0.01 - it clears, but not comfortably. The maturity check
+S3 was run at coupling 0.35 in the original gate and has NOT been repeated
+at the couplings where the statistic works; a difference-based importance
+score would decay with training and that must be re-tested here before any
+further claim. No real recording has been touched.
+
+The honest status: the statistic is unconfounded, correctly signed, and
+strong enough to use in the strong-coupling regime on synthetic data. That
+is a reopened line, not a working method.

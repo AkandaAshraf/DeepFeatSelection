@@ -2003,3 +2003,45 @@ Rule added:
     showed the code must be nearly as wide as its input anyway, the stated
     mechanism no longer held and the retry changed the diagnosis even though
     the verdict survived.
+
+## Source detection: LINE REOPENED, and the two statistics are complementary
+## (2026-08-22)
+
+Declared before running. scripts/source_outflow_coupling.py, b=64,
+coupling in {0.05, 0.15, 0.30, 0.50, 0.70}, three seeds.
+
+  coupling  source    sink     ghost    margin   src-sink gap
+    0.05   -0.0004  -0.0007  -0.0007   +0.0003     +0.0003
+    0.15   +0.0000  -0.0006  -0.0011   +0.0010     +0.0006
+    0.30   +0.0009  -0.0003  -0.0006   +0.0019     +0.0016
+    0.50   +0.0100  +0.0027  -0.0008   +0.0107     +0.0098
+    0.70   +0.0099  +0.0062  -0.0012   +0.0103     +0.0070
+
+All four declared conditions hold. Source outflow grows ~25-fold with
+coupling, so the weak signal recorded on Thursday was not intrinsic; the
+margin clears the 0.01 bar at coupling 0.50 and 0.70; sinks stay separated
+in 3/3 seeds at every coupling with the gap GROWING rather than closing; the
+ghost stays within 0.0013 everywhere.
+
+The C3 risk - that harder driving strengthens the sink's proxy and recloses
+the confound - did not materialise, though its first sign appears at 0.70
+where sink outflow reaches +0.0062 and the gap narrows.
+
+UNANTICIPATED AND MORE INTERESTING: the two statistics are COMPLEMENTARY.
+The boundary map found MACE's own recall flat at 0.18-0.22 through coupling
+0.35 and collapsing to 0.06 at 0.50, where synchrony makes a driven
+channel's own history predict it and the inflow excess vanishes. Outflow
+clears its bar at exactly 0.50 and above. Where inflow works outflow has no
+signal; where inflow collapses outflow separates sources. The crossover sits
+near coupling 0.5 and neither statistic covers the whole range alone.
+
+NOT ESTABLISHED: synthetic logistic maps only; the margin clears but not
+comfortably; the S3 maturity check was run at coupling 0.35 and has NOT been
+repeated where the statistic works, which it must be before any further
+claim; no real recording touched. Reopened line, not a working method.
+
+Rule added:
+
+77. A statistic rejected as too weak may have been measured only where it is
+    weak. This one was killed at coupling 0.3 and works at 0.5; the regime
+    was a parameter of our synthetic system, not of the world.
