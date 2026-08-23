@@ -207,3 +207,45 @@ by the gate, before any statistic is run, and reported in full.
 Void if the grid or the candidate list changes after any number is seen, if a
 dataset is selected at other than the smallest qualifying m, or if any
 candidate screened is left unreported.
+
+---
+
+## Screen result (2026-08-23): two of four chamber datasets qualify
+
+Reference recomputed with the identical code path: L30 = +0.0114,
+L50 = +0.0136. Unchanged, as required.
+
+  wt_walks_v1            m=1  +0.0002 | m=2 +0.0007 | m=5 +0.0018
+                         m=10 +0.0158 QUALIFIES | m=20 +0.0162 | m=50 +0.0405
+                         at m>=10 only 2 runs retain 2,000 samples: the two
+                         320k-sample regime_jumps runs. 4 live sources there
+                         (hatch is constant in them).
+  wt_changepoints_v1     m=1 +0.0000, and no run retains 2,000 samples at any
+                         higher m. DISQUALIFIED.
+  wt_bernoulli_v1        +0.0001, +0.0000, +0.0000, +0.0001, +0.0004, +0.0015
+                         across the grid. DISQUALIFIED. Despite the name, the
+                         randomised loads are held for many samples: their
+                         lag-1 autocorrelation is 0.99.
+  wt_intake_impulse_v1   m=1 +0.0008 | m=2 +0.0015 | m=5 +0.0083
+                         m=10 +0.0224 QUALIFIES | m=20 +0.0254 | m=50 +0.0000
+                         5 runs of 250,000 samples, 25,000 after decimation.
+                         2 live sources: hatch and load_in.
+
+Ghost at or below +0.0011 in every cell of every dataset.
+
+The earlier verdict on wt_walks_v1 stands as given: at the sampling rate its
+logs are distributed in, it carries no lagged influence. Decimation is not a
+rescue of that result but a different question - whether the APPARATUS can
+carry lagged influence at some rate - and the answer for two of these
+datasets is yes.
+
+The m=50 collapse for the impulse dataset, from +0.0254 to +0.0000, is
+consistent with the transient being aliased away entirely at that spacing.
+No claim is made about it.
+
+### A selection rule that was NOT declared
+
+The script broke the tie between the two qualifying datasets by taking the
+larger lag_info. The protocol declared how a dataset qualifies but not how to
+choose among several that do, so that tie-break is an undeclared rule. It is
+not used. BOTH qualifying datasets go forward, and both are reported.
