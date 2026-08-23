@@ -2239,3 +2239,57 @@ Rule added:
     holds only under a premise, the premise needs a number and that number
     needs a positive control, or the guarantee must be reported as
     unlicensed.
+
+2026-08-23  SATURATION GATE - VOID, and Rules 71-72 narrowed
+Pre-registration: paper/saturation_gate_protocol.md at 49078fa. Full result:
+paper/saturation_gate_result.md. 57 cells, 10.5 min.
+
+S1, the declared reproduction check, FAILED on the discovery grid. Source
+false positives are 0.000 at every observation-noise level down to a
+self-baseline of 0.060 (V=15, coupling 0.35, 27 cells). What falls instead is
+RECALL, 1.00 to 0.25: the method stops seeing drivenness before it starts
+inventing it. The script stopped at S1 as instructed; no s* was fitted.
+
+WHY IT DID NOT REPRODUCE. The observation-noise cells that produced Rules
+71-72 were run ONLY at k=2, with duplicated channels present. The crossed
+cell - low saturation, no duplicates - does not exist in
+ExpOutput/duplicate_channel/duplicate_channel.csv. These 27 cells are that
+missing cell. The claim was generalised past its evidence.
+
+HELD-OUT CELLS, computed before S1 was evaluated and reported as description
+only, nothing fitted to them: at V=30 the failure DOES appear without any
+duplicates, source FP reaching 0.80.
+
+TOGETHER, at matched self-baseline:
+  self-R2 ~0.87   V=15 srcFP 0.00   V=30 srcFP 0.20
+  self-R2 ~0.65   V=15 srcFP 0.00   V=30 srcFP 0.40
+The same self-R2 carries different risk at different width, so a
+one-dimensional per-channel saturation bar cannot exist in the proposed form.
+Rule 84's first item is answered partially and not as expected: the licensing
+premise is at least two dimensional.
+
+CONFOUND NAMED, NOT RESOLVED: b was held at 32 for both widths, so b/V is 2.1
+at V=15 and 1.07 at V=30. The V=30 grid was under-capacity by inherited
+default - recall 0.48-0.52 even at zero noise. Width and capacity are not
+separated and no further reading of these cells will separate them.
+
+NEEDED: saturation x b/V held at 2 x k in {0,2}, crossed. Until then the
+honest statement is that sources can be flagged at reduced saturation, seen
+with duplicates at V=15 and without them at V=30 under-capacity, and the
+conditions are not established.
+
+Rules added:
+
+85. Show that the discovery system exhibits the failure before fitting a gate
+    against it. This gate was designed against a phenomenon the discovery
+    grid did not contain; the pre-registered reproduction check caught it and
+    nothing else would have.
+
+86. Rules 71 and 72 are NARROWED. Their observation-noise evidence is k=2
+    only. The no-duplicate cell at low saturation was never run and, when
+    run, gives source FP 0.000 at V=15 down to self-R2 0.06. The failure is
+    real; its conditions were never established.
+
+87. If the same value of a licensing quantity carries different risk under
+    different capacity, it cannot be the gate on its own. A premise that is
+    one number in the theory may need two in practice.
