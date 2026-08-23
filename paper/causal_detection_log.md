@@ -2200,3 +2200,42 @@ Rule added:
     same units, on a system where the method works. Without that positive
     control its zero is uninformative and the disqualification is an
     assumption wearing a number.
+
+2026-08-23  THRESHOLD AUDIT - which declared constants were ever calibrated?
+Full record in paper/threshold_audit.md. Prompted by the chamber void; asks
+the Rule 79 question of every load-bearing constant in the project. Changes
+no result.
+
+  CALIBRATED  ghost bar 0.005 (ghost_max 0.0013-0.0015 flat across all 90
+              bottleneck and 51 boundary cells, so the bar is 4x the null on
+              systems where the method works); length floor ~2,000 (read off
+              the n sweep); gate-statistic thresholds (matched 10% specificity
+              by construction); flagging threshold (per-scan surrogates, not a
+              constant); DepMap tau_prox = 0.8 (same-complex pairs 0.90-0.98,
+              PSMA1-KRT1 0.04 - thin anchor set but controlled both ways, and
+              cross-checked independently by the Perturb-seq base-rate
+              matching); dataset fitness L50.
+
+  UNCALIBRATED
+              SATURATION - most consequential. Self-R2 "near 1" licenses
+              Proposition 1 and has never been made a number. No saturation
+              gate exists; only a reported statistic, (self_r2 > 0.9).mean(),
+              in three scripts, where 0.9 is unexamined. The failure mode is
+              quantified - off ceiling, up to 50% of sources flagged, ghost
+              passes (Rules 71-74) - while the licensing condition is not.
+              OUTFLOW BAR 0.01 - declared, never justified; the line was
+              reopened on a margin of 0.0107, clearing by 7%.
+              iEEG validity gate 0.30 - moot, that result was withdrawn.
+              tf/torch F1 0.90 and F2 0.70 - low stakes, passed comfortably.
+              source FP rate 0.05 - never binds, observed 0.000 throughout.
+
+The constant under review at PLOS is controlled in both directions. That was
+the outcome most in need of checking, and the reason for auditing before a
+reviewer does.
+
+Rule added:
+
+84. A licensing condition stated qualitatively is not a gate. If a guarantee
+    holds only under a premise, the premise needs a number and that number
+    needs a positive control, or the guarantee must be reported as
+    unlicensed.
