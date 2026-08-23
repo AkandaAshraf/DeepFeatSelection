@@ -2405,3 +2405,65 @@ Rule added:
     comparison of medians and a channel-level ranking are different
     quantities; a threshold meaning something for one means nothing for the
     other. Three of today's experiments voided or misfired on this mistake.
+
+2026-08-23  CONDITIONAL OUTFLOW - CONFIRMED at k=0. The line reopens.
+Pre-registration: paper/conditional_outflow_protocol.md at 2e1c431. Full
+result: paper/conditional_outflow_result.md. 90 cells, fresh seeds 5-14,
+17 min. A1 and C1 differ ONLY in the conditioning set.
+
+  SOURCE vs SINK AUC, k=0      c=0.30  c=0.50  c=0.70
+  A1 marginal (current)         0.768   0.655   0.517
+  C1 conditional                0.856   0.877   0.872
+  margin                       +0.087  +0.222  +0.356
+
+  P1 direction reproduces (0.768 -> 0.517). P2 PRIMARY passes: C1 above A1 at
+  all three, margin grows. P3 passes: C1 puts sinks on the isolated reference
+  at every coupling. P5 passes: both ghosts clean.
+
+At coupling 0.70 the current metric is at CHANCE - it cannot tell a source
+from its own sink where driving is strongest. Conditioning holds at 0.872,
+and the gap widens with coupling because the sink proxy that defeats the
+marginal statistic is exactly what conditioning removes.
+
+WHY, as a reason rather than a fit: a sink at t is a function of its driver
+at t-1 and itself at t-1, both already in the conditioning set, so it adds
+nothing unique. A source at t carries its own value at t, which the lagged
+sinks do not yet contain. C1 is conditional Granger causality in code space,
+not a difference-based importance score.
+
+CONTROL, not pre-declared: sinks use r in [3.5,3.7], sources AND isolated
+share [3.7,3.9]. Source-vs-ISOLATED AUC is ~0.90 for BOTH statistics at every
+coupling, so neither tracks the parameter range, and conditioning fixes the
+source-vs-sink comparison without breaking what already worked.
+
+EFFECT SIZES: source median +0.00172 vs null -0.00010 at c=0.70, ~17x. Source
+q25 +0.00005 against sink q75 -0.00002, so ~13% of pairs mis-order. AUC 0.87
+is not a clean threshold.
+
+P4 THE DECLARED RISK IS UNTESTED, NOT CLEARED. Copies did not zero the
+sources - C1 AUC rose to 0.98 at k=1,2 - but adding copies grows the panel
+while b stayed at 64, so b/V moved 4.00 -> 3.37 -> 2.91. The redundancy axis
+is confounded with capacity: the FOURTH confounded axis today, repeating the
+saturation experiment's mistake. Tempering it: the confound moves in the
+direction that should have made the risk MORE likely, and P2/P3/P5 were all
+declared and evaluated at k=0 where capacity does not move. The k>0
+improvement is UNEXPLAINED and is not claimed as a benefit of redundancy.
+
+STATUS: the line reopens on a measurement, not a threshold - with a declared
+prediction, fresh seeds, and the statistic it replaces beside it. But this is
+one synthetic family, coupled logistic, which is where every previous version
+of this line also looked healthy. Next step is a real dataset clearing the
+dataset-fitness gate at L50, which exists so the data is qualified before the
+statistic runs on it.
+
+Rules added:
+
+91. Vary one thing. Adding channels to test redundancy also changed the panel
+    size and hence the capacity ratio, so the axis measured two things at
+    once. When an axis changes the channel count, hold b/V fixed by
+    construction.
+
+92. When a statistic confuses two roles, examine what it CONDITIONS on before
+    what it SCORES. Rescoring the same predictions cannot separate what the
+    conditioning set has already merged. A day was spent on thresholds and
+    error functions over a difference that lived in neither.
