@@ -2467,3 +2467,69 @@ Rules added:
     what it SCORES. Rescoring the same predictions cannot separate what the
     conditioning set has already merged. A day was spent on thresholds and
     error functions over a difference that lived in neither.
+
+2026-08-23  REAL-DATA CONDITIONAL OUTFLOW - does not transfer; the MARGINAL
+statistic does. Pre-registration: paper/real_conditional_protocol.md at
+79f00cc. Full result: paper/real_conditional_result.md. 11.2 min.
+
+Datasets selected by the fitness gate, both qualifying ones tested and
+reported, corrected ground truth (load_in/load_out settable), b = 4V.
+
+  PRIMARY wt_intake_impulse_v1 m=10, 5 runs, 10 source / 55 sensor channels
+    A1 marginal    AUC 0.916  source +0.00568  ghost CLEAN  perm p 0.0001
+    C1 conditional AUC 0.751  source +0.00209  ghost DIRTY  perm p 0.0052
+    R1 FAILS
+  SECOND  wt_walks_v1 m=10, 2 runs
+    A1 AUC 0.605 ghost DIRTY p 0.19 | C1 AUC 0.632 ghost DIRTY p 0.13
+    R1 passes, but both near chance, both dirty, neither significant
+
+Declared verdict PARTIAL. It should be read as R6 for C1: the dataset where
+R1 passed carries no weight, and on the only clean, significant dataset
+conditioning LOSES decisively to the statistic it was meant to replace.
+
+WHY - the risk declared before the synthetic run, arriving on real data. The
+synthetic protocol named it: "a source recoverable from its own sinks is
+redundant too", and the redundancy axis meant to test it was confounded with
+capacity. The impulse dataset has 2 actuators and 11 downstream sensors, so
+the actuators ARE recoverable from the sensors and conditioning removes their
+unique contribution along with the redundancy. C1's source signal is 2.7x
+smaller than A1's and its source 5th percentile is NEGATIVE (-0.0035). The
+synthetic system gave each source two sinks; this gives each actuator five or
+six. Conditioning wins where the driver is not reconstructable from what it
+drives - the opposite of most real systems.
+
+UNEXPECTED, not the hypothesis, A1's permutation test NOT pre-declared and
+computed only because withholding it would misinform: the EXISTING marginal
+statistic reaches AUC 0.916 on a real physical system with structural ground
+truth, clean ghost, p = 0.0001. First real-data positive in this line. One
+dataset, one protocol, 5 runs, 10 vs 55 channels. To replicate, not announce.
+
+It does NOT contradict the voided chamber run, which used m=1 (no lagged
+influence to find), b=2V (half the needed capacity) and a truth set with two
+of five actuators labelled as sensors. Correct all three and the same
+apparatus yields a signal. The fitness gate and the b=4V rule earned their
+place.
+
+PROTOCOL ERRORS DISCLOSED: (1) the protocol says hatch is constant in the
+regime_jumps runs - wrong, sd is 17.6 over 320k and 0.000 over the first 20k,
+which is what was inspected; the analysis used real data and scored five
+sources, so no number is affected. Second truncated-read error today. (2) R3
+ghost-cleanliness FAILED on both datasets but was declared as a prediction
+rather than as disqualifying, unlike the error-metric protocol the same day.
+Had it been disqualifying the second dataset would have been excluded and the
+verdict would have been sharper.
+
+Rules added:
+
+93. A conditional statistic measures unique contribution, so it fails exactly
+    where its target is redundantly represented. Before choosing between a
+    marginal and conditional form, count driven channels per source: real
+    systems usually have many measured consequences of few controls, which is
+    where conditioning loses.
+
+94. Rule 81 extended: describe a dataset from all of its ROWS as well as all
+    of its files. Twice today a truncated read reached a committed protocol.
+
+95. Declare validity conditions as DISQUALIFYING, not as predictions. A ghost
+    check that fails but counts only as a missed prediction lets an
+    uninterpretable dataset into the verdict.
