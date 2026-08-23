@@ -2293,3 +2293,56 @@ Rules added:
 87. If the same value of a licensing quantity carries different risk under
     different capacity, it cannot be the gate on its own. A premise that is
     one number in the theory may need two in practice.
+
+2026-08-23  CALIBRATED OUTFLOW BAR - the ghost is the wrong null; 0.01 stands
+Pre-registration: paper/outflow_bar_protocol.md at 4a19b1a. Full result:
+paper/outflow_bar_result.md. 90 runs, 24 min.
+
+  O1  ghost null, 30 calibration seeds: median -0.0007, range [-0.0016,
+      +0.0003]. A null, as required.
+  O2  bar = q95(ghost) = -0.00005, two orders below the declared 0.01. O5
+      does not fire; the line does not close on that rule.
+  O3  sensitivity at coupling 0.50: 29/30 clear the bar, 0.97. PASS.
+  O4  control at coupling 0.30: 25/30 clear it, 0.83. FAIL (bar 0.20).
+  VERDICT as declared: DOES NOT SEPARATE.
+
+DESIGN ERROR OWNED: O4 called coupling 0.30 "known NOT to work", inherited
+from the coupling sweep where it failed a margin of 0.01. That is a statement
+about the OLD bar, not ground truth - at 0.30 sources genuinely drive sinks,
+and a no-influence bar should flag them. The control was defined in terms of
+the threshold being replaced and did not survive the replacement.
+
+WHAT SETTLES IT REGARDLESS: at coupling 0.50, sources clear the bar 29/30 and
+SINKS clear it 28/30. A null-calibrated bar admits driven channels almost as
+often as sources.
+
+WHY: the isolated channels in the existing coupling sweep - real dynamics,
+coupled to nothing - sit exactly at the ghost level at every coupling
+(-0.0005 to -0.0007). So the ghost IS a valid null for "influences nothing".
+Sinks are not at the null because a sink CARRIES A PROXY of its driver, so
+masking it removes information the code was using. What confuses outflow is
+proxy-carrying, not influence, and the ghost has neither.
+
+Also: the sink proxy GROWS with coupling, +0.0027 at 0.50 to +0.0062 at 0.70,
+against a flat source signal of +0.0100 and +0.0099. Risk C3, recorded as
+survived when the coupling sweep ran, returns at the top of the range.
+
+CONSEQUENCE: 0.01 is not retired and not replaced. What it was actually doing
+is suppressing the sink proxy while being documented as a margin over the
+ghost, and as a sink threshold it is entirely uncalibrated. Rule 84's second
+item stays OPEN with a sharper specification: calibrate against the SINK
+distribution, not the ghost.
+
+NOTED, CLAIMED AS NOTHING: source outflow exceeds sink outflow in 25/30 runs
+at coupling 0.30 and 27/30 at 0.50. From re-reading runs collected for
+another purpose; needs its own pre-registration to be a finding.
+
+Rules added:
+
+88. A null control must exclude what actually confuses the statistic. The
+    ghost excludes influence; what confuses outflow is proxy-carrying. A bar
+    calibrated against the wrong null admits every driven channel while
+    looking rigorous.
+
+89. When a threshold is replaced, re-derive every control defined in terms of
+    the old one.
