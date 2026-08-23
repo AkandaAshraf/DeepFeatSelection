@@ -2346,3 +2346,62 @@ Rules added:
 
 89. When a threshold is replaced, re-derive every control defined in terms of
     the old one.
+
+2026-08-23  ERROR-METRIC SWEEP - VOID on an imported bar, over a table worth
+re-running. Pre-registration: paper/error_metric_protocol.md at b5dfa70.
+Full result: paper/error_metric_result.md. 15 cells, 8 metrics, one
+autoencoder per cell so all metrics see identical codes and identical data.
+
+M1 required A1 (the current metric) to reproduce: source-vs-sink AUC >= 0.80
+at coupling 0.50 and degrading at 0.70. Got 0.767 / 0.704 / 0.542. The
+degradation reproduced exactly; the 0.80 bar did not. VOID; the script
+stopped at M1 without evaluating M2, M3 or M5.
+
+THE BAR WAS IMPORTED FROM A DIFFERENT STATISTIC. 0.80 came from the
+outflow-bar run, where source exceeded sink in 27 of 30 RUNS - a run-level
+comparison of medians. AUC here is a CHANNEL-level ranking. At coupling 0.50
+the medians separate cleanly (+0.0126 vs +0.0028) while individual channels
+overlap enough to give 0.704. Third instance today of setting a bar or
+control by importing a number from a different quantity (O4, S1, M1).
+
+DESCRIPTION ONLY, nothing fitted or claimed:
+
+  SOURCE vs SINK AUC     c=0.30  c=0.50  c=0.70
+  A1_r2  (current)        0.767   0.704   0.542
+  A2_nmae                 0.749   0.676   0.542
+  A3_spearman             0.762   0.713   0.547
+  A4_gauss_nats           0.762   0.671   0.531
+  A5_rff_r2               0.618   0.664   0.553  ghost-excluded
+  B1_recon_mse            0.444   0.400   0.367  ghost-excluded
+  B2_recon_mae            0.329   0.327   0.253  ghost-excluded
+  C1_conditional          0.916   0.929   0.924
+
+  - Family A is one metric in four costumes: rescoring the same ridge
+    predictions changes nothing, all agree within 0.04 and degrade together.
+    A4 was declared expected-degenerate and its largest gap is 0.033.
+  - Family B is worse than useless, which answers one reading of the
+    question: the network's own reconstruction error ranks SINKS ABOVE
+    SOURCES (AUC below 0.5) with a dirty ghost. A sink is reconstructed
+    largely from its driver, so masking it damages everything correlated with
+    it and the measure reads correlation, not direction.
+  - C1 conditional pins sinks at the null (-0.00007) exactly where isolated
+    channels and the ghost sit, at every coupling, while the source signal
+    RISES with coupling (+0.00053, +0.00212, +0.00290) instead of being
+    overtaken. Under R2 the sink proxy grows +0.00283 to +0.00740 against a
+    source of +0.01140. Cost is magnitude: about 4x smaller than R2, still
+    ~40x its own null. The declared risk - that sources recoverable from
+    their sinks collapse too - did not appear here and is untested under
+    denser redundancy.
+
+NOT A FINDING. C1 was one column of eight, on one system family, with no
+declared bar, from a void run. A proper test needs C1 as the primary
+hypothesis, FRESH seeds, a qualitative reproduction check with no imported
+constant, the decisive comparison expressed as C1 against A1 on the same
+cells, and a redundancy axis.
+
+Rule added:
+
+90. Never import a numeric bar from one statistic to another. A run-level
+    comparison of medians and a channel-level ranking are different
+    quantities; a threshold meaning something for one means nothing for the
+    other. Three of today's experiments voided or misfired on this mistake.
