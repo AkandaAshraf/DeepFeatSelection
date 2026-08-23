@@ -78,3 +78,63 @@ median across the 16 runs.
 Void if the threshold is moved after the chamber number is seen, if the
 ghost control exceeds 0.002, if runs are added or dropped after a result, or
 if the outcome is reported for only one of the two systems.
+
+---
+
+## Result (2026-08-23): the chamber is DISQUALIFIED on evidence
+
+### Reference, computed first
+
+  coupling   lag_info    ghost     outflow status (already established)
+  0.05       +0.0007    -0.0000    fails
+  0.15       +0.0044    -0.0001    fails
+  0.30       +0.0114    -0.0001    fails          <- L30, the floor
+  0.50       +0.0136    -0.0002    WORKS          <- L50, the pass mark
+  0.70       +0.0189    -0.0001    WORKS
+
+lag_info rises monotonically with coupling and the ghost sits at zero
+throughout, so the quantity measures what it was built to measure. The two
+couplings where outflow clears the 0.01 bar are the two highest values.
+
+### Candidate
+
+  16 actuators_random_walk runs, one family, all three sources varying
+
+  lag_info median  -0.0000   range [-0.0020, +0.0000]
+  ghost    median  -0.0000   range [-0.0007, +0.0000]
+
+### Verdict
+
+DISQUALIFIED. The chamber sits at zero - not merely below the L30 floor but
+below coupling 0.05, the weakest system tested, by an order of magnitude.
+The maximum over all 16 runs is +0.0000. At this sampling rate the actuators'
+history adds nothing to any sensor beyond that sensor's own history.
+
+There is no lagged influence in this dataset for any statistic of this family
+to find. The chamber was never a test of the method, and it could not have
+been. That was true before any autoencoder was trained.
+
+### What this settles, and what it does not
+
+It settles the chamber: no re-run at b = 4V, no re-registration, no further
+compute. The exclusion now rests on a measured absence rather than on the
+uncalibrated self-R2 threshold that voided the earlier attempt.
+
+It also vindicates the earlier conclusion while confirming the audit's charge
+against its reasoning. "The test did not happen" was right. The self-R2
+diagnostic was not what showed it and could not have shown it, since that
+same diagnostic fires at coupling 0.50 where the method works. Right answer,
+wrong instrument, now with the right one.
+
+LIMIT, stated rather than left implicit: lag_info is linear in a poly2
+expansion of the delay embedding. A purely nonlinear lagged dependence
+invisible to that expansion would not be detected. The check is not a proof
+of absence. What licenses its use here is that the same expansion registers
++0.0114 to +0.0189 on the systems where the method works, so it is sensitive
+at exactly the scale that matters, and the chamber returns zero against it.
+
+### Standing use
+
+This becomes the pre-flight gate for every future candidate dataset in this
+line. A dataset is not selected until it has been run and has cleared L50,
+and the number is reported whatever it says.

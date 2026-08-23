@@ -2162,3 +2162,41 @@ Rules added:
 82. Run a real-data test at the configuration the method was shown to work at.
     A null obtained below that capacity is confounded and carries no
     information about the data.
+
+2026-08-23  DATASET FITNESS CHECK - the chamber is disqualified on evidence
+Pre-registration: paper/dataset_fitness_protocol.md, committed at 608ddab
+before the quantity was computed. Rule 79 applied to the check Rule 78 asked
+for: the pass mark is calibrated against systems where outflow is known to
+work, not declared as a constant.
+
+Quantity: median over targets of R2[x_q(t+1) | own lags (+) driver lags] -
+R2[x_q(t+1) | own lags]. Linear, poly2, no autoencoder trained.
+
+  REFERENCE  coupling 0.05 +0.0007 | 0.15 +0.0044 | 0.30 +0.0114 (L30, floor)
+             0.50 +0.0136 (L50, pass mark, outflow WORKS) | 0.70 +0.0189
+             ghost at zero throughout; monotone in coupling
+  CHAMBER    16 actuators_random_walk runs, lag_info median -0.0000,
+             max over runs +0.0000, ghost -0.0000
+
+VERDICT: DISQUALIFIED. The chamber sits below coupling 0.05 - the weakest
+system tested - by an order of magnitude. The actuators' history adds nothing
+to any sensor beyond that sensor's own history. There was no lagged influence
+to detect, so the dataset was never a test of the method.
+
+This vindicates the earlier conclusion and confirms the audit's charge
+against its reasoning. "The test did not happen" was correct; the self-R2
+diagnostic was not what showed it and could not have, since that diagnostic
+fires at coupling 0.50 where outflow works.
+
+LIMIT: linear in poly2, so a purely nonlinear lagged dependence would be
+missed. What licenses it is that the same expansion returns +0.0114 to
++0.0189 where the method works.
+
+No re-run at b = 4V. The chamber line is closed on evidence.
+
+Rule added:
+
+83. A check used to DISQUALIFY must be shown to return a positive, in the
+    same units, on a system where the method works. Without that positive
+    control its zero is uninformative and the disqualification is an
+    assumption wearing a number.
