@@ -2561,3 +2561,26 @@ Rule added:
     whose source-to-sensor propagation is within-sample at every achievable
     logging rate cannot test a lagged-influence statistic at any decimation,
     and the fitness gate detects this for the cost of a linear regression.
+
+2026-08-24  NIST UR5 SCREEN - DISQUALIFIED; a third disqualification mode.
+Pre-registered addendum + result in paper/dataset_fitness_protocol.md;
+scripts/nist_screen.py; 18 runs, all cells reported. Best cell +0.0003
+against L50 +0.0136; ghost at zero.
+
+The declared risk fired with a second jaw: the position servo closes within
+one 8 ms sample (control-bandwidth synchrony), and the slower dynamics that
+might carry lag at deeper decimation - thermal mass, trajectory-level
+inertia - are unreachable because runs are 0.9-1.4 min, so m > 5 drops
+every run below the 2,000-sample floor. Not absent physics; recordings too
+short to decimate to where the physics lives.
+
+Three screens, three modes: wind tunnel QUALIFIED (dynamics reached by
+decimation); light tunnel DISQUALIFIED (no lag at any rate - optics); UR5
+DISQUALIFIED (lag plausible, recordings too short to reach it).
+
+Rule added:
+
+97. Run length bounds the reachable decimation. A dataset can fail the gate
+    not because its physics lacks lag but because n < floor x (dynamics
+    timescale / sampling interval), and that inequality is checkable from
+    the file listing before anything is downloaded. Check it first.

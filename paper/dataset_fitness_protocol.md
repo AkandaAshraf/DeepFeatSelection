@@ -433,3 +433,39 @@ most five varying sources predicts conditioning loses).
 Void if the truth assignment changes after any result, if any of the 18
 runs is dropped from the report, or if the replication runs without its own
 pre-registration.
+
+### NIST UR5 screen result (2026-08-24): DISQUALIFIED
+
+Reference unchanged (L30 +0.0114, L50 +0.0136). Every cell:
+
+  m=1   18 runs   lag_info +0.0000  (max over runs +0.0001)  ghost -0.0000
+  m=2   18 runs   lag_info +0.0001  (max +0.0002)            ghost -0.0000
+  m=5    5 runs   lag_info +0.0003  (max +0.0003)            ghost -0.0001
+  m>=10 no run retains 2,000 samples
+
+Best cell +0.0003, forty times below the L50 pass mark and thirty below the
+L30 floor.
+
+The risk declared in the addendum fired, and with a second jaw. At 8 ms per
+sample the UR5's position servo closes within one sample, so actual
+position is synchronous with its target - the light-tunnel failure through
+control bandwidth. The slower dynamics that might have carried lag at
+deeper decimation (thermal mass, minutes-scale; trajectory-level inertia)
+are unreachable: the runs are 0.9-1.4 minutes, so any m above 5 drops every
+run below the 2,000-sample floor. The dataset is disqualified not because
+the arm lacks lagged physics but because its recordings are too short to
+decimate to the rate where that physics lives.
+
+That is a third distinct disqualification mode, and it is checkable by
+arithmetic BEFORE downloading anything: the run length must satisfy
+n >= floor x (dynamics timescale / sampling interval). A candidate whose
+slow dynamics live at seconds needs runs of at least floor x (seconds /
+sample interval) samples. The UR5 runs fail that inequality for every
+timescale slower than its servo.
+
+CONSEQUENCE: three screens, three modes. The wind tunnel qualified
+(dynamics present, decimation reached them). The light tunnel cannot carry
+lag at any rate (physics). The UR5 arm plausibly carries lag but was not
+recorded long enough to reach it (run length). The replication target must
+have set drivers, dynamics slower than sampling, AND recordings long enough
+to decimate into that regime.
