@@ -129,7 +129,7 @@ def main() -> int:
               f"{d.lag_info.max():+.4f} "
               f"({d.loc[d.lag_info.idxmax(), 'dataset']} at "
               f"m={int(d.loc[d.lag_info.idxmax(), 'm'])}).")
-        print("      All four chamber datasets are DISQUALIFIED. The apparatus")
+        print(f"      All {len(CANDIDATES)} candidate datasets are DISQUALIFIED. The apparatus")
         print("      does not carry lagged actuator influence at any sampling")
         print("      rate reachable by decimating its logs.")
     else:

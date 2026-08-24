@@ -321,3 +321,43 @@ here too).
 Void if the truth assignment changes after any result, if a candidate is
 dropped from the report, or if the replication is run without its own
 pre-registration.
+
+### Light-tunnel screen result (2026-08-24): DISQUALIFIED at every decimation
+
+Reference recomputed unchanged (L30 +0.0114, L50 +0.0136). Every cell:
+
+  lt_walks_v1                    m=1/2/5: 3 runs, lag_info +0.0000 (max over
+                                 runs +0.0010/+0.0013/+0.0025); m=10: 1 run,
+                                 +0.0000; m>=20 below the floor
+  lt_test_v1                     +0.0000 in every surviving cell
+  lt_interventions_standard_v1   +0.0000 in every surviving cell (only the
+                                 10,000-sample reference run survives)
+  lt_malus_v1, lt_validate_v1    no run retains 2,000 samples at any m
+
+Ghost at zero throughout. Best cell observed anywhere: +0.0025, a quarter of
+the L30 floor.
+
+THE PHYSICAL READING, and why decimation cannot rescue this apparatus where
+it rescued the wind tunnel. The wind tunnel carries lagged influence because
+rotors and air have inertia: a fan-load step takes real time to appear in
+rpm and pressure, so there exists a sampling rate at which the actuator's
+history adds information, and decimation can reach it. In the light tunnel
+the actuator-to-sensor path is light: an LED setting appears in the
+photodiodes within the same sample at ANY logging rate the apparatus can
+achieve. Decimation changes the sampling of the dynamics; it cannot create
+dynamics that the physics does not have.
+
+The one plausibly lagged pathway - the polariser servos, where commanded
+pol_1/pol_2 must reach measured angle_1/angle_2 through a motor - is two of
+fifteen targets and cannot move the declared median. Restricting the gate to
+those two targets after seeing this result would be the post-hoc subgroup
+move this project refuses; if a servo-only test is ever worth running it
+needs its own pre-registration naming angle_1/angle_2 as the only targets
+BEFORE any lag_info is computed, and it would be a far narrower test (two
+commanded angles against two measured ones) than the replication this screen
+was looking for.
+
+CONSEQUENCE: the wind-tunnel outflow result cannot be replicated on the
+light tunnel. The replication needs a different physical system with
+experimenter-set drivers AND internal dynamics slower than its sampling -
+mechanical, thermal or chemical, not optical.

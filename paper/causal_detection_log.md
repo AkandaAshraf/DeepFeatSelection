@@ -2533,3 +2533,31 @@ Rules added:
 95. Declare validity conditions as DISQUALIFYING, not as predictions. A ghost
     check that fails but counts only as a missed prediction lets an
     uninterpretable dataset into the verdict.
+
+2026-08-24  LIGHT-TUNNEL SCREEN - DISQUALIFIED at every decimation; the
+replication target falls. Pre-registered addendum + result in
+paper/dataset_fitness_protocol.md; scripts/lt_screen.py; every cell of all
+five candidate datasets reported. lag_info +0.0000 everywhere (best single
+run +0.0025, a quarter of the L30 floor); ghost at zero; three of five
+datasets never clear the 2,000-sample floor at any decimation.
+
+Physical reading: decimation rescued the wind tunnel because rotors and air
+have inertia, so a sampling rate exists at which actuator history carries
+information. The light tunnel's actuator-to-sensor path is light -
+within-sample at any achievable logging rate. Decimation changes how
+dynamics are sampled; it cannot create dynamics the physics does not have.
+The one lagged pathway (polariser servo, pol -> angle) is two of fifteen
+targets; a servo-only test would need its own pre-registration naming those
+targets in advance, and is a far narrower question.
+
+CONSEQUENCE: the AUC 0.916 wind-tunnel result cannot be replicated on the
+light tunnel. A second apparatus must have experimenter-set drivers AND
+internal dynamics slower than its sampling - mechanical, thermal or
+chemical, not optical.
+
+Rule added:
+
+96. Decimation can only recover lag that the physics provides. An apparatus
+    whose source-to-sensor propagation is within-sample at every achievable
+    logging rate cannot test a lagged-influence statistic at any decimation,
+    and the fitness gate detects this for the cost of a linear regression.
