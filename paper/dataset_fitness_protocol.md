@@ -469,3 +469,77 @@ lag at any rate (physics). The UR5 arm plausibly carries lag but was not
 recorded long enough to reach it (run length). The replication target must
 have set drivers, dynamics slower than sampling, AND recordings long enough
 to decimate into that regime.
+
+---
+
+## Addendum (2026-08-24): the NASA PCoE randomized battery usage data
+
+Declared before any lag_info was computed on this data. All 28 cells of all
+seven archives parsed and inspected for composition (Rules 81, 94); no
+statistic has been run.
+
+### Why this dataset
+
+Rule 97 asks for set drivers, dynamics slower than sampling, and recordings
+long enough to decimate into that regime. Battery cycling under a RANDOMIZED
+load satisfies all three by construction: the applied current is redrawn at
+random from a declared distribution every 60-300 s (exogenous excitation, the
+same class as the wind tunnel's random walk), terminal voltage responds
+through RC polarisation at seconds and through state of charge - an integral
+of the whole current history - and cell temperature responds through thermal
+mass at minutes. Recordings span 98-204 days per cell at 1 s within active
+steps. Zenodo mirror of the NASA PCoE set, CC-open, no registration.
+
+### Ground truth, fixed now
+
+  SOURCE   applied current (set by the randomized protocol)
+  DRIVEN   terminal voltage, cell temperature
+  V = 3 per cell, plus the gate's shifted-driver ghost.
+
+EXOGENEITY CAVEAT, declared rather than hidden: two regimes couple current
+back to the cell state - the constant-voltage tail of each charge (charger
+feedback) and the 3.2 V discharge cutoff that truncates a random-walk step
+early. The random-walk selection itself is exogenous. Both regimes stay in
+the series and are disclosed; excising them after inspection would be
+selection.
+
+### Base grid, declared
+
+The native sampling is mixed-rate: 1 Hz inside active steps, 60 s in
+charges and long rests, so contiguous 1 Hz stretches never reach the 2,000
+floor. The base grid is DT = 60 s - the excitation's own timescale and the
+sparse blocks' native rate - built by linear interpolation within recording
+spans and SPLIT at voids longer than 300 s (the ~13 reference-cycle outages
+per cell). Segments with at least 2,000 grid points enter; the decimation
+grid m in {1, 2, 5, 10, 20, 50} then spans 1-50 minutes.
+
+### Composition, from all rows of all files
+
+  family (4 cells each)            span/cell   RW step   usable pts/cell
+  Uniform charge+discharge          ~147 d      300 s      165k-168k
+  Uniform discharge (room T)        ~98-157 d   300 s      137k-220k
+  Uniform variable charge (room T)  ~154 d      300 s       96k-97k
+  Skewed high 40C                   ~99 d        60 s      139k-140k
+  Skewed high (room T)              ~201 d      5-60 s     254k-276k
+  Skewed low 40C                    ~99 d        60 s      140k
+  Skewed low (room T)               ~204 d      229k-281k (60 s steps)
+
+Total ~4.7 million usable grid points over 28 cells. Two cells (RW18, RW19)
+have median random-walk step durations of 13 s and 5 s - shorter than the
+base grid, so their driver moves within one grid sample; declared here,
+reported per family, not excluded.
+
+### Rule, unchanged
+
+Same calibrated pass mark L50 recomputed by the identical code path, ghost
+beside every cell, every decimation reported. Screen:
+scripts/battery_screen.py. If the dataset qualifies, the replication test
+gets its own pre-registration BEFORE any outflow is computed - marginal
+statistic primary (what the wind tunnel validated), conditional reported
+beside it under its declared envelope, with the note that V = 3 makes this
+the smallest panel the statistic has faced.
+
+Void if the truth assignment changes after any result, if any of the 28
+cells is dropped from the report, if the base grid or void bound moves after
+any lag_info is seen, or if the replication runs without its own
+pre-registration.
