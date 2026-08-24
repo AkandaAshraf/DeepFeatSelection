@@ -2584,3 +2584,37 @@ Rule added:
     not because its physics lacks lag but because n < floor x (dynamics
     timescale / sampling interval), and that inequality is checkable from
     the file listing before anything is downloaded. Check it first.
+
+2026-08-24  BATTERY SCREEN - DISQUALIFIED at the declared grid; design error
+disclosed. Pre-registered addendum + result in
+paper/dataset_fitness_protocol.md; scripts/battery_screen.py; per-cell
+report in ExpOutput/battery_screen/per_cell.csv. NASA PCoE randomized-usage
+mirror, 28 cells, ~4.7M grid points, randomized current as the exogenous
+source, voltage and temperature driven.
+
+  m=1 +0.0010   m=2 +0.0018   m=5 +0.0100 (max cell +0.0192)   m>=10
+  unreachable. L50 +0.0136. DISQUALIFIED by the declared rule.
+
+MY ERROR: Rule 97 applied to the span, not the segment. Segments are ~12,000
+points, so m > 6 was dead on arrival - knowable from the composition sweep
+before the grid was declared. The upper half of the pre-registered grid
+could never run.
+
+DESCRIPTION ONLY: lag_info rises monotonically toward the truncation edge in
+every family; skewed-high-40C reaches exactly L50 at m=5 with 2/4 cells
+clearing. The NIST mode, softened: dynamics plausibly live at tens of
+minutes to hours, and the declared grid cannot reach them.
+
+ANOMALY: uniform charge+discharge family (RW9-12), all four cells, lag_info
+-0.13 to -0.17 at m=1/2 with clean ghosts. Unexplained; no claim.
+
+FOLLOW-UP LICENSED ONLY AS SPLIT-SAMPLE: coarser grid fixed from physics,
+discovery on 4 named cells, verdict on the 24 held-out - because the regrid
+is post-hoc motivated and anything less is grid-shopping.
+
+Rule added:
+
+98. Rule 97's inequality binds at the longest contiguous SEGMENT, not the
+    recording span. Protocol outages partition a months-long record into
+    pieces, and the reachable decimation range must be computed from the
+    piece, before the grid is declared.

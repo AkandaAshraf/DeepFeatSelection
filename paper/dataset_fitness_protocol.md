@@ -543,3 +543,45 @@ Void if the truth assignment changes after any result, if any of the 28
 cells is dropped from the report, if the base grid or void bound moves after
 any lag_info is seen, or if the replication runs without its own
 pre-registration.
+
+### Battery screen result (2026-08-24): DISQUALIFIED at the declared grid,
+### with a disclosed design error and a licensed follow-up
+
+Reference unchanged (L30 +0.0114, L50 +0.0136). Aggregate, 28 cells:
+
+  m=1  +0.0010   m=2  +0.0018   m=5  +0.0100  [cell range -0.0004,+0.0192]
+  m>=10: no cell retains 2,000 samples. Ghost at or below 0.0008 throughout.
+
+VERDICT by the rule fixed in advance: DISQUALIFIED. Best median +0.0100
+against L50 +0.0136.
+
+DESIGN ERROR, disclosed: Rule 97's inequality was applied to the recording
+SPAN (98-204 days) when it binds at the SEGMENT (~8 days between reference
+outages, ~12,000 grid points). 12,000 / 2,000 = 6, so decimations above
+m=5-6 were unreachable BY ARITHMETIC VISIBLE IN THE COMPOSITION SWEEP, and
+the pre-registered grid to m=50 was half dead on arrival. The screen is
+valid for the cells it could reach; the error is that the reachable range
+was knowable in advance and was not checked.
+
+DESCRIPTION, claimed as nothing: lag_info rises monotonically toward the
+truncation point in every family. At m=5 the skewed-high-40C family sits at
+median +0.0136 - exactly the pass mark - with 2 of 4 cells clearing it, and
+every family's trajectory is still ascending where the samples run out.
+This is the NIST failure mode softened: not hopeless physics, but a grid
+that cannot reach the timescale where the dynamics live (thermal and
+state-of-charge effects at tens of minutes to hours).
+
+ANOMALY, reported and unexplained: all four cells of the uniform
+charge+discharge family (RW9-12) show large NEGATIVE lag_info at m=1 and
+m=2 (-0.13 to -0.17) with clean ghosts - adding driver lags actively hurts
+held-out prediction. A negative of this size is not noise; no explanation
+is offered and no claim is made.
+
+LICENSED FOLLOW-UP, declared now with its motivation admitted: any coarser
+regrid is post-hoc motivated by the ascent above, so it cannot simply be
+re-declared and re-run. The honest design is a split-sample
+pre-registration: fix the new base grid from the PHYSICS (thermal and SOC
+timescales, not from these numbers), tune nothing, and evaluate on a
+DISCOVERY set of 4 named cells with the verdict taken on the remaining 24
+held-out cells only. Without that split, a qualifying result would be
+grid-shopping.
