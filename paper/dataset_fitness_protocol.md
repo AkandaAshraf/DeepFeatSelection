@@ -249,3 +249,75 @@ The script broke the tie between the two qualifying datasets by taking the
 larger lag_info. The protocol declared how a dataset qualifies but not how to
 choose among several that do, so that tie-break is an undeclared rule. It is
 not used. BOTH qualifying datasets go forward, and both are reported.
+
+---
+
+## Addendum (2026-08-24): the light tunnel
+
+Declared before any lag_info was computed on this data. Column names, run
+lengths and per-column variance were inspected across ALL files of ALL five
+datasets (Rules 81, 94); no statistic has been run.
+
+### Why
+
+The wind-tunnel result (marginal outflow AUC 0.916) rests on one apparatus
+and one experimental protocol. The light tunnel is the second apparatus of
+the same chamber family: physically unrelated dynamics (LEDs and polarisers
+against fans and pressure), same structural ground truth. It is the declared
+replication target, and the gate must qualify its data first.
+
+### Ground truth, fixed now for every light-tunnel dataset
+
+  SETTABLE (sources)  red, green, blue, pol_1, pol_2
+  MEASURED (driven)   current, angle_1, angle_2, ir_1, vis_1, ir_2, vis_2,
+                      ir_3, vis_3, l_11, l_12, l_21, l_22, l_31, l_32
+  EXCLUDED            timestamp, config, counter, flag, intervention,
+                      osr_*, v_*, diode_*, t_*, camera, v_board, v_reg
+                      (sensor-configuration parameters and metadata, the
+                      same class excluded for the wind tunnel)
+
+pol_1/pol_2 are commanded polariser angles; angle_1/angle_2 are the measured
+angles and are consequences. current is the LED current draw, a consequence
+of red/green/blue.
+
+Per run, a settable counts as a source only if it varies there (Rule 80).
+NEW, symmetric rule declared now: a MEASURED column constant in a run is
+excluded from the target set for that run - a structural zero is not
+evidence about lagged influence. In the inspected data the six wall
+photodiodes l_* are constant in two of the three walks runs.
+
+### Candidates and their composition, from all files and all rows
+
+  lt_walks_v1                    3 runs: actuators_white n=20,000 (all five
+                                 sources vary), color_mix n=10,000 (red,
+                                 green, blue only), smooth_polarizers
+                                 n=10,000 (red, green, blue, pol_1)
+  lt_interventions_standard_v1   59 runs: 58 of n=1,000 (below the 2,000
+                                 floor at every decimation) plus
+                                 uniform_reference n=10,000 (all five vary)
+  lt_test_v1                     4 calibration runs, n=3,128-12,000, mostly
+                                 sensor-config interventions
+  lt_malus_v1                    12 runs of n=1,000 - expected to drop
+                                 entirely at the floor
+  lt_validate_v1                 29 runs of n=50-1,000 - expected to drop
+                                 entirely at the floor
+
+All five are screened and every cell is reported, including the expected
+empty ones. The screen is scripts/lt_screen.py, which reuses the wind-tunnel
+machinery unchanged except for the variable assignment above.
+
+### Rule, unchanged
+
+Same grid m in {1, 2, 5, 10, 20, 50}, same 2,000-sample floor, same
+calibrated pass mark L50 recomputed by the identical code path, ghost beside
+every cell, qualification at the smallest clearing m, every qualifying
+dataset goes forward. If any dataset qualifies, the replication test gets
+its own pre-registration BEFORE any outflow is computed, with the MARGINAL
+statistic as primary this time - that is what the wind tunnel validated -
+and the conditional variant reported beside it under its declared envelope
+(fifteen measured consequences per five sources predicts conditioning loses
+here too).
+
+Void if the truth assignment changes after any result, if a candidate is
+dropped from the report, or if the replication is run without its own
+pre-registration.

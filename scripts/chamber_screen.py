@@ -73,7 +73,12 @@ def screen(pattern, m):
         if len(live) == 0:
             dropped += 1
             continue
-        cols = np.concatenate([live, np.arange(len(SETTABLE), x.shape[1])])
+        # a measured column constant in this run carries no target variance
+        # and would dilute the median with structural zeros; excluded, as
+        # constant settables are excluded from the source set (Rule 80)
+        meas = np.arange(len(SETTABLE), x.shape[1])
+        meas = meas[x[:, meas].std(0) > 1e-9]
+        cols = np.concatenate([live, meas])
         xi = x[:, cols]
         srcs.append(len(live))
         vals.append(lag_info(xi, len(live)))
