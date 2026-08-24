@@ -361,3 +361,75 @@ CONSEQUENCE: the wind-tunnel outflow result cannot be replicated on the
 light tunnel. The replication needs a different physical system with
 experimenter-set drivers AND internal dynamics slower than its sampling -
 mechanical, thermal or chemical, not optical.
+
+---
+
+## Addendum (2026-08-24): the NIST UR5 robot arm
+
+Declared before any lag_info was computed on this data. All 18 files parsed
+and inspected for composition (Rules 81, 94); no statistic has been run.
+
+### Why this dataset
+
+The light tunnel fell to Rule 96: optical propagation is within-sample at
+any logging rate. A robot arm is the mechanical case: commanded joint
+trajectories reach measured positions through servo loops, link inertia and
+motor electrical dynamics, and reach joint temperatures through thermal
+mass. The NIST degradation dataset (Universal Robots UR5, NIST PHM
+programme, public, no registration) logs TARGET and ACTUAL signals at
+125 Hz while the arm repeatedly runs a preprogrammed trajectory with
+randomly-selected stop points, under varied speed (half/full), payload
+(1.6/4.5 lb) and thermal state (cold-start arm included).
+
+### Ground truth, fixed now
+
+  SOURCES   the six TARGET_JOINT_POSITIONS: the preprogrammed trajectory,
+            exogenous to the physical plant by construction
+  DRIVEN    ACTUAL_JOINT_POSITIONS (6), ACTUAL_JOINT_VELOCITIES (6),
+            ACTUAL_JOINT_CURRENT (6), JOINT_CONTROL_CURRENT (6),
+            CARTESIAN_COORD_TOOL (6), TCP_FORCE (6), JOINT_TEMP (6)
+  EXCLUDED  TARGET velocities, accelerations, currents and torques. These
+            are deterministic functions of the same preprogrammed
+            trajectory (interpolator derivatives and the controller's
+            feedforward model): not independent sources, not physical
+            consequences. Declaring them sources would stack five copies of
+            one exogenous signal; declaring them driven would put commanded
+            quantities in the consequence set, the error Rule 80's chamber
+            correction exists to prevent.
+
+Per run, a source column counts only if it varies there (one target joint
+is held constant in every run inspected); a driven column constant in a run
+leaves the target set (the symmetric rule of the light-tunnel addendum).
+
+### Composition, from all rows of all files
+
+18 runs: half/full speed x 1.6/4.5 lb x 3 repetitions (12) plus cold-start
+half/full x 4.5 lb x 3 (6). Row counts 6,487-10,440 (0.9-1.4 min each),
+total 153,658 samples. Target-position lag-1 autocorrelation is 1.0000 in
+every run - heavily oversampled, as the wind tunnel was, so the decimation
+grid is where qualification will be decided. At m=5 most runs fall below
+the 2,000-sample floor; the informative cells are expected at m=1 and m=2.
+Joint temperatures span 23-37 C across runs.
+
+### The risk named in advance
+
+A UR5 position servo tracks within milliseconds. If the tracking loop
+closes within one 8 ms sample, actual position may be synchronous with its
+target - the light-tunnel failure arriving through control bandwidth rather
+than optics. Currents, TCP force and temperatures have their own slower
+dynamics, so the outcome is genuinely open; that is what the gate is for,
+and either verdict is informative about the gate as well as the data.
+
+### Rule, unchanged
+
+Same grid m in {1, 2, 5, 10, 20, 50}, same 2,000-sample floor, same
+calibrated L50 recomputed by the identical code path, ghost beside every
+cell, every cell reported. Screen: scripts/nist_screen.py. If the dataset
+qualifies, the replication test gets its own pre-registration BEFORE any
+outflow is computed, marginal statistic primary, conditional reported
+beside it under its declared envelope (about 40 driven channels against at
+most five varying sources predicts conditioning loses).
+
+Void if the truth assignment changes after any result, if any of the 18
+runs is dropped from the report, or if the replication runs without its own
+pre-registration.
