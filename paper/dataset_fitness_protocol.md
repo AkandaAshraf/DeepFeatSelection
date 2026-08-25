@@ -585,3 +585,36 @@ timescales, not from these numbers), tune nothing, and evaluate on a
 DISCOVERY set of 4 named cells with the verdict taken on the remaining 24
 held-out cells only. Without that split, a qualifying result would be
 grid-shopping.
+
+---
+
+## Addendum (2026-08-25): battery split-sample re-screen
+
+Declared before scripts/battery_screen2.py ran. The motivation is admitted:
+the first battery screen showed lag_info ascending toward its truncation
+edge, so ANY regrid is post-hoc motivated. This design contains that in
+three ways, all fixed now.
+
+1. THE GRID COMES FROM PHYSICS, NOT FROM THE NUMBERS. An 18650 cell in
+   air has a thermal time constant of roughly 10-30 minutes; resolving
+   lagged influence around that timescale needs a sampling interval of a
+   fraction of it. Base grid DT = 300 s. This value is also the random-walk
+   step duration of the uniform protocol families - protocol knowledge, not
+   result knowledge. Rule 98 arithmetic, computed IN ADVANCE this time:
+   segments of ~12,000 minutes give ~2,400 grid points at DT = 300 s, so
+   only m = 1 is reachable and only m = 1 is declared. No dead grid cells.
+
+2. DISCOVERY AND VERDICT ARE DISJOINT CELLS. Discovery, named now: RW25
+   (skewed high 40C), RW3 (uniform discharge room T), RW13 (skewed low room
+   T), RW9 (uniform charge+discharge - the anomaly family). Discovery cells
+   may be examined freely and carry no evidential weight. The verdict is
+   the median lag_info over the 24 HELD-OUT cells, against the unchanged
+   L50 = +0.0136, ghost beside every cell. No cell is excluded; the anomaly
+   family's held-out cells stay in.
+
+3. THIS IS THE FINAL SCREEN OF THIS DATASET. If the held-out median fails,
+   the dataset is disqualified and no third grid will be sought.
+
+Void if the grid or the discovery set changes after any number is seen, if
+any held-out cell is dropped, or if a third grid is proposed after a
+failure.
