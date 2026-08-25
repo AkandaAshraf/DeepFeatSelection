@@ -96,3 +96,9 @@ paper/depmap_plos.pdf
 paper/plos_cover_letter.md
 paper/depmap_paper.pdf
 paper/plos_submission/
+
+# large downloaded datasets (screened by the fitness gate, not redistributed)
+Data/battery_rw/
+Data/nist_ur5/
+Data/pronto/
+Data/perturbseq/
