@@ -2618,3 +2618,43 @@ Rule added:
     recording span. Protocol outages partition a months-long record into
     pieces, and the reachable decimation range must be computed from the
     piece, before the grid is declared.
+
+2026-08-25  BATTERY SPLIT-SAMPLE RE-SCREEN - DISQUALIFIED. Final for this
+dataset. Pre-registration + result in paper/dataset_fitness_protocol.md;
+scripts/battery_screen2.py; ExpOutput/battery_screen2/cells.csv.
+
+Grid 300 s from thermal physics and protocol step duration, m=1 only by
+Rule 98 arithmetic done in advance, discovery cells named before running.
+
+  HELD-OUT VERDICT  median +0.0102 (17 cells) vs L50 +0.0136  ghost -0.0004
+  DISCOVERY         +0.0035 (3 cells, no weight)
+  best family: skewed high 40C +0.0133, 1/3 cells clearing
+
+SECOND ARITHMETIC ERROR DISCLOSED: promised 24 held-out / 4 discovery, got
+17 / 3. Eight cells - the whole uniform charge+discharge family (RW9-12) and
+the whole uniform variable-charge family (RW1,2,7,8) - have no segment
+reaching 2,000 points at 300 s (longest 1,102-1,550), because their protocol
+interleaves reference cycles more often. Rule 98 one level finer: the
+inequality binds per FAMILY, and I checked pooled rather than shortest. Same
+error class as the rule I had just written. The criterion was fixed in
+advance and applied identically to all 28, so nothing was chosen - but the
+declared counts were wrong and RW9 (anomaly family) vanished, leaving the
+-0.13/-0.17 anomaly unexplained and untestable at this grid.
+
+TWO SCREENS TOGETHER: 60 s gave +0.0100, 300 s with independent held-out
+cells gives +0.0102. Five-fold coarsening moved it by 0.0002, so the first
+screen's ascent was approach to a PLATEAU BELOW L50, not a truncated climb
+toward it. The dataset carries lagged influence (far above zero, ghost
+clean) but not enough for outflow to work.
+
+FOUR SCREENS, FOUR VERDICTS: wind tunnel QUALIFIED; light tunnel
+disqualified by physics (96); UR5 by run length (97); battery on the
+quantity itself at two independent grids - the first to fail because the
+influence is genuinely too weak rather than because the recording could not
+express it.
+
+Rule added:
+
+99. A sample-floor inequality binds at the SHORTEST stratum, not the pooled
+    median. Checking it against pooled segment lengths silently drops whole
+    families and changes the declared design after the fact.

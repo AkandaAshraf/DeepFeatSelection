@@ -618,3 +618,56 @@ three ways, all fixed now.
 Void if the grid or the discovery set changes after any number is seen, if
 any held-out cell is dropped, or if a third grid is proposed after a
 failure.
+
+### Split-sample re-screen result (2026-08-25): DISQUALIFIED. Final.
+
+Reference unchanged (L30 +0.0114, L50 +0.0136). Base grid 300 s, m = 1, as
+declared.
+
+  HELD-OUT VERDICT   median +0.0102 over 17 cells  [+0.0047, +0.0192]
+                     ghost -0.0004
+  DISCOVERY          median +0.0035 over 3 cells (informational, no weight)
+
+  per family, held-out          median    cells clearing L50
+  Uniform discharge (room T)   +0.0072          0/3
+  Skewed high 40C              +0.0133          1/3
+  Skewed high (room T)         +0.0101          0/4
+  Skewed low 40C               +0.0105          0/4
+  Skewed low (room T)          +0.0063          0/3
+
++0.0102 against +0.0136. DISQUALIFIED. As declared, this is final for this
+dataset and no third grid will be sought.
+
+A SECOND ARITHMETIC ERROR, disclosed. The addendum promised 24 held-out and
+4 discovery cells; the run reports 17 and 3. Eight cells produced no segment
+reaching 2,000 points at the 300 s grid - the entire uniform charge+discharge
+family (RW9-12, longest segments 1,102-1,311 points) and the entire uniform
+variable-charge family (RW1, RW2, RW7, RW8, longest 1,384-1,550). Their
+protocol interleaves reference cycles more often, so their segments are
+shorter, and 300 s x 2,000 = ~7 days exceeds what those families ever run
+uninterrupted. This is Rule 98 again, one level finer: the inequality binds
+per FAMILY, and I checked it against the pooled segment length rather than
+the shortest family's. It is the same class of error I had just written a
+rule about.
+
+The dropped cells were not chosen: the criterion was fixed in advance and
+applied identically to all 28. But two consequences must be stated. The
+declared cell counts were wrong, and RW9 - a discovery cell, and the
+anomaly family - vanished with them, so the -0.13 to -0.17 anomaly of the
+first screen remains unexplained and is now untestable at this grid. Both
+are reported rather than repaired.
+
+WHAT THE TWO SCREENS SAY TOGETHER. At 60 s the reachable median was +0.0100;
+at 300 s, with independent held-out cells, +0.0102. Coarsening five-fold
+moved the statistic by 0.0002 and did not approach the pass mark, which is
+evidence that the first screen's ascent was the approach to a plateau below
+L50 rather than a truncated climb toward it. The dataset carries lagged
+influence - the values are far above zero and the ghost is clean - but not
+enough to reach the level at which outflow is known to work.
+
+CONSEQUENCE: four screens, four verdicts. Wind tunnel QUALIFIED. Light
+tunnel disqualified by physics (Rule 96). UR5 disqualified by run length
+(Rule 97). Battery disqualified on the quantity itself, at two independently
+declared grids, with a clean ghost - the first candidate to fail because the
+influence is genuinely too weak rather than because the recording could not
+express it.
