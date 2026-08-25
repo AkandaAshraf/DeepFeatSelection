@@ -747,3 +747,47 @@ any outflow is computed, marginal statistic primary.
 Void if the truth assignment changes after any result, if a test-day is
 dropped from the report, or if a grid coarser than the declared arithmetic
 allows is introduced after a failure.
+
+### PRONTO screen result (2026-08-25): DISQUALIFIED, and negative throughout
+
+Reference unchanged (L30 +0.0114, L50 +0.0136). Every reachable cell:
+
+  m=1    3 days   lag_info -0.0001  (max -0.0000)  ghost -0.0000
+  m=2    3 days   lag_info -0.0009  (max -0.0002)  ghost -0.0000
+  m=5    3 days   lag_info -0.0014  (max -0.0007)  ghost -0.0001
+  m=10   1 day    lag_info -0.0199  (max -0.0199)  ghost -0.0003
+
+DISQUALIFIED. Not merely below the pass mark: NEGATIVE at every grid, and
+increasingly so as the grid coarsens. Adding the commanded set points'
+history makes held-out prediction of the measured process variables WORSE.
+
+A CORRECTION to this addendum's own composition table: it recorded
+0626Testday5 as having flat set points, excluded by Rule 80. Wrong. That
+file has a different column set entirely - 69 columns, and NO SP.CV channels
+at all. It was never a candidate for this truth assignment, and the reason
+stated was the wrong one. The exclusion stands; its justification is
+corrected.
+
+THE LIKELY MECHANISM, offered as a reading and not a claim. A source
+contributes a poly2 expansion of its three delay lags, so three varying set
+points add 54 features to a 9-feature own-lag baseline. Where those features
+carry no predictive information, a ridge at fixed regularisation pays a
+held-out penalty for carrying them, and the penalty grows as decimation
+shrinks the sample count - which is the observed pattern, monotone from
+-0.0001 at 25,000 samples to -0.0199 at 2,500. On this reading a negative
+lag_info means "no lagged information, plus the cost of asking", and the
+statistic is behaving correctly. Testing that would need a feature-count
+control, which is not run here.
+
+This is the second dataset to return negative values - the battery's uniform
+charge+discharge family gave -0.13 to -0.17 - and the two share the
+structure of many added driver features against a well-predicted target. The
+battery anomaly is no longer isolated, and no explanation is claimed for
+either.
+
+WHY THIS APPARATUS FAILS. The rig has genuine transport delay, but the
+control loops close on their set points fast relative to 1 Hz, so the
+measured flows track the commands within a sample; and the slow flow-regime
+dynamics that would carry lag live at 5-7 minutes, where the sample floor
+puts a 60 s grid out of reach (420 samples against 2,000 on the longest
+day). Squeezed from both sides - the UR5 mode, on a chemical plant.

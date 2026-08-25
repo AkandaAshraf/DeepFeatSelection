@@ -2658,3 +2658,39 @@ Rule added:
 99. A sample-floor inequality binds at the SHORTEST stratum, not the pooled
     median. Checking it against pooled segment lengths silently drops whole
     families and changes the declared design after the fact.
+
+2026-08-25  PRONTO SCREEN - DISQUALIFIED, negative at every reachable grid.
+Pre-registration + result in paper/dataset_fitness_protocol.md;
+scripts/pronto_screen.py; ExpOutput/pronto_screen/screen.csv. Cranfield
+multiphase flow rig, 4 test-days at 1 Hz, sources = 4 commanded flow set
+points, driven = 22 measured process variables, PID outputs excluded as
+feedback-computed.
+
+  m=1 -0.0001 | m=2 -0.0009 | m=5 -0.0014 | m=10 -0.0199 (1 day). Ghost at
+  zero. L50 +0.0136. DISQUALIFIED.
+
+A FORECAST OF MINE, RECORDED WRONG BEFORE RUNNING: I predicted from the
+technical report that the 5-7 min flow-regime settling time would force a
+grid coarser than the floor allows. That conflated two timescales - the set
+points move on seconds and the loops answer there - and the composition
+inspection corrected it. Kept in the protocol rather than deleted.
+
+A COMPOSITION ERROR CORRECTED: the addendum said 0626Testday5 had flat set
+points (Rule 80). Wrong - that file has 69 different columns and no SP.CV
+channels at all. Exclusion stands, justification corrected.
+
+NEGATIVE VALUES, second occurrence. Likely mechanism, offered as a reading:
+three varying sources add 54 poly2 features to a 9-feature own-lag baseline,
+and a ridge at fixed regularisation pays a held-out penalty for uninformative
+features - a penalty that grows as decimation shrinks n, which is the
+observed monotone pattern (-0.0001 at 25k samples to -0.0199 at 2.5k). On
+that reading negative lag_info means "no information, plus the cost of
+asking". A feature-count control would test it; not run.
+
+WHY IT FAILS: loops close on their set points within a sample, while the
+slow flow-regime dynamics live at 5-7 min where the floor puts a 60 s grid
+out of reach (420 samples vs 2,000). The UR5 mode on a chemical plant.
+
+FIVE SCREENS: wind tunnel QUALIFIED; light tunnel (physics, R96); UR5 (run
+length, R97); battery (influence too weak, R98/R99, two independent grids);
+PRONTO (both sides, negative throughout).
