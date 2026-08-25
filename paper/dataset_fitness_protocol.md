@@ -671,3 +671,79 @@ tunnel disqualified by physics (Rule 96). UR5 disqualified by run length
 declared grids, with a clean ghost - the first candidate to fail because the
 influence is genuinely too weak rather than because the recording could not
 express it.
+
+---
+
+## Addendum (2026-08-25): the PRONTO multiphase flow facility
+
+Declared before any lag_info was computed on this data. All four test-day
+process files parsed and inspected; the reachable-grid arithmetic is done
+BELOW, in advance, per test-day (Rules 97, 98, 99).
+
+### Why, and a forecast that was wrong
+
+Cranfield's 2-inch multiphase flow rig (Stief et al. 2019; Zenodo 1341583,
+CC-BY). Operators command air and water flow SET POINTS; the rig answers
+through valves, pumps, two-phase transport up a riser and a separator - real
+transport delay. DeltaV logs every process variable at 1 Hz CONTINUOUSLY for
+a whole test day, so both the set point changes and their transients are in
+the record.
+
+A forecast made from the technical report - that the 5-7 minute flow-regime
+settling time forces a grid coarser than the sample floor allows - is
+recorded here as WRONG, before it could quietly disappear. It confused two
+timescales. Flow-regime stabilisation is minutes, but the SET POINTS
+themselves move on a scale of seconds (mean holds of 2-27 s, thousands of
+changes per day), and the control loops answer at that scale. The fast
+timescale is testable at 1 Hz even though the slow one is not, and the
+inspection below is what corrected the forecast.
+
+### Ground truth, fixed now
+
+  SOURCES   FIC302/PID1/SP.CV, FIC301/PID1/SP.CV, FIC102/PID1/SP.CV,
+            FIC101/PID1/SP.CV - the four commanded flow set points
+  DRIVEN    the 22 measured process variables: air and water flow
+            transmitters, air/water temperature and density, mixture-zone,
+            riser-outlet, top-separator and three-phase pressures,
+            separator gas and liquid flows, three level indicators, and the
+            controllers' PROCESS VALUES (PV.CV)
+  EXCLUDED  the controllers' OUTPUT values - FIC302/301/102/101/PID1/OUT.CV,
+            PIC501/PID1/OUT.CV, LVC502-SR/PID1/OUT.CV (valve openings).
+            These are computed by feedback from SP and PV: neither exogenous
+            nor pure physical consequences, the same class excluded as the
+            UR5's target velocities.
+
+A NAMING TRAP, disclosed because it would silently corrupt the truth set:
+DeltaV writes a bare transmitter's reading as "FT305/OUT.CV". That is a
+MEASUREMENT. Only "/PID1/OUT.CV" is a controller output. Classifying by the
+"OUT.CV" suffix alone would move fourteen sensors into the excluded set.
+
+Per test-day, a source counts only if it varies there; a driven column
+constant in a day leaves the target set.
+
+### Composition and the reachable grid, computed in advance
+
+  file               rows     span    setpoint changes   grids >= 2,000
+  0626Testday5.csv   3,601    1.0 h   0 (all four flat)  1 s only
+  0907Testday2.csv  18,601    5.2 h   13,645             1 s
+  0911Testday3.csv  25,201    6.3 h   15,347             1 s, 10 s
+  0912Testday4.csv  14,401    4.0 h   8,412              1 s
+
+Declared grid: m in {1, 2, 5, 10}. Nothing coarser is declared because
+nothing coarser is reachable - at 60 s the longest day yields 420 samples
+against a floor of 2,000. This is Rule 98/99 applied before the fact rather
+than after it, and m=10 is expected to retain 0911Testday3 alone.
+
+0626Testday5 has NO varying set point and is therefore excluded from the
+source set by Rule 80 - reported, not silently dropped.
+
+### Rule, unchanged
+
+Same calibrated L50 recomputed by the identical code path, ghost beside
+every cell, every reachable cell reported. Screen: scripts/pronto_screen.py.
+If it qualifies, the replication test gets its own pre-registration before
+any outflow is computed, marginal statistic primary.
+
+Void if the truth assignment changes after any result, if a test-day is
+dropped from the report, or if a grid coarser than the declared arithmetic
+allows is introduced after a failure.
