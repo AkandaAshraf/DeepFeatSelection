@@ -2694,3 +2694,66 @@ out of reach (420 samples vs 2,000). The UR5 mode on a chemical plant.
 FIVE SCREENS: wind tunnel QUALIFIED; light tunnel (physics, R96); UR5 (run
 length, R97); battery (influence too weak, R98/R99, two independent grids);
 PRONTO (both sides, negative throughout).
+
+2026-08-25  ADVERSARIAL REVIEW OF THE v2 MANUSCRIPT - eight defects fixed
+Six independent review lenses over paper/mace_v2.tex, each finding then
+attacked by a separate refute-by-default verifier; 15 findings verified, 8
+survived. Every survivor was then checked by hand against primary sources
+before any edit. One lens (statistics) died on an API error and has NOT been
+re-run - that pass is still owed.
+
+THE SERIOUS ONE. The 2026-08-16 WormWideWeb corpus scan - 91 freely-moving
+C. elegans recordings, pre-registered, primary prediction FAILED at base
+rate (6 labelled channels clear, 2 command/motor, p=0.64) - was ABSENT from
+the manuscript. Verified: grep for wormwideweb/GFP/freely-moving on the .tex
+returned zero. Meanwhile Limitations (5) read "the one study in this paper
+that reached a pre-registered held-out replication failed it", which was
+true only because this one was left out. The paper's whole defence is that
+it reports its failures, and it was inviting reviewers into a ledger that
+contained an omitted one.
+
+Also omitted: that corpus's GFP finding. Activity-free recordings score top
+excess +0.081/+0.133/+0.240 with 17-42 channels above threshold while their
+ghost panels stay CLEAN (max +0.007 to +0.043). The ghost is structurally
+blind to within-platform shared artifacts - a SECOND blindness beside the
+saturation one - and the paper's claim that "each scan reports its own
+artifact floor" was unqualified.
+
+FIXED: a new paragraph in the worm subsection reporting the failed corpus
+replication and scoping the worm validation to IMMOBILISED preparations; the
+GFP artifact floor and the ghost's second blindness stated; the artifact-
+floor claim qualified in place; Limitations (5) rewritten to cover BOTH
+failed generalisation tests.
+
+SEVEN MORE, all verified before fixing:
+  - "at the deployed b=32 the statistic was confounded" - WRONG, it was
+    b=16 (source_outflow_gate.py:33; ledger L1978). Fixed.
+  - "b=64, the b~2V rule applied to V=16" - WRONG, 2x16=32, so b=64 is 4V.
+    The sweep shows outflow needs TWICE the relative width inflow does.
+    Fixed, and the carve-out added to the recipe and Limitations (2): b~2V
+    for inflow, b~4V for outflow. This also resolves an apparent
+    self-contradiction, where the paper condemned the first chamber run for
+    b=2V while the protocol recorded it following the published 2V rule.
+  - "the apparatus settles within a sample" - re-committed the exact
+    mechanism the 2026-08-22 chamber audit voided as argued backwards.
+    Settling and oversampling are opposite conditions, and the paper's own
+    screen.csv rises +0.0002 -> +0.0158 -> +0.0405 with decimation, which is
+    the oversampling signature. Fixed to the corrected reading.
+  - "laginfo -0.0000" was the pre-correction number; the corrected re-screen
+    gives +0.0002. Fixed. Disqualification unaffected.
+  - linear-cost-in-V stated unconditionally while the new capacity rule
+    makes fixed b under-capacity: at b ~ 2V the scan is quadratic in V
+    again. Scoped to the fixed-b operating point, with the wall-clock
+    figures labelled as such.
+  - the capacity rule was given without its measured validity range
+    (b <= 128, V <= 240, one generating process). Added.
+  - abstract said "95-rule ledger"; it is at 99. Fixed.
+
+Rule added:
+
+100. Have someone else attack the manuscript, not just the experiments. Six
+     lenses over a paper whose numbers all passed an audit gate found an
+     omitted pre-registered replication failure, two wrong capacity
+     constants, and a mechanism the ledger had already corrected. An audit
+     gate checks that quoted numbers match their files; it cannot see what
+     the paper does not mention.
