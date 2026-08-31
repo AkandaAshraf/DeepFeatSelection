@@ -102,3 +102,6 @@ Data/battery_rw/
 Data/nist_ur5/
 Data/pronto/
 Data/perturbseq/
+
+# personal funding application, not for the public repo
+paper/credits_application.md
