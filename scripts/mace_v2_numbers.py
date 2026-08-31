@@ -133,6 +133,16 @@ else:
         chk("chamber: A1 AUC (secondary)", 0.605, r.A1_auc, tol=0.005)
         chk("chamber: C1 AUC (secondary)", 0.632, r.C1_auc, tol=0.005)
 
+d = read("ExpOutput/chamber_cluster_check/summary.csv")
+if d is None:
+    SKIP.append("chamber_cluster_check summary.csv missing")
+else:
+    r = d.iloc[0]
+    chk("chamber: run-cluster CI lower bound", 0.862, r.ci_lo, tol=0.01)
+    chk("chamber: run-cluster CI upper bound", 0.962, r.ci_hi, tol=0.01)
+    chk("chamber: run-clustering variance ratio", 3.45, r.clustering_ratio,
+        tol=0.1)
+
 # ------------------------------------------------------------ fitness gate
 d = read("ExpOutput/dataset_fitness/reference.csv")
 if d is None:

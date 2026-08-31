@@ -2757,3 +2757,44 @@ Rule added:
      constants, and a mechanism the ledger had already corrected. An audit
      gate checks that quoted numbers match their files; it cannot see what
      the paper does not mention.
+
+2026-08-31  STATISTICS RE-REVIEW: the chamber's channel-level permutation p
+was invalid; the qualitative result survives correct inference. Prompted by
+the adversarial review's statistics lens, which crashed on an API error
+2026-08-25 and was re-run standalone.
+
+The 0.916 AUC result (Table 8, real_conditional.py) reports permutation
+p=1e-4 by shuffling all 65 source-or-sensor channels (2 source + 11 sensor
+per each of 5 runs) as independent draws. They are not: channels within a
+run share one trained encoder and one physical realisation of that run's
+noise. Checked directly (scripts/chamber_cluster_check.py): the ratio of
+between-run to within-run variance in sensor A1 scores is 3.45 - substantial
+clustering. The effective sample size for inference is 5 runs, not 65
+channels, and the channel-level p-value is invalid as a significance test.
+
+Two checks temper this rather than resolve it by assumption. First, source
+exceeds sensor within EVERY ONE of the 5 runs individually (not just in
+aggregate), which rules out the confound that the whole effect is a
+between-run artefact. Second, a correctly specified run-level cluster
+bootstrap - resample the 5 runs with replacement, recompute AUC each time,
+2,000 resamples - gives AUC 0.920, 95% CI [0.862, 0.962], excluding chance
+(0.5) in every resample.
+
+VERDICT: the qualitative claim (source detection separates actuators from
+sensors, well above chance) SURVIVES properly specified inference. The
+channel-level p=1e-4 does not survive and is downgraded to descriptive.
+Fixed in paper/mace_v2.tex: abstract now cites the run-clustered CI instead
+of the invalid p-value; Table 8's p-value column is relabelled to state its
+actual scope; the prose after the table adds the clustering diagnostic, the
+within-run check, and the correct bootstrap CI. Added to the audit gate
+(scripts/mace_v2_numbers.py), 38/38 passing.
+
+Rule added:
+
+101. When channels are scored within runs (or subjects, or any grouping
+     variable), the run is the unit of independence for inference, not the
+     channel, however many channels there are. A permutation test that
+     shuffles channel labels without respecting that grouping is invalid
+     regardless of how small the resulting p-value is - check the
+     between-group/within-group variance ratio before trusting it, and use
+     a cluster bootstrap or permute at the group level instead.
