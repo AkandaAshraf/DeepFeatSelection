@@ -2798,3 +2798,64 @@ Rule added:
      regardless of how small the resulting p-value is - check the
      between-group/within-group variance ratio before trusting it, and use
      a cluster bootstrap or permute at the group level instead.
+
+2026-08-31  CCM/PCMCI HEAD-TO-HEAD: H1 FAILS, CCM ties MACE at V=30.
+Pre-registration: paper/ccm_pcmci_baseline_protocol.md at d16876a, committed
+before any score. Closes the adversarial review's finding 6 (no baseline is
+ever compared to MACE directly, only to other baselines).
+
+V=30, n=4000, coupling 0.20, seed 0 - the boundary map's own centre cell, so
+ground truth is byte-identical to MACE's published Table 4 row. CCM 18.8 min
+(435 pairs), PCMCI 3.7 min.
+
+  method   membership AUROC   true-edge AUROC
+  CCM           1.000              1.000
+  PCMCI         0.728              0.984
+  MACE          1.000              n/a
+
+H1 FAILED AS DECLARED: MACE does not exceed both baselines. CCM ties it at
+1.000. Reported as it fell.
+
+TWO DEFECTS IN OUR OWN SCORING, found because PCMCI first read 0.008 -
+near-perfect INVERSION, which is a transposed matrix, not a failing method:
+  1. TRANSPOSE BUG. tigramite's val_matrix[i,j,tau] is dependence of j on i
+     at lag -tau, i.e. ALREADY i->j. chamber_detect.py returns
+     val.max(axis=2) with no transpose and is correct; the new script added
+     a .T and inverted every PCMCI edge. Corrected: 0.728, not 0.008. CCM
+     unaffected (direction checked against deepfeatselect.ccm's documented
+     semantics before the run).
+  2. H3 DILUTED TO USELESSNESS. As declared it compared ALL 125
+     source-to-driven pairs against non-edges, but only 25 are true edges
+     (one parent per driven channel), so the positive set was 80% non-edges
+     and H3 was pinned near 0.5 by construction - it read 0.578/0.479 and
+     could not have detected anything. Replaced with the true-edge version,
+     recovering parent[] by replaying make_system's rng draws in order.
+     Both baselines then pass comfortably.
+Rescored in scripts/ccm_pcmci_rescore.py; no re-run needed, matrices saved.
+
+WHAT IT MEANS, against our own interest: at V=30, where pairwise CCM is
+still affordable, CCM is not worse than MACE at the membership task. This is
+what the paper's own method-selection map already says, now measured rather
+than asserted. MACE's claim was never accuracy at widths a pairwise method
+can reach.
+
+WHAT IT DOES NOT ESTABLISH: one cell, one seed, at the easiest width in the
+grid, where MACE also scores 1.000 and has no headroom to be beaten. A tie
+at ceiling is not equivalence. The informative comparison is V=60-240 where
+MACE's recall falls to 0.14-0.23, and that is exactly where CCM becomes
+unaffordable (65+ min/seed at V=60, quadratic). Not run.
+
+SCALING CLAIM RE-MEASURED INDEPENDENTLY: 435 pairs in 18.8 min at n=4000
+extrapolates to ~30,800 compute-hours at V=10^4, consistent with the paper's
+15,800-hour figure measured at half the sample length.
+
+Added to paper/mace_v2.tex as sec:map:headtohead, and to the audit gate:
+43/43 passing.
+
+Rule added:
+
+102. A near-zero AUROC is a transpose, not a result. An inverted score matrix
+     produces near-perfect anti-separation, which looks like catastrophic
+     method failure and is actually an indexing bug. Check the orientation
+     against a known-correct implementation before reporting any baseline as
+     having failed.

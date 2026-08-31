@@ -143,6 +143,19 @@ else:
     chk("chamber: run-clustering variance ratio", 3.45, r.clustering_ratio,
         tol=0.1)
 
+d = read("ExpOutput/ccm_pcmci_baseline/results_corrected.csv")
+if d is None:
+    SKIP.append("ccm_pcmci results_corrected.csv missing")
+else:
+    r = d.set_index("method").membership_auroc
+    chk("baseline: CCM membership AUROC", 1.000, r.loc["CCM"], tol=0.005)
+    chk("baseline: PCMCI membership AUROC", 0.728, r.loc["PCMCI"], tol=0.005)
+    chk("baseline: MACE membership AUROC (same cell)", 1.000, r.loc["MACE"],
+        tol=0.005)
+    e = d.set_index("method").true_edge_auroc
+    chk("baseline: CCM true-edge AUROC", 1.000, e.loc["CCM"], tol=0.005)
+    chk("baseline: PCMCI true-edge AUROC", 0.984, e.loc["PCMCI"], tol=0.005)
+
 # ------------------------------------------------------------ fitness gate
 d = read("ExpOutput/dataset_fitness/reference.csv")
 if d is None:

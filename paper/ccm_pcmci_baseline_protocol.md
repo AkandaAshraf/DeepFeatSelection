@@ -88,3 +88,71 @@ comparison apples-to-apples without spending more compute.
 Void if the width, seed, or aggregation rule (max over incoming edges) is
 changed after any score is seen, or if MACE's number is taken from anywhere
 other than the pre-existing, already-published boundary map cell.
+
+---
+
+## Result (2026-08-31): H1 FAILS. CCM ties MACE at this width.
+
+V = 30, n = 4000, coupling 0.20, redundancy 0, seed 0. CCM 18.8 min
+(435 pairs, 2.6 s/pair realised), PCMCI 3.7 min.
+
+  method   membership AUROC      H3 true-edge AUROC
+  CCM            1.000                 1.000
+  PCMCI          0.728                 0.984
+  MACE           1.000                 n/a (scores membership directly)
+
+**H1 FAILED, as declared.** MACE does not exceed both baselines: CCM ties it
+at 1.000. H2 had no prediction and CCM beat PCMCI on membership. H3 is
+passed by both baselines once computed correctly (below), so neither is
+disqualified and the comparison is informative for both.
+
+### Two defects in our own scoring, found and fixed before reporting
+
+PCMCI's first membership score was 0.008 -- near-perfect INVERSION, which is
+the signature of a transposed matrix, not of a method failing. Both defects
+were in `scripts/ccm_pcmci_baseline.py`, not in the baselines:
+
+1. **Transpose bug.** tigramite's `val_matrix[i, j, tau]` is the dependence
+   of j at lag 0 on i at lag -tau, so it is ALREADY evidence for i -> j.
+   `scripts/chamber_detect.py` returns `val.max(axis=2)` with no transpose
+   and is correct; this script added a `.T` and inverted every PCMCI edge.
+   Corrected, PCMCI's membership AUROC is 0.728, not 0.008. CCM was
+   unaffected: its direction convention was checked against
+   `deepfeatselect.ccm`'s documented semantics before the run.
+
+2. **H3 was diluted to uselessness.** As declared, H3 compared ALL
+   source-to-driven pairs (5 x 25 = 125) against non-edges. But only 25 of
+   those 125 are true edges -- each driven channel has exactly one parent --
+   so the positive set was 80% non-edges and H3 was pinned near 0.5 by
+   construction. It read 0.578 and 0.479 and could not have detected
+   anything. The protocol called this "a weaker, conservative version of
+   H3"; it was weaker to the point of being uninformative. Replaced with the
+   true-edge version, recovering `parent[]` by replaying `make_system`'s rng
+   draws in order. Both baselines then pass H3 comfortably.
+
+Rescoring is in `scripts/ccm_pcmci_rescore.py` and needed no re-run: both
+matrices were saved.
+
+### What this means, stated against our own interest
+
+The honest reading is the one the paper's own method-selection map already
+gives: **at V = 30, where pairwise CCM is still affordable, CCM is not worse
+than MACE at the membership task.** Both separate driven from source
+channels perfectly on this cell. MACE's claim was never accuracy at widths a
+pairwise method can reach; it is that those widths stop at some point and
+the question does not.
+
+The run also re-measures that scaling claim independently. 435 pairs took
+18.8 minutes at n = 4000. Extrapolated to V = 10^4 (49,995,000 pairs) that
+is roughly 30,800 compute-hours -- consistent with the paper's 15,800-hour
+figure, which was measured at n = 2000, at twice the sample length.
+
+### What this does NOT establish
+
+One cell, one seed, one coupling, at the easiest width in the grid, where
+MACE also scores a perfect 1.000 and so has no headroom to be beaten. A
+tie at ceiling is not evidence of equivalence in general: the informative
+comparison is at V = 60-240 where MACE's own recall falls to 0.14-0.23, and
+that comparison is unaffordable for CCM (65+ min/seed at V = 60) and was not
+run. Nothing here says CCM would keep pace where MACE degrades, or that it
+would not.
