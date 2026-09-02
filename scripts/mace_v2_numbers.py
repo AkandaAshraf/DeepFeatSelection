@@ -156,6 +156,22 @@ else:
     chk("baseline: CCM true-edge AUROC", 1.000, e.loc["CCM"], tol=0.005)
     chk("baseline: PCMCI true-edge AUROC", 0.984, e.loc["PCMCI"], tol=0.005)
 
+d = read("ExpOutput/ccm_pcmci_v60/results.csv")
+if d is None:
+    SKIP.append("ccm_pcmci_v60 results.csv missing")
+else:
+    g = d.groupby("method").membership_auroc.median()
+    chk("V60: MACE membership AUROC (median)", 0.976, g.loc["MACE"], tol=0.005)
+    chk("V60: CCM membership AUROC (median)", 0.674, g.loc["CCM"], tol=0.005)
+    chk("V60: PCMCI membership AUROC (median)", 0.590, g.loc["PCMCI"],
+        tol=0.005)
+    e = d.groupby("method").true_edge_auroc.median()
+    chk("V60: CCM true-edge AUROC (median)", 0.984, e.loc["CCM"], tol=0.005)
+    chk("V60: PCMCI true-edge AUROC (median)", 0.950, e.loc["PCMCI"],
+        tol=0.005)
+    w = d[d.method == "CCM"].membership_auroc
+    chk("V60: CCM worst seed at chance", 0.490, w.min(), tol=0.005)
+
 # ------------------------------------------------------------ fitness gate
 d = read("ExpOutput/dataset_fitness/reference.csv")
 if d is None:

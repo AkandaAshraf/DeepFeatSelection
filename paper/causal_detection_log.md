@@ -2859,3 +2859,69 @@ Rule added:
      method failure and is actually an indexing bug. Check the orientation
      against a known-correct implementation before reporting any baseline as
      having failed.
+
+2026-09-02  V=60 HEAD-TO-HEAD: H1 HOLDS. The V=30 tie was a ceiling effect.
+Pre-registration: paper/ccm_pcmci_v60_protocol.md at ea29539, before any
+score at this width. Three seeds, one process each. CCM 249 min, PCMCI 85
+min, MACE 0 (re-derived from published boundary-map cells).
+
+  MEMBERSHIP AUROC   s0     s1     s2     median
+  MACE              0.918  1.000  0.976  0.976
+  CCM               0.678  0.674  0.490  0.674
+  PCMCI             0.590  0.604  0.502  0.590
+  true-edge median: CCM 0.984, PCMCI 0.950 - both function, H3 excludes
+  neither.
+
+H1 HOLDS: MACE leads CCM by 0.30 at the width where MACE's own recall has
+collapsed to 0.14-0.18. Neither at ceiling, so the comparison discriminates,
+unlike V=30 where both scored 1.000.
+
+THE MECHANISM IS AGGREGATION, NOT EDGE RECOVERY. CCM's true-edge AUROC is
+0.982-0.995 - it recovers parent-child edges essentially perfectly and does
+NOT degrade at its own job when V doubles. What collapses is edges ->
+membership: a channel's score is its max incoming edge, so at V=60 each
+source has twice the chances of V=30 to collect one spurious high incoming
+score. At seed 2 CCM sits at 0.490 (chance) on membership while its
+true-edge AUROC on the same matrix is 0.982. MACE scores membership directly
+and never pays this. This is exactly the mechanism H4 named and DECLINED to
+predict, because predicting it after seeing the V=30 tie would have been
+fitting the story - recorded now as measured, not predicted.
+
+READ AGAINST OUR OWN INTEREST, both stated in the paper:
+  - The aggregation is OURS, not CCM's. Max-over-incoming is the natural
+    reduction and is what chamber_detect.py already used, but a count above
+    a per-scan threshold or a calibrated per-source null might degrade more
+    gracefully. Established: pairwise edge recovery does not convert to
+    membership at scale UNDER THE OBVIOUS AGGREGATION. Not: CCM cannot do
+    this.
+  - MACE's 0.976 AUROC coexists with recall 0.14-0.18 on the identical
+    cells. It ranks driven channels well while its threshold rule surfaces
+    few. That gap is the capacity limit of the bottleneck section, not a
+    ranking failure.
+
+SCALING RE-MEASURED: CCM 81-87 min/seed at V=60 vs 18.8 at V=30 - 4.5x for
+2x width, as the quadratic pair count implies. PCMCI 3.7 -> 24-32 min,
+roughly 8x, worse than quadratic, consistent with its combinatorial parent
+search.
+
+MEMORY: the first V=60 attempt OOM'd on a 1 MB allocation and discarded 90
+min of completed CCM. Fixed (dc3c2fd): worker baseline cut 690 -> 89 MB by
+pre-generating systems in a throwaway process, loading ccm.py by path to
+bypass the deepfeatselect __init__ that pulls keras, and inlining auc()
+rather than importing error_metrics (which pulls torch). Peak per seed then
+508-635 MB and all three completed.
+
+Rules added:
+
+103. A method can be excellent at its own task and useless at yours. CCM
+     recovered true edges at AUROC 0.98+ while its membership score sat at
+     chance, because the reduction from edges to a per-node score amplifies
+     one spurious edge per node as the panel grows. When adapting a method
+     across tasks, the adapter is a design choice you own and must report as
+     yours, not a property of the method you are comparing against.
+
+104. Measure the run's own memory before blaming the machine. A crash on a
+     1 MB allocation looked like external pressure; 564 MB of the process's
+     690 MB baseline turned out to be torch and tensorflow that the
+     computation never used. Import cost is a real experimental parameter on
+     a loaded machine.
