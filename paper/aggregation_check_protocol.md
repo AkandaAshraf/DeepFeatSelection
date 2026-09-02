@@ -74,3 +74,57 @@ results, and the incumbent MAX is reported beside them in every table.
 Void if an aggregation outside {MAX, MEAN, COUNT, TOP2MEAN} is introduced
 after any score is seen, if COUNT's percentile is changed after a result, or
 if the V = 30 cross-check (G4) is omitted from the report.
+
+---
+
+## Result (2026-09-02): CAVEAT DISCHARGED. The adapter is not the problem.
+
+Scored on the already-saved matrices; no new edge computation.
+
+  V=60, median over three seeds
+  method    MAX     MEAN   COUNT  TOP2MEAN
+  CCM      0.674   0.680   0.590   0.658
+  PCMCI    0.590   0.444   0.400   0.548
+
+  V=30, single seed (G4 cross-check)
+  CCM      1.000   1.000   0.720   1.000
+  PCMCI    0.728   0.568   0.584   0.712
+
+  MACE median at V=60: 0.976
+
+**G2 holds: no alternative comes close to MACE.** The best of the three,
+MEAN at 0.680, is 0.30 below MACE and only 0.006 above the incumbent MAX --
+which is noise, not an improvement.
+
+G1 technically holds (MEAN 0.680 > MAX 0.674) and is reported as
+technically holding and substantively empty. A 0.006 difference over three
+seeds is not evidence that MEAN is a better adapter, and it would be
+dishonest to present it as one. The declared prediction was that MAX should
+be the weakest of the four because it is the most sensitive to the
+single-spurious-edge mechanism; what the data show is that MAX is roughly
+tied with MEAN and better than both COUNT and TOP2MEAN, so the reasoning
+behind G1 was wrong even though its letter was satisfied.
+
+G4 is satisfied: MEAN scores 1.000 at V=30, tied with MAX, so nothing here
+is width-specific tuning.
+
+### What this settles
+
+The V=60 section's caveat -- that a different aggregation might degrade more
+gracefully -- is now a measurement rather than an assertion. Three
+alternatives were declared in advance and tried; the edges-to-membership
+conversion still fails, and the gap to MACE is 0.30 under every one of them.
+
+The claim in the paper is unchanged in substance but can now be stated
+without the hedge: pairwise edge recovery does not convert to membership at
+V = 60 under any of four aggregations, including the two most obvious
+robust alternatives to the maximum.
+
+### What it does not settle
+
+Four aggregations are not all aggregations. A per-source calibrated null --
+scoring each channel against a distribution of what its own incoming edges
+look like under a surrogate -- is a fifth family that was NOT declared and
+is NOT run here, because adding it after seeing these numbers is precisely
+the shopping this protocol forbids. It remains the honest open door, and
+anyone with the released matrices can test it in minutes.

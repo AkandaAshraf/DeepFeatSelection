@@ -2925,3 +2925,32 @@ Rules added:
      690 MB baseline turned out to be torch and tensorflow that the
      computation never used. Import cost is a real experimental parameter on
      a loaded machine.
+
+2026-09-02  AGGREGATION CHECK: the caveat is discharged, the adapter is not
+the problem. Pre-registration: paper/aggregation_check_protocol.md, before
+any alternative was scored. Reused the saved V=60/V=30 matrices; minutes,
+not the 334 min the edge scoring took.
+
+  V=60 median over 3 seeds    MAX    MEAN   COUNT  TOP2MEAN
+  CCM                        0.674  0.680  0.590   0.658
+  PCMCI                      0.590  0.444  0.400   0.548
+  MACE 0.976
+
+G2 HOLDS: no alternative approaches MACE. Best is MEAN at 0.680, still 0.30
+below, and only 0.006 above the incumbent.
+
+G1 technically holds and is substantively empty - 0.006 over three seeds is
+noise. Recorded as such rather than as a win, and the REASONING behind G1
+was wrong even though its letter was met: the prediction was that MAX would
+be weakest because it is most exposed to the single-spurious-edge mechanism,
+but MAX ties MEAN and beats both COUNT and TOP2MEAN.
+
+G4 satisfied: MEAN ties MAX at 1.000 at V=30, so no width-specific tuning.
+
+CONSEQUENCE: the V=60 section's hedge ("a different aggregation might
+degrade more gracefully") becomes a measurement. Three declared alternatives
+tried, conversion still fails, gap to MACE 0.30 under all four.
+
+NOT SETTLED, and stated: a per-source calibrated null is a fifth family not
+declared and not run, because adding it after seeing these numbers is the
+shopping the protocol forbids. Open door; the matrices are released.
