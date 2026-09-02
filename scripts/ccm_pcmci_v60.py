@@ -23,6 +23,10 @@ Expect four to five hours: ~77 min of CCM per seed (1,770 pairs at the
 
 from __future__ import annotations
 
+import argparse
+import ctypes
+import ctypes.wintypes as wt
+import gc
 import sys
 import time
 from pathlib import Path
@@ -31,9 +35,71 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
-from boundary_map import make_system  # noqa: E402
-from deepfeatselect.ccm import ccm  # noqa: E402
-from error_metrics import auc  # noqa: E402
+
+# LEAN IMPORTS. `boundary_map` pulls torch (+351 MB) and the `deepfeatselect`
+# package __init__ pulls keras/tensorflow (+213 MB); the computation here
+# needs neither. The first V=60 attempt died on a 1 MB allocation, so that
+# 564 MB is worth not paying. Systems come pre-generated from
+# scripts/v60_gen_systems.py, and ccm.py is loaded directly by path so the
+# package __init__ never executes.
+import importlib.util as _ilu  # noqa: E402
+
+_spec = _ilu.spec_from_file_location(
+    "_ccm_direct", str(Path(__file__).parent.parent / "deepfeatselect"
+                       / "ccm.py"))
+_ccm_mod = _ilu.module_from_spec(_spec)
+sys.modules["_ccm_direct"] = _ccm_mod       # dataclasses need this registered
+_spec.loader.exec_module(_ccm_mod)
+ccm = _ccm_mod.ccm
+
+
+def auc(pos, neg):
+    """P(a random positive outranks a random negative), ties at 0.5.
+
+    Inlined verbatim from scripts/error_metrics.py rather than imported:
+    that module imports torch and source_outflow_gate, costing ~330 MB for
+    six lines of numpy. scripts/test_auc_identical.py asserts this stays
+    byte-identical in behaviour to the original.
+    """
+    if len(pos) == 0 or len(neg) == 0:
+        return float("nan")
+    d = pos[:, None] - neg[None, :]
+    return float(((d > 0).sum() + 0.5 * (d == 0).sum()) / d.size)
+
+class _PMC(ctypes.Structure):
+    _fields_ = [("cb", wt.DWORD), ("PageFaultCount", wt.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t)]
+
+
+_GPMI = ctypes.windll.psapi.GetProcessMemoryInfo
+_GPMI.argtypes = [wt.HANDLE, ctypes.POINTER(_PMC), wt.DWORD]
+_GPMI.restype = wt.BOOL
+_CURPROC = ctypes.windll.kernel32.GetCurrentProcess
+_CURPROC.restype = wt.HANDLE
+
+
+def mem_mb() -> tuple[float, float]:
+    """(current, peak) working set in MB for this process.
+
+    argtypes must be declared: without them the 64-bit process handle is
+    truncated to int and the call silently returns zeros.
+    """
+    try:
+        c = _PMC()
+        c.cb = ctypes.sizeof(_PMC)
+        if not _GPMI(_CURPROC(), ctypes.byref(c), c.cb):
+            return float("nan"), float("nan")
+        return c.WorkingSetSize / 2**20, c.PeakWorkingSetSize / 2**20
+    except Exception:
+        return float("nan"), float("nan")
+
 
 OUT = Path("ExpOutput/ccm_pcmci_v60")
 N, V, COUPLING, REDUNDANCY = 4000, 60, 0.20, 0
@@ -74,7 +140,10 @@ def pcmci_matrix(x: np.ndarray) -> tuple[np.ndarray, float]:
     import tigramite.data_processing as pp
 
     t0 = time.time()
-    z = (x - x.mean(0)) / (x.std(0) + 1e-12)
+    # float32 halves the conditioning arrays tigramite builds internally --
+    # the OOM at V=60 was inside one of them. ParCorr is a partial
+    # correlation at n=4000; float32 precision is ample for it.
+    z = ((x - x.mean(0)) / (x.std(0) + 1e-12)).astype(np.float32)
     df = pp.DataFrame(z, var_names=[str(i) for i in range(x.shape[1])])
     pcmci = PCMCI(dataframe=df, cond_ind_test=ParCorr(), verbosity=0)
     res = pcmci.run_pcmci(tau_max=TAU_MAX, pc_alpha=None)
@@ -99,20 +168,30 @@ def score_cell(mat, is_driven, is_source, true_edge):
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", type=int, default=None,
+                    help="run ONE seed in this process (memory isolation); "
+                         "omit to run all seeds in one process")
+    args = ap.parse_args()
+    seeds = (args.seed,) if args.seed is not None else SEEDS
+
     OUT.mkdir(parents=True, exist_ok=True)
-    print(f"V={V} n={N} coupling={COUPLING} seeds={SEEDS}")
+    print(f"V={V} n={N} coupling={COUPLING} seeds={seeds}")
     print("MACE reference recall at this cell: 0.18 / 0.18 / 0.14\n")
     rows, t_start = [], time.time()
 
-    for seed in SEEDS:
+    for seed in seeds:
         print(f"=== seed {seed} ===", flush=True)
-        x, is_driven, is_source = make_system(
-            n=N, V=V, coupling=COUPLING, redundancy=REDUNDANCY, seed=seed)
-        parent, n_src = true_parents(V, seed)
-        src_idx, drv_idx = np.where(is_source)[0], np.where(is_driven)[0]
-        true_edge = np.zeros((V, V), bool)
-        for k, p in enumerate(parent):
-            true_edge[src_idx[p], drv_idx[k]] = True
+        sysf = OUT / f"system_s{seed}.npz"
+        if not sysf.exists():
+            print(f"  missing {sysf} - run scripts/v60_gen_systems.py first")
+            return 1
+        _d = np.load(sysf)
+        x = _d["x"]
+        is_driven, is_source = _d["is_driven"], _d["is_source"]
+        true_edge = _d["true_edge"]
+        print(f"  system loaded, sha={_d['sha']}  "
+              f"(mem {mem_mb()[0]:.0f} MB)", flush=True)
 
         # CCM is the memory-light, expensive part and carries H1 (the
         # decisive MACE-vs-CCM prediction). Save it the instant it finishes,
@@ -123,6 +202,9 @@ def main() -> int:
                             is_driven=is_driven, is_source=is_source,
                             true_edge=true_edge)
         methods = [("CCM", cm, ct)]
+        print(f"  mem after CCM: {mem_mb()[0]:.0f} MB "
+              f"(peak {mem_mb()[1]:.0f} MB)", flush=True)
+        gc.collect()   # return CCM's per-pair KD-trees before PCMCI's peak
 
         # PCMCI is secondary (H2 has no prediction) and is the part that
         # OOM'd at V=60 on this loaded machine. Best-effort: a MemoryError
@@ -147,7 +229,9 @@ def main() -> int:
                          "minutes": t / 60})
             print(f"  {name:6s} membership {m_auc:.3f}   "
                   f"true-edge {e_auc:.3f}", flush=True)
-        pd.DataFrame(rows).to_csv(OUT / "results.csv", index=False)
+        tag = f"_s{seed}" if args.seed is not None else ""
+        pd.DataFrame(rows).to_csv(OUT / f"results{tag}.csv", index=False)
+        print(f"  mem peak this seed: {mem_mb()[1]:.0f} MB", flush=True)
 
         m = np.load(f"ExpOutput/boundary_map/raw_n{N}_V{V}_c{COUPLING}"
                     f"_r{REDUNDANCY}_s{seed}.npz")
@@ -159,8 +243,13 @@ def main() -> int:
         print(f"  MACE   membership {mace_auc:.3f}\n", flush=True)
 
     d = pd.DataFrame(rows)
+    print(f"({(time.time()-t_start)/60:.1f} min total, "
+          f"peak {mem_mb()[1]:.0f} MB)\n")
+    if args.seed is not None:
+        print("single-seed run complete; aggregate with the driver once all "
+              "seeds are done.")
+        return 0
     d.to_csv(OUT / "results.csv", index=False)
-    print(f"({(time.time()-t_start)/60:.1f} min total)\n")
 
     g = d.groupby("method").membership_auroc.agg(["median", "min", "max"])
     print("MEMBERSHIP AUROC over three seeds")
