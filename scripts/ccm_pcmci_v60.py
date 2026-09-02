@@ -114,21 +114,40 @@ def main() -> int:
         for k, p in enumerate(parent):
             true_edge[src_idx[p], drv_idx[k]] = True
 
+        # CCM is the memory-light, expensive part and carries H1 (the
+        # decisive MACE-vs-CCM prediction). Save it the instant it finishes,
+        # so a later PCMCI failure never discards 90 minutes of it.
         cm, ct = ccm_matrix(x, seed)
         print(f"  CCM   {ct/60:.1f} min", flush=True)
-        pm, pt = pcmci_matrix(x)
-        print(f"  PCMCI {pt/60:.1f} min", flush=True)
-        np.savez_compressed(OUT / f"matrices_s{seed}.npz", ccm=cm, pcmci=pm,
+        np.savez_compressed(OUT / f"ccm_s{seed}.npz", ccm=cm,
                             is_driven=is_driven, is_source=is_source,
                             true_edge=true_edge)
+        methods = [("CCM", cm, ct)]
 
-        for name, mat, t in [("CCM", cm, ct), ("PCMCI", pm, pt)]:
+        # PCMCI is secondary (H2 has no prediction) and is the part that
+        # OOM'd at V=60 on this loaded machine. Best-effort: a MemoryError
+        # records it as unavailable for this seed and the run continues, so
+        # the decisive comparison still completes.
+        try:
+            pm, pt = pcmci_matrix(x)
+            print(f"  PCMCI {pt/60:.1f} min", flush=True)
+            np.savez_compressed(OUT / f"pcmci_s{seed}.npz", pcmci=pm)
+            methods.append(("PCMCI", pm, pt))
+        except MemoryError:
+            print("  PCMCI OOM - recorded as unavailable, continuing",
+                  flush=True)
+            rows.append({"seed": seed, "method": "PCMCI",
+                         "membership_auroc": np.nan,
+                         "true_edge_auroc": np.nan, "minutes": np.nan})
+
+        for name, mat, t in methods:
             m_auc, e_auc = score_cell(mat, is_driven, is_source, true_edge)
             rows.append({"seed": seed, "method": name,
                          "membership_auroc": m_auc, "true_edge_auroc": e_auc,
                          "minutes": t / 60})
             print(f"  {name:6s} membership {m_auc:.3f}   "
                   f"true-edge {e_auc:.3f}", flush=True)
+        pd.DataFrame(rows).to_csv(OUT / "results.csv", index=False)
 
         m = np.load(f"ExpOutput/boundary_map/raw_n{N}_V{V}_c{COUPLING}"
                     f"_r{REDUNDANCY}_s{seed}.npz")
