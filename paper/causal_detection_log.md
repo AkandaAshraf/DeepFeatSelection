@@ -3255,3 +3255,82 @@ Rules added:
      nothing is not a source; random wiring manufactures such channels at
      a rate that depends on shape, and any comparison across shapes
      inherits the difference unless it is reported with the result.
+
+2026-09-03  CLEAN GENERATOR: THE CLOSURE WAS AN ARTEFACT. Q1 and Q2 both
+hold. Pre-registration paper/clean_generator_protocol.md, committed and the
+seeds declared before the run. 120 runs, 20.5 min, seeds 1100-1429.
+
+  shape    bar       sensitivity              AUC    src med   dead  orphan runs
+  3/6/6    +0.00876  26/30 = 0.87 [0.70,0.95] 0.889  +0.01205  2/60  22/60
+  2/11/2   +0.01360  30/30 = 1.00 [0.89,1.00] 0.977  +0.02546  0/60   1/60
+  dirty generator, same protocol: 0.53 (read 0.5-0.7) and 0.83.
+
+  Q1 DECISIVE 0.87 >= 0.80 HOLDS.  Q2 1.00 >= 0.80 HOLDS.
+  Q3 shape effect persists threshold-free (src med and AUC both higher).
+  Q4 2 dead runs, limit 3, does not fire.  Q5 gap 0.30 -> 0.13, shrinks.
+  Q6 ghost clears the bar in 0.00 of runs at both shapes, clean.
+  Rejection check: largest source max|ac| over 120 runs is 0.856 < 0.90.
+
+VERDICT CLOSURE WAS AN ARTEFACT, by the rule fixed in advance. One line of
+the generator - rejecting the phase-locked windows of U(3.7, 3.9) - moves
+the shape that closed the line from 0.53 to 0.87 with nothing else changed.
+The 2026-09-02 closure measured the generator.
+
+THE TWO DEAD RUNS ARE THE INTERESTING PART. Q4 was declared to catch
+exactly the case where dead runs survive the fix, and two did, both at
+3/6/6, neither with a locked source (max |ac| 0.75). Both have an ORPHAN
+source, and with three sources the run statistic is a median of three, so
+one orphan plus one weakly connected source sits the median at zero however
+well the statistic works on the source that drives the system:
+  seed 1205  sinks driven 2, 4, 0   outflow -0.0005, +0.0496, -0.0009
+  seed 1224  sinks driven 1, 5, 0   outflow -0.0008, +0.0416, -0.0005
+So on the clean generator the residual failures are a truth-label defect
+plus the run-level median, not the statistic.
+
+POST HOC, AND LABELLED AS SUCH. Restricting calibration and test to runs
+where every source drives at least one sink: 3/6/6 reaches 20/20 at a
++0.00728 bar with AUC 1.000, 2/11/2 29/29 with AUC 1.000. Both shapes then
+detect a source in EVERY test run, and what is left of the shape effect is
+the size of the signal, not whether it is found (src med +0.0123 vs
++0.0256). Pooling every non-orphan source by how many sinks it drives:
+0.0081, 0.0135, 0.0189, 0.0227, 0.0248, 0.0272, 0.0319, 0.0318 for 1..8
+sinks (n = 39, 70, 43, 34, 31, 26, 15, 13), monotone. That is the MARGINAL
+half of the mechanism withdrawn today, and at the source level it is clean.
+It does not reinstate the withdrawn claim: what the ratio sweep refuted is
+the CONDITIONAL half - that the two variants move in opposite directions -
+and the conditional variant improved with the ratio too, so that refutation
+is untouched. Pre-registering the source-level gradient is the obvious next
+step and it has not been done.
+
+WHAT IS NOW ON RECORD ABOUT EVERY EARLIER SYNTHETIC OUTFLOW NUMBER. The
+capacity, coupling and maturity gates, the outflow bar, the sink-calibrated
+closure, the crossed-saturation run, the chamber-shape comparison, the
+reopen and the ratio sweep were all measured with phase-locked sources
+present at a rate of about one source in five, and with orphan sources
+counted as misses at a rate that differs by shape (22/60 at 3/6/6 versus
+1/60 at 2/11/2). None of those runs is re-run here. The manuscript states
+the defect where it quotes any of them.
+
+WHAT DOES NOT MOVE. The chamber's 0.916 never used this generator. The
+ratio sweep's refutation does not depend on it: locking and orphans hurt
+both variants on the SAME runs and cannot produce an ordering between them.
+The reopen is strengthened (0.83 dirty, 1.00 clean).
+
+NOT ESTABLISHED. Two shapes, one coupling, one family, 30 test runs each.
+Clipping was deliberately left in (Rule 91) and is untested. The coupling
+sweep that set 0.50 as the operating point was run on the defective
+generator and has not been repeated.
+
+Rules added:
+
+116. When a defect is found in a generator, the honest report is not the
+     corrected number alone but the corrected number, the defective one,
+     and the list of every result that used the defective one. Today's list
+     is eight experiments; naming them is what makes the correction
+     checkable rather than a claim about our own diligence.
+
+117. A run-level statistic that aggregates over few channels inherits the
+     truth labels' defects at full strength. A median over three sources
+     goes to zero when one is an orphan and one is weak, so 3/6/6 loses
+     runs that 2/11/2 cannot lose. Report the aggregation width alongside
+     any rate, and prefer per-channel evidence when the width is small.

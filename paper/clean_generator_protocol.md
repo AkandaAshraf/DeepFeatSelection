@@ -128,3 +128,117 @@ the generator's rejection step; if seeds 1100-1429 have been used before; if
 the bar is calibrated on anything but the same-shape calibration block; if
 Q6 fails; or if the outcome is reported without the dirty-generator figures
 (0.53 / 0.667 and 0.83) beside it.
+
+## Result (2026-09-03, seeds 1100-1429, 120 runs, 20.5 min, `ExpOutput/clean_generator/`)
+
+  shape    bar        sensitivity              AUC    source med  sink med  dead
+  3/6/6    +0.00876   26/30 = 0.87 [0.70,0.95] 0.889  +0.01205    +0.00239  2/60
+  2/11/2   +0.01360   30/30 = 1.00 [0.89,1.00] 0.977  +0.02546    +0.00761  0/60
+
+  dirty generator, same shapes and protocol: 0.53 (read 0.5-0.7) and 0.83.
+
+  Q1  DECISIVE. 3/6/6 sensitivity 0.87 >= 0.80. HOLDS.
+  Q2  2/11/2 sensitivity 1.00 >= 0.80. HOLDS.
+  Q3  Shape effect, threshold-free: source median +0.01205 -> +0.02546,
+      AUC 0.889 -> 0.977. PERSISTS.
+  Q4  Dead runs 2/60 and 0/60, at most 3 allowed. Does not fire.
+  Q5  Sensitivity gap +0.13 against the dirty generator's +0.30. SHRINKS.
+  Q6  The ghost clears the bar in 0.00 of runs at both shapes. Clean.
+  Q7  Bars came out at +0.00876 and +0.01360 against the audit's clean-subset
+      +0.00557 and +0.01585, so those post-hoc bars were the right order of
+      magnitude and no better than that.
+
+  Rejection check: the largest max |autocorrelation| over any source channel
+  in 120 runs is 0.856, below the 0.90 lock criterion. No locked source
+  survived rejection.
+
+VERDICT: **CLOSURE WAS AN ARTEFACT**, by the rule fixed above. The synthetic
+source-detection line does not close. It was closed on 2026-09-02 at
+sensitivity 0.53 by a generator that drew about one source in five from a
+phase-locked window of the logistic family; on the same protocol, the same
+bar construction, the same capacity and the same shape, with only those
+windows removed from the draw, the same statistic reaches 0.87. The earlier
+number measured the generator.
+
+### The two dead runs, and what they say
+
+Q4 allowed up to three dead runs per shape as a check on the locking
+explanation. Two occurred, both at 3/6/6, and neither has a locked source
+(seeds 1205 and 1224, maximum source |ac| 0.75). Both have an **orphan**
+source -- a source the random parent draw assigned no sink:
+
+  seed 1205  sources drive 2, 4 and 0 sinks; outflows -0.0005, +0.0496, -0.0009
+  seed 1224  sources drive 1, 5 and 0 sinks; outflows -0.0008, +0.0416, -0.0005
+
+With three sources the run statistic is the median of three numbers, so one
+orphan and one weakly-connected source put the median at zero however well
+the statistic works on the source that actually drives the system. The dead
+runs on the clean generator are a defect of the truth labels and of the
+run-level median, not of the statistic and not of locking.
+
+### Post-hoc: the orphan defect accounts for the rest
+
+Everything in this subsection was computed after seeing the result and is
+reported as a diagnosis, not as a test. Restricting both the calibration and
+the test block to runs in which every source drives at least one sink:
+
+  shape    orphan-free bar   sensitivity              AUC     source med
+  3/6/6    +0.00728          20/20 = 1.00 [0.84,1.00] 1.000   +0.01227
+  2/11/2   +0.01360          29/29 = 1.00 [0.88,1.00] 1.000   +0.02558
+
+Orphans occur in 22 of 60 runs at 3/6/6 and 1 of 60 at 2/11/2, because
+`n_sink = 6` random draws over 3 sources leave one empty far more often than
+11 draws over 2. At 3/6/6 the per-run AUC median is 0.944 on orphan-free
+runs against 0.556 on runs with an orphan, and orphan sources have median
+outflow -0.00077 against +0.01448 for connected ones -- correctly zero for a
+channel that drives nothing, and wrongly counted as a miss.
+
+So on a generator with chaotic sources and no orphan labels, **both shapes
+detect sources in every test run**. What remains of the shape effect is a
+difference in the size of the signal, not in whether it is found: median
+source outflow is still twice as large at 2/11/2 (+0.0256) as at 3/6/6
+(+0.0123).
+
+### Post-hoc: what the size difference tracks
+
+Pooling every non-orphan source in all 120 runs and grouping by the number
+of sinks that source actually drives:
+
+  sinks driven   1       2       3       4       5       6       7       8
+  n              39      70      43      34      31      26      15      13
+  outflow med    0.0081  0.0135  0.0189  0.0227  0.0248  0.0272  0.0319  0.0318
+
+Monotone across the whole range (0.0341 at 9 sinks, n = 5; 0.0411 at 11,
+n = 1). This is the *marginal* half of the mechanism withdrawn on the
+evidence of the ratio sweep -- that outflow grows with how much of the
+system depends on a channel -- and at the level of the individual source it
+is clean and monotone. It is not a re-instatement of the withdrawn claim:
+what the ratio sweep refuted was the *conditional* half, that the two
+variants are pushed in opposite directions, and that refutation stands
+because the conditional variant improved with the ratio as well. Nor is this
+a pre-registered result. It is a post-hoc regularity on a defective-label
+generator, and it is the obvious thing to pre-register next.
+
+### What this changes and what it does not
+
+CHANGES. The closure of 2026-09-02 is withdrawn. The manuscript's Section 12
+must state that the synthetic basis for the source-detection complement
+holds at both tested shapes once the generator is fixed, and must disclose
+that every synthetic outflow number reported before 2026-09-03 -- the
+capacity, coupling and maturity gates, the outflow bar, the closure, the
+crossed-saturation run, the chamber-shape comparison, the reopen and the
+ratio sweep -- was measured with phase-locked sources present.
+
+DOES NOT CHANGE. The chamber result (AUC 0.916, real actuators, gate-
+screened) never depended on this generator. The ratio sweep's refutation of
+the "opposite directions" mechanism does not depend on it either: the
+conditional variant led at every ratio, and locking and orphans, which hurt
+both variants on the same runs, cannot produce that ordering. The reopen
+result (0.83 dirty, 1.00 clean here) is strengthened, not overturned.
+
+NOT ESTABLISHED. Two shapes, one coupling, one generating family, 30 test
+runs each. The clipping defect (83% of sinks at the [0,1] boundary at
+coupling 0.50) was deliberately left in place and is untested. Whether the
+statistic separates sources from sinks at other couplings on a clean
+generator has not been re-measured, and the earlier coupling sweep was run
+on the defective one.

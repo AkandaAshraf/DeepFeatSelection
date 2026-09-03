@@ -342,13 +342,62 @@ else:
 # ------------------------------------------------------- clean generator
 d = read("ExpOutput/clean_generator/summary.csv")
 if d is None:
-    SKIP.append("clean_generator summary.csv missing (run not finished)")
+    SKIP.append("clean_generator summary.csv missing")
 else:
     r = d.set_index(d.columns[0])
     chk("clean generator: ghost clean at both shapes", True,
         bool((r.ghost_clear <= 0.05).all()), tol=0)
     chk("clean generator: no locked source survives rejection", True,
         bool((r.src_max_ac < 0.90).all()), tol=0)
+    chk("clean generator: 3/6/6 bar", 0.00876, r.loc["3/6/6", "bar"], tol=5e-5)
+    chk("clean generator: 3/6/6 sensitivity", 0.867, r.loc["3/6/6", "sens"],
+        tol=0.01)
+    chk("clean generator: 3/6/6 AUC", 0.889, r.loc["3/6/6", "auc"], tol=0.01)
+    chk("clean generator: 2/11/2 bar", 0.01360, r.loc["2/11/2", "bar"],
+        tol=5e-5)
+    chk("clean generator: 2/11/2 sensitivity", 1.000, r.loc["2/11/2", "sens"],
+        tol=0.01)
+    chk("clean generator: 2/11/2 AUC", 0.977, r.loc["2/11/2", "auc"], tol=0.01)
+    chk("clean generator: Q1 clears the 0.80 bar the dirty run failed", True,
+        bool(r.loc["3/6/6", "sens"] >= 0.80), tol=0)
+    chk("clean generator: dead runs within the declared limit of 3", True,
+        bool((r.dead <= 3).all()), tol=0)
+
+d = read("ExpOutput/clean_generator/runs.csv")
+c = read("ExpOutput/clean_generator/channels.csv")
+if d is None or c is None:
+    SKIP.append("clean_generator runs.csv / channels.csv missing")
+else:
+    dead = d[d.source < 0.002]
+    chk("clean generator: dead runs total", 2, len(dead), tol=0)
+    chk("clean generator: every dead run has an orphan source", True,
+        bool((dead.n_orphan > 0).all()), tol=0)
+    chk("clean generator: no dead run has a locked source", True,
+        bool((dead.src_max_ac < 0.90).all()), tol=0)
+    chk("clean generator: orphan runs at 3/6/6", 22,
+        int((d[d["shape"] == "3/6/6"].n_orphan > 0).sum()), tol=0)
+    chk("clean generator: orphan runs at 2/11/2", 1,
+        int((d[d["shape"] == "2/11/2"].n_orphan > 0).sum()), tol=0)
+    # post-hoc, orphan-free: both shapes detect in every test run
+    for shape, k in [("3/6/6", 20), ("2/11/2", 29)]:
+        a = d[(d["shape"] == shape) & (d.n_orphan == 0)]
+        bar = float(np.quantile(a[a.set == "cal"].sink, 0.95))
+        te = a[a.set == "test"]
+        chk(f"clean generator: orphan-free sensitivity at {shape}", k,
+            int((te.source > bar).sum()), tol=0)
+        chk(f"clean generator: orphan-free test runs at {shape}", k, len(te),
+            tol=0)
+    src = c[(c.role == "source") & (c.n_sinks > 0)]
+    g = src.groupby("n_sinks").outflow.median()
+    chk("clean generator: outflow rises with sinks driven, 1 to 8", True,
+        bool(all(g.loc[i] <= g.loc[i + 1] + 1e-4 for i in range(1, 8))), tol=0)
+    chk("clean generator: outflow median at 1 sink", 0.00813, g.loc[1],
+        tol=5e-5)
+    chk("clean generator: outflow median at 8 sinks", 0.03182, g.loc[8],
+        tol=5e-5)
+    orph = c[(c.role == "source") & (c.n_sinks == 0)]
+    chk("clean generator: orphan sources score ~zero", 0.0,
+        float(orph.outflow.median()), tol=0.002)
 
 # ---------------------------------------------------------------- report
 print("MACE v2 audit gate\n")
