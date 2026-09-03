@@ -259,6 +259,97 @@ else:
         chk("fitness: impulse dataset at m=10", 0.0224,
             q.iloc[0].lag_info, tol=5e-4)
 
+# ------------------------------------------------- reopen at the chamber shape
+d = read("ExpOutput/chamber_shape_reopen/summary.csv")
+if d is None:
+    SKIP.append("chamber_shape_reopen summary.csv missing")
+else:
+    r = d.iloc[0]
+    chk("reopen: calibrated bar", 0.01498, r.bar, tol=5e-5)
+    chk("reopen: sensitivity at 2/11/2", 0.833, r.sensitivity, tol=0.01)
+    chk("reopen: AUC", 0.864, r.auc_median, tol=0.01)
+    chk("reopen: source median", 0.02312, r.source_med, tol=5e-5)
+    chk("reopen: clears the declared 0.80 bar", True,
+        bool(r.sensitivity >= 0.80), tol=0)
+
+d = read("ExpOutput/chamber_shape_reopen/runs.csv")
+if d is None:
+    SKIP.append("chamber_shape_reopen runs.csv missing")
+else:
+    te = d[d.set == "test"]
+    bar = float(np.quantile(d[d.set == "cal"].sink, 0.95))
+    chk("reopen: test runs clearing the bar", 25, int((te.source > bar).sum()),
+        tol=0)
+    chk("reopen: dead test runs", 2, int((te.source < 0.002).sum()), tol=0)
+
+# ------------------------------------------------------------- ratio sweep
+d = read("ExpOutput/ratio_sweep/results.csv")
+if d is None:
+    SKIP.append("ratio_sweep results.csv missing")
+else:
+    r = d.sort_values("ratio").reset_index(drop=True)
+    chk("ratio sweep: T2 Spearman(C1 AUC, ratio)", 0.941,
+        r[["ratio", "C1_auc"]].corr(method="spearman").iloc[0, 1], tol=0.01)
+    chk("ratio sweep: T2 FAILS - conditional AUC does not fall", True,
+        bool(r[["ratio", "C1_auc"]].corr(method="spearman").iloc[0, 1] >= 0),
+        tol=0)
+    chk("ratio sweep: conditional never behind the marginal variant", True,
+        bool((r.C1_auc >= r.A1_auc - 1e-9).all()), tol=0)
+    chk("ratio sweep: no strict AUC sign change (no crossover)", 0,
+        int((np.sign((r.A1_auc - r.C1_auc).values)[:-1]
+             * np.sign((r.A1_auc - r.C1_auc).values)[1:] < 0).sum()), tol=0)
+    chk("ratio sweep: A1 sensitivity at ratio 1", 0.45, r.A1_sens.iloc[0],
+        tol=0.01)
+    chk("ratio sweep: C1 sensitivity at ratio 1", 0.90, r.C1_sens.iloc[0],
+        tol=0.01)
+
+# --------------------------------------------------------- generator audit
+d = read("ExpOutput/generator_audit/r_scan.csv")
+if d is None:
+    SKIP.append("generator_audit r_scan.csv missing")
+else:
+    chk("audit: locked fraction of U(3.7, 3.9)", 0.192, d.locked.mean(),
+        tol=0.002)
+    chk("audit: P(locked source) at n_src=3", 0.47,
+        1 - (1 - d.locked.mean()) ** 3, tol=0.01)
+    chk("audit: P(locked source) at n_src=2", 0.35,
+        1 - (1 - d.locked.mean()) ** 2, tol=0.01)
+
+d = read("ExpOutput/generator_audit/locked_runs.csv")
+if d is None:
+    SKIP.append("generator_audit locked_runs.csv missing")
+else:
+    for name, n_locked, n_dead in [("sink_bar 3/6/6", 26, 8),
+                                   ("reopen 2/11/2", 24, 4)]:
+        e = d[d.experiment == name]
+        chk(f"audit: {name} runs with a locked source", n_locked,
+            int((e.n_locked > 0).sum()), tol=0)
+        chk(f"audit: {name} dead runs", n_dead,
+            int((e.source < 0.002).sum()), tol=0)
+        chk(f"audit: {name} every dead run has a locked source", True,
+            bool(((e.source < 0.002) <= (e.n_locked > 0)).all()), tol=0)
+
+d = read("ExpOutput/generator_audit/gate_by_parent.csv")
+if d is None:
+    SKIP.append("generator_audit gate_by_parent.csv missing")
+else:
+    g = d.groupby("parent_locked").dR2.median()
+    chk("audit: gate dR2, chaotic parent", 0.0211, g.loc[False], tol=5e-4)
+    chk("audit: gate dR2, locked parent", 0.0005, g.loc[True], tol=5e-4)
+    chk("audit: locked parents fail the L50 gate (+0.0136)", True,
+        bool(g.loc[True] < 0.0136 < g.loc[False]), tol=0)
+
+# ------------------------------------------------------- clean generator
+d = read("ExpOutput/clean_generator/summary.csv")
+if d is None:
+    SKIP.append("clean_generator summary.csv missing (run not finished)")
+else:
+    r = d.set_index(d.columns[0])
+    chk("clean generator: ghost clean at both shapes", True,
+        bool((r.ghost_clear <= 0.05).all()), tol=0)
+    chk("clean generator: no locked source survives rejection", True,
+        bool((r.src_max_ac < 0.90).all()), tol=0)
+
 # ---------------------------------------------------------------- report
 print("MACE v2 audit gate\n")
 for line in OK:
