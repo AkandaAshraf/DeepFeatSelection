@@ -1,15 +1,22 @@
-"""Conditional outflow as the primary hypothesis, on fresh seeds.
+"""Sinks per source as a continuous axis: marginal (A1) and conditional (C1)
+outflow on identical runs.
 
-Pre-registration: paper/conditional_outflow_protocol.md, committed before
-this was written or run.
+Pre-registration: paper/ratio_sweep_protocol.md, committed before this was
+written or run. The per-cell machinery is conditional_outflow.cell with the
+shape parameterised; A1 and C1 differ only in the conditioning set.
 
-A1 and C1 differ ONLY in the conditioning set - same autoencoder, same codes,
-same data, same ridge, same squared-error scoring - so any difference between
-them is attributable to conditioning and to nothing else. The redundancy axis
-is part of the design because it tests the risk C1 carries: if a source is
-recoverable from its own sinks, conditioning should zero the source too.
+POST-RUN FIXES (2026-09-03), made after the run of that date and disclosed in
+the protocol's result section. The verdict that run printed is preserved in
+ExpOutput/ratio_sweep_run.log and was WRONG for two reasons fixed here:
+  1. a tie in A1_auc - C1_auc (both at the 1.000 ceiling) was counted as a
+     sign change, i.e. a crossover;
+  2. the verdict never consulted T2, although the declared rule requires
+     T1, T2 and T3 together.
+Also fixed: per-run frames are now written to disk (the run saved only six
+aggregate rows), the docstring pointed at the wrong protocol, and
+COPY_NOISE was undefined on a dead path.
 
-    python scripts/conditional_outflow.py
+    python scripts/ratio_sweep.py
 """
 
 from __future__ import annotations
@@ -23,13 +30,14 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 import source_outflow_gate as G  # noqa: E402
-from error_metrics import _ridge_pred, auc, score_all  # noqa: E402
+from error_metrics import _ridge_pred, score_all  # noqa: E402
 
 OUT = Path("ExpOutput/ratio_sweep")
 COUPLING = 0.50
 ALPHA = 0.05
 V_TOTAL = 25                      # + ghost = 26, so b = 4V = 104 everywhere
 EPOCHS = 25                       # as in every prior outflow gate
+COPY_NOISE = 0.02                 # conditional_outflow's value; copies=0 here
 CAL_SEEDS, TEST_SEEDS = range(900, 920), range(1000, 1020)
 # (n_src, n_sink) -> sinks per source; n_iso pads to V_TOTAL
 RATIOS = [(12, 12), (6, 12), (4, 12), (3, 15), (2, 16), (1, 11)]
@@ -142,6 +150,8 @@ def main() -> int:
         ratio = n_sink / n_src
         cal = pd.DataFrame([run(n_src, n_sink, s) for s in CAL_SEEDS])
         test = pd.DataFrame([run(n_src, n_sink, s) for s in TEST_SEEDS])
+        pd.concat([cal.assign(set="cal"), test.assign(set="test")]).to_csv(
+            OUT / f"runs_{n_src}_{n_sink}.csv", index=False)
         barA = float(np.quantile(cal.A1_sink, 1 - ALPHA))
         barC = float(np.quantile(cal.C1_sink, 1 - ALPHA))
         rows.append({
@@ -172,16 +182,28 @@ def main() -> int:
     # T3: crossover in AUC, the metric both variants share
     diff = d.A1_auc - d.C1_auc
     signs = np.sign(diff.values)
+    # a STRICT sign change; a tie (both variants at the same value, e.g. the
+    # 1.000 ceiling) is a meeting, not a crossing
     cross = [(d.ratio.iloc[i], d.ratio.iloc[i + 1])
-             for i in range(len(d) - 1) if signs[i] != signs[i + 1]]
+             for i in range(len(d) - 1) if signs[i] * signs[i + 1] < 0]
+    tie = [d.ratio.iloc[i] for i in range(len(d)) if signs[i] == 0]
     print(f"\nT3  DECISIVE: A1_auc - C1_auc across the sweep: "
           + "  ".join(f"{r:.1f}:{v:+.3f}" for r, v in zip(d.ratio, diff)))
+    if tie:
+        print("    ties (both variants equal) at ratio "
+              + ", ".join(f"{t:.1f}" for t in tie) + " - not crossings")
 
-    print("\nVERDICT (rule fixed before running)")
+    print("\nVERDICT (rule fixed before running; T1, T2 and T3 all consulted)")
     if rho_a <= 0:
         print("   -> MECHANISM WRONG (T5). Marginal sensitivity does not "
               "rise with the ratio;\n      today's shape explanation is "
               "not a ratio effect and needs re-examination.")
+    elif rho_c >= 0:
+        print("   -> T2 FAILS: conditional AUC does not fall with the ratio. "
+              "The declared rule has\n      no branch for this outcome, so "
+              "no crossover verdict is available; the protocol's\n      "
+              "mechanism (conditioning loses as sinks per source rise) is "
+              "contradicted.")
     elif cross:
         lo, hi = cross[0]
         print(f"   -> CROSSOVER FOUND between ratio {lo:.1f} and {hi:.1f} "
