@@ -87,3 +87,61 @@ requirement), V = 15 plus ghost, n = 4000, 25 epochs, 2 models.
 Void if the bar is computed from the test seeds, if alpha changes after any
 source outflow is seen, if seeds are added or dropped after a result, or if
 S3 fires and is reported as anything other than the line closing.
+
+---
+
+## Result (2026-09-02): CLOSED. S3 fires.
+
+30 calibration + 30 test + 30 descriptive runs, b = 4V, 17.1 min.
+
+  S1  sink-calibrated bar q95(sink) = +0.01051
+      sink distribution: median +0.00201, range [-0.00025, +0.01471]
+      ghost-calibrated bar was -0.00005; the declared bar was 0.01
+      Higher than the ghost bar, as declared. Recorded, not a finding.
+
+  S2  DECISIVE, coupling 0.50: 16 of 30 runs clear the bar.
+      **Sensitivity 0.53**, against a declared bar of 0.80. FAIL.
+      source median +0.01064   sink median +0.00174   margin +0.00013
+
+  S3  0.47 of runs fail to clear. Sources and sinks OVERLAP at a 5% sink
+      false-alarm rate.
+
+  Descriptive, coupling 0.30: 0.00 of runs clear. No pass/fail attached.
+
+**VERDICT: CLOSED, by the rule fixed in advance.** At a stated 5% false-alarm
+rate against the confuser that actually matters, outflow separates sources
+from sinks in barely half of runs. The 0.01 bar was concealing an overlap,
+not describing a margin.
+
+### The arithmetic that makes this unambiguous
+
+The declared bar was 0.01. The sink-calibrated q95 is +0.01051 -- within 5%
+of it. So the constant was, accidentally, an almost exactly correct sink
+threshold. What was never reported is the sensitivity AT that threshold: 0.53.
+The line was reopened on a "margin of +0.0107 over the ghost", and that
+margin is now revealed as the distance between the source median and a null
+that was never the relevant one. Against the relevant null the margin is
++0.00013 -- three orders of magnitude smaller, and indistinguishable from
+zero given a sink distribution whose own range reaches +0.01471.
+
+### What closes, and what does not
+
+CLOSES: the claim that outflow reliably separates sources from sinks on
+synthetic coupled-logistic systems at a stated false-alarm rate. Three prior
+gates (capacity, coupling, maturity) tested outflow against the ghost or
+against sinks without a calibrated rate, and all three passed. This is the
+first test at a stated operating point against the right null, and it fails.
+
+DOES NOT CLOSE, and must not be conflated: the causal-chamber result. That
+is a different system with different structure (2 actuators against 11
+sensors rather than 3 sources against 6 sinks), and it is measured by AUC
+over channels, which is threshold-free, rather than by a per-run threshold.
+AUC 0.916 with a run-clustered CI of [0.862, 0.962] stands as measured.
+
+But the tension is real and is stated rather than resolved: **on synthetics
+outflow separates sources from sinks only half the time at a 5% sink
+false-alarm rate, while on the chamber it ranks actuators above sensors at
+0.916.** One of three things is true -- the chamber's structure is more
+favourable than the synthetic family, AUC is more forgiving than a
+thresholded rate, or the chamber result is fortunate. This experiment cannot
+distinguish them, and no further reading of these cells will.

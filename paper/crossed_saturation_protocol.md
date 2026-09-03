@@ -88,3 +88,80 @@ ghost median and max.
 Void if b is not 2V in every cell, if the noise ladder or seeds change after
 any result is seen, if k = 0 cells are dropped, or if X2 is judged on cells
 whose ghost failed X5.
+
+---
+
+## Result (2026-09-02): INCONCLUSIVE. The two redundancy strata disagree.
+
+90 cells, b = 2V throughout, 0 ghost-dirty (X5 clean everywhere).
+
+  X1 REPRODUCTION: HOLDS. At k = 2 source false positives reach 0.67, and
+     rise as the self-baseline falls at every width.
+
+  X3: HOLDS directionally. k = 0 mean rate 0.122, 15 of 36 noisy cells
+     non-zero; k = 2 mean rate 0.217, 25 of 36. Duplicates make the failure
+     worse, as Rule 86 implies -- but k = 0 is NOT clean, reaching 0.50.
+
+  X4 (no prediction was made): b = 2V does not remove the failure. It does
+     substantially restore RECALL: at zero noise, 1.00 / 0.92 / 0.61 for
+     V = 15 / 30 / 60, against 0.18 at V = 60 with b = 32. The capacity rule
+     works for detection and does nothing for source blindness.
+
+### X2: the script's verdict and the declared criterion disagree
+
+`scripts/crossed_saturation.py` printed **TWO DIMENSIONS**. That verdict
+should not be relied on: its rule was "spread of median source_fp across
+widths > 0.05", and the medians it compared (0.000, 0.000, 0.200) are
+medians over ALL noise levels including the all-zero nz = 0 cells, of a rate
+quantised in steps of 1/3, 1/5 and 1/10 because n_src is 3, 5 and 10. That
+is a poor summary and it is not what X2 declared.
+
+X2 as written asks whether source false positives **at matched self-R2** are
+ordered by width. Computed that way, on the declared k = 2 basis:
+
+    Spearman(source_fp rate, V), k = 2, noise > 0:   +0.002
+    mean rate by width:   V=15  0.250   V=30  0.167   V=60  0.233
+
+There is no width ordering at k = 2. At matched noise the largest width is
+worst only at nz = 0.02; at nz = 0.05 and 0.10 the SMALLEST width is worst,
+and at nz = 0.30 the middle one is. In absolute counts the flagged-source
+tally is 1, 1, 2 out of 3, 5, 10 at nz = 0.05 -- similar counts, different
+denominators, which is most of what the earlier "width effect" was.
+
+**But the k = 0 stratum says the opposite:**
+
+    Spearman(source_fp rate, V), k = 0, noise > 0:   +0.672
+    mean rate by width:   V=15  0.000   V=30  0.117   V=60  0.250
+
+At k = 0, width orders the failure cleanly and monotonically.
+
+### Verdict: INCONCLUSIVE, and the protocol's own choice is why
+
+The declared basis (k = 2) supports CAPACITY: no width ordering survives at
+constant b/V. The undeclared-but-run k = 0 stratum supports TWO DIMENSIONS
+with a strong monotone ordering. **The two halves of the same experiment
+disagree, and the protocol's decision to judge X2 on k = 2 alone was made
+before anyone knew that choice would decide the answer.**
+
+Adopting the k = 2 result because it is the declared one, while a
+same-experiment stratum with a Spearman of +0.672 says otherwise, would be
+letting an arbitrary prior choice settle a question the data does not
+settle. The honest verdict is that this experiment does not resolve width
+versus capacity, and the reason is now specific: **the answer depends on
+redundancy.** With duplicates present the failure saturates at every width;
+without them it grows with width.
+
+That interaction was not anticipated by the protocol and is not tested by
+it -- k has two levels, which cannot characterise an interaction. Rule 84's
+first item therefore stays open, with a sharper statement than before: the
+licensing premise depends on at least self-baseline, width and redundancy
+jointly, and the earlier one-dimensional gate proposal remains dead.
+
+### Disclosed
+
+The implemented rule did not match the declared criterion, and this was
+noticed only after seeing results -- exactly the situation in which
+reinterpretation is suspect. Both readings are therefore reported, the
+script's printed verdict is left in the log, and the conclusion drawn is the
+conservative one (inconclusive) rather than either of the two the strata
+would separately support.

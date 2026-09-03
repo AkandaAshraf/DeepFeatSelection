@@ -2954,3 +2954,96 @@ tried, conversion still fails, gap to MACE 0.30 under all four.
 NOT SETTLED, and stated: a per-source calibrated null is a fifth family not
 declared and not run, because adding it after seeing these numbers is the
 shopping the protocol forbids. Open door; the matrices are released.
+
+2026-09-02  SINK-CALIBRATED OUTFLOW BAR: CLOSED. S3 fires.
+Pre-registration paper/sink_bar_protocol.md, before any bar was computed.
+30 calibration + 30 test + 30 descriptive runs, b=4V, 17.1 min.
+
+  bar = q95(sink) = +0.01051   (ghost-calibrated attempt gave -0.00005)
+  S2 DECISIVE: 16/30 runs clear -> sensitivity 0.53 vs declared 0.80. FAIL.
+  source median +0.01064, sink median +0.00174, margin +0.00013
+  S3: 0.47 of runs fail to clear - sources and sinks OVERLAP.
+
+VERDICT CLOSED, by the rule fixed in advance.
+
+THE ARITHMETIC. The declared bar was 0.01; the sink-calibrated q95 is
++0.01051, within 5% of it. So the constant was accidentally an almost
+correct sink threshold - and the sensitivity AT it, never reported, is 0.53.
+The line was reopened on "margin +0.0107 over the ghost". Against the
+relevant null the margin is +0.00013, three orders smaller, inside a sink
+distribution whose own range reaches +0.01471.
+
+WHAT CLOSES: the claim that outflow reliably separates sources from sinks on
+synthetic coupled-logistic systems at a stated false-alarm rate. Three prior
+gates (capacity, coupling, maturity) all scored against the ghost or against
+sinks with no stated rate, and all passed. First test at a stated operating
+point against the right null, and it fails.
+
+WHAT DOES NOT CLOSE: the chamber result. Different structure (2 actuators/11
+sensors vs 3 sources/6 sinks), threshold-free AUC 0.916, run-clustered CI
+[0.862,0.962]. Stands as measured. The TENSION is stated, not explained
+away: half the time on synthetics at a 5% sink FA rate, 0.916 on the
+chamber. Either the chamber structure is more favourable, or AUC is more
+forgiving than a thresholded rate, or the chamber result is fortunate. Our
+evidence cannot distinguish these.
+
+2026-09-02  CROSSED SATURATION: INCONCLUSIVE. The strata disagree.
+Pre-registration paper/crossed_saturation_protocol.md. 90 cells, b=2V
+throughout, 0 ghost-dirty.
+
+  X1 reproduction HOLDS (k=2 reaches 0.67 source FP).
+  X3 HOLDS directionally: k=0 mean rate 0.122 (15/36 cells non-zero), k=2
+     mean 0.217 (25/36). Duplicates make it worse - but k=0 is NOT clean,
+     reaching 0.50.
+  X4 (no prediction): b=2V does NOT remove the failure, but substantially
+     restores RECALL - 1.00/0.92/0.61 at V=15/30/60 with zero noise, against
+     0.18 at V=60 with b=32. The capacity rule works for detection and does
+     nothing for source blindness.
+
+X2: THE SCRIPT'S VERDICT AND THE DECLARED CRITERION DISAGREE. The script
+printed TWO DIMENSIONS on a rule ("spread of median source_fp by width >
+0.05") that is NOT what X2 declared. Those medians (0.000/0.000/0.200) pool
+all noise levels including all-zero cells, of a rate quantised in steps of
+1/3, 1/5, 1/10 since n_src is 3, 5, 10. X2 as written asks about ordering at
+matched self-R2:
+
+  Spearman(rate, V), k=2, noise>0:  +0.002   means 0.250/0.167/0.233 - NONE
+  Spearman(rate, V), k=0, noise>0:  +0.672   means 0.000/0.117/0.250 - CLEAN
+
+The declared basis (k=2) supports CAPACITY; the k=0 stratum supports TWO
+DIMENSIONS. The two halves of one experiment disagree, and the protocol's
+choice to judge X2 on k=2 was made before anyone knew it would decide the
+answer. Adopting k=2 because it was declared, while k=0 says otherwise with
+rho=+0.672, would let an arbitrary prior choice settle what the data does
+not. VERDICT: INCONCLUSIVE, with the reason now specific - THE ANSWER
+DEPENDS ON REDUNDANCY. With duplicates the failure saturates at every width;
+without them it grows with width. k has two levels and cannot characterise
+that interaction.
+
+Much of the earlier "width effect" is also a denominator artefact: at
+nz=0.05 the flagged-source counts are 1, 1, 2 out of 3, 5, 10 - similar
+counts, different denominators.
+
+DISCLOSED: the implementation/criterion mismatch was noticed only AFTER
+seeing results, exactly when reinterpretation is suspect. Both readings are
+reported, the script's printed verdict is left in the log, and the
+conservative conclusion (inconclusive) is drawn rather than either stratum's.
+
+Rules added:
+
+105. Score a statistic against the null that actually confuses it, not the
+     null that is easiest to construct. Outflow was gated three times
+     against a shifted-copy ghost, which nulls "influences nothing", while
+     the confuser is "carries a proxy of an influencer". Calibrating against
+     the right null turned a 0.0107 margin into 0.00013 and a passing line
+     into a closed one.
+
+106. A rate is not comparable across groups with different denominators. The
+     apparent width effect in source false positives was substantially a
+     3-vs-5-vs-10 source-count artefact: similar absolute counts, different
+     divisors. Check counts before believing an ordering in rates.
+
+107. When the implemented decision rule does not match the pre-registered
+     criterion, and the mismatch is found after seeing results, report both
+     and adopt the conservative outcome. Choosing whichever now looks right
+     is indistinguishable from choosing whichever now looks better.

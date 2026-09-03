@@ -172,6 +172,42 @@ else:
     w = d[d.method == "CCM"].membership_auroc
     chk("V60: CCM worst seed at chance", 0.490, w.min(), tol=0.005)
 
+d = read("ExpOutput/sink_bar/summary.csv")
+if d is None:
+    SKIP.append("sink_bar summary.csv missing")
+else:
+    r = d.iloc[0]
+    chk("sink bar: q95(sink) calibrated bar", 0.01051, r.bar, tol=5e-5)
+    chk("sink bar: sensitivity at coupling 0.50", 0.53, r.sensitivity_c050,
+        tol=0.02)
+    chk("sink bar: source median at 0.50", 0.01064, r.source_median_c050,
+        tol=5e-5)
+
+d = read("ExpOutput/crossed_saturation/cells.csv")
+if d is None:
+    SKIP.append("crossed_saturation cells.csv missing")
+else:
+    chk("crossed sat: cells", 90, len(d), tol=0)
+    chk("crossed sat: ghost-dirty cells", 0, int((~d.ghost_ok).sum()), tol=0)
+    n = d[(d.k == 2) & (d.noise > 0)]
+    chk("crossed sat: Spearman(rate,V) at k=2", 0.002,
+        n[["V", "source_fp"]].corr(method="spearman").iloc[0, 1], tol=0.02)
+    z = d[(d.k == 0) & (d.noise > 0)]
+    chk("crossed sat: Spearman(rate,V) at k=0", 0.672,
+        z[["V", "source_fp"]].corr(method="spearman").iloc[0, 1], tol=0.02)
+    chk("crossed sat: recall at V=60, b=2V, no noise", 0.61,
+        d[(d.V == 60) & (d.noise == 0)].recall.median(), tol=0.02)
+
+d = read("ExpOutput/aggregation_check/results.csv")
+if d is None:
+    SKIP.append("aggregation_check results.csv missing")
+else:
+    c = d[(d.V == 60) & (d.method == "CCM")].groupby("aggregation").auroc.median()
+    chk("aggregation: CCM MAX at V=60", 0.674, c.loc["MAX"], tol=0.005)
+    chk("aggregation: CCM MEAN at V=60", 0.680, c.loc["MEAN"], tol=0.005)
+    chk("aggregation: best alternative still below MACE", True,
+        float(c.drop("MAX").max()) < 0.976, tol=0)
+
 # ------------------------------------------------------------ fitness gate
 d = read("ExpOutput/dataset_fitness/reference.csv")
 if d is None:
