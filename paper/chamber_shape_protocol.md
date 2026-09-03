@@ -74,3 +74,77 @@ separable only if both are measured on the same runs.
 Void if the bar, alpha, coupling or seeds differ from the sink-bar protocol;
 if C4 fails and any arm is nonetheless interpreted; or if C2's higher bar is
 retrospectively presented as having been predicted.
+
+---
+
+## Result (2026-09-02): SHAPE EXPLAINS. And C3 eliminates a second candidate.
+
+30 calibration + 30 test runs per arm, 32.5 min.
+
+  shape                             bar      sens    AUC    src med  sink med
+  synthetic (3 src / 6 sink / 6 iso)  0.0078  0.667  0.667   0.0116   0.0020
+  chamber   (2 src / 11 sink / 0 iso) 0.0138  0.867  0.864   0.0220   0.0059
+  chamber at V=15 (2 / 11 / 2)        0.0113  0.967  0.864   0.0226   0.0058
+
+  C4  the two chamber arms differ by 0.10, inside the declared 0.15, so
+      shape and width are NOT entangled and the arms are interpretable.
+  C1  DECISIVE: 0.867 against the incumbent's 0.667. **SHAPE EXPLAINS.**
+
+### The incumbent arm reads 0.667 here and 0.53 in the sink-bar run
+
+Same configuration, different seed blocks (300-429 there, 500-629 here).
+The gap is 0.137, which is 1.08 standard errors of the difference at n = 30
+-- ordinary sampling noise, not a discrepancy. Two consequences, both
+stated rather than buried:
+
+  1. A sensitivity estimated on 30 runs carries SE ~0.09, so 0.53 has a 95%
+     interval of [0.35, 0.71]. The closure should not have been reported as
+     though 0.53 were precise, and is corrected here: the incumbent shape
+     sits somewhere near 0.5-0.7.
+  2. The closure verdict is unaffected. Both estimates fall below the
+     declared 0.80, so the synthetic line closes on either seed block.
+
+### C3 FAILED, and its failure is more useful than its success would have been
+
+C3 predicted AUC would exceed thresholded sensitivity in every arm, on the
+general ground that AUC is threshold-free. It does not: 0.667 vs 0.667,
+0.864 vs 0.867, and 0.864 vs 0.967. AUC is equal or **lower**, never higher.
+
+That eliminates the second of the three candidate explanations. The status
+section proposed that the chamber's 0.916 might be inflated because AUC is
+more forgiving than a thresholded rate. On this evidence it is not more
+forgiving; if anything it is more conservative. The caveat that AUC here is
+per-run source-vs-sink while the chamber's 0.916 is pooled over channels
+still applies, so this is strong evidence rather than proof.
+
+### The tension resolves
+
+Of the three candidates the status section could not choose between:
+
+  1. the chamber's structure is more favourable   -- CONFIRMED (C1)
+  2. AUC is more forgiving than a rate            -- ELIMINATED (C3 failed)
+  3. the chamber result is fortunate              -- no longer needed
+
+The mechanism is legible. The chamber has 2 actuators driving 11 sensors,
+roughly 5.5 sinks per source; the synthetic family has 3 sources driving 6
+sinks, 2 per source. Outflow measures how much the rest of the system's code
+depends on a channel, so a source driving more sinks has more influence to
+detect. **Marginal outflow improves as sinks per source rises.**
+
+That is the exact opposite of the conditional variant's envelope, where many
+sinks per source make the source recoverable from what it drives and destroy
+C1's advantage (Rule 93). The two variants are pushed in opposite directions
+by the same structural parameter, which is a coherent account of both
+results rather than two unrelated observations.
+
+### What is NOT claimed
+
+C2 explicitly declined to predict whether the chamber shape would clear 0.80.
+It does -- 0.867 and 0.967 -- and that is reported, not claimed. Clearing
+0.80 at the chamber's shape would, on the sink-bar protocol's own rule,
+correspond to a working statistic at that shape. But that bar was declared
+for a different experiment on a different shape, and importing it here after
+the fact is precisely the move Rule 90 forbids. What this experiment
+establishes is the comparison it declared: chamber shape beats synthetic
+shape. Whether the line REOPENS at the chamber's shape needs its own
+pre-registration, on fresh seeds, and is not asserted here.

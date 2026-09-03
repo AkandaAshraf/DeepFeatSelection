@@ -3047,3 +3047,94 @@ Rules added:
      criterion, and the mismatch is found after seeing results, report both
      and adopt the conservative outcome. Choosing whichever now looks right
      is indistinguishable from choosing whichever now looks better.
+
+2026-09-02  CHAMBER SHAPE: SHAPE EXPLAINS, and C3 eliminates a second
+candidate. Pre-registration paper/chamber_shape_protocol.md. 30 cal + 30
+test per arm, 32.5 min.
+
+  shape                              bar     sens    AUC
+  synthetic 3 src / 6 sink / 6 iso   0.0078  0.667  0.667
+  chamber   2 src / 11 sink / 0 iso  0.0138  0.867  0.864
+  chamber at V=15  2 / 11 / 2        0.0113  0.967  0.864
+
+  C4 the two chamber arms differ by 0.10, inside the declared 0.15 - shape
+     is isolated from width, arms interpretable.
+  C1 DECISIVE: 0.867 vs incumbent 0.667. SHAPE EXPLAINS.
+
+C3 FAILED, AND ITS FAILURE IS THE USEFUL PART. We predicted AUC would exceed
+thresholded sensitivity (it is threshold-free). It does not: 0.667/0.667,
+0.864/0.867, 0.864/0.967 - equal or LOWER, never higher. That eliminates the
+second candidate explanation, that the chamber's 0.916 is inflated by AUC
+being more forgiving than a rate. Caveat retained: this AUC is per-run
+source-vs-sink, the chamber's is pooled over channels, so strong evidence
+rather than proof.
+
+THE TENSION RESOLVES. Of the three candidates the status section could not
+choose between: (1) chamber structure more favourable - CONFIRMED; (2) AUC
+more forgiving - ELIMINATED; (3) chamber result fortunate - no longer needed.
+
+MECHANISM: outflow measures how much the rest-of-system code depends on a
+channel, so a source driving 5.5 sinks has more to detect than one driving
+2. Marginal outflow IMPROVES as sinks per source rises - the exact opposite
+of the conditional variant, which loses in that regime because the source
+becomes recoverable from what it drives (Rule 93). One structural parameter
+pushes the two variants in opposite directions, accounting for both results.
+
+CORRECTION TO THE CLOSURE'S PRECISION: the incumbent shape reads 0.667 here
+against 0.53 in the sink-bar run, same config, different seed blocks. The
+gap is 1.08 SE at n=30, ordinary noise. So 0.53 should be read as roughly
+0.5-0.7, and the closure verdict is unaffected since both are below 0.80.
+The sink-bar result was reported as though 0.53 were precise; it is not.
+
+NOT CLAIMED: C2 declined to predict whether the chamber shape clears 0.80.
+It does (0.867, 0.967). Whether that REOPENS the line at that shape needs
+its own pre-registration on fresh seeds - importing the sink-bar protocol's
+bar to a different shape after the fact is what Rule 90 forbids.
+
+2026-09-02  REDUNDANCY AXIS: INTERACTION CHARACTERISED. 135 cells, b=2V,
+ghost clean everywhere. Pre-registration paper/redundancy_axis_protocol.md.
+
+  R1 k=0 Spearman(source_fp,V) = +0.681 against the crossed run's +0.672 on
+     independent cells. REPRODUCES almost exactly.
+  R2 mean source FP by k: 0.122, 0.224, 0.239, 0.287, 0.309 for
+     k=0,1,2,4,8. MONOTONE. Duplicating a source's signal makes source
+     blindness worse, smoothly rather than at a threshold.
+  R3 Spearman(source_fp,V) by k: +0.681, +0.258, -0.256, +0.133, -0.159.
+     The width ordering does not decay gradually - it is GONE BY k=1.
+
+RESOLVES THE CROSSED RUN'S CONTRADICTION. Width orders the failure only in
+the complete absence of redundancy. One duplicate per source erases the
+ordering; further duplicates raise the rate without restoring it. The
+crossed run sampled exactly the two levels that disagree most (0 and 2) with
+nothing between, so its inconclusive verdict was the right call on the
+evidence it had.
+
+RULE 84 ITEM 1, SHARPENED. Source blindness fails as a function of the
+self-baseline (whether it happens at all), redundancy (raises the rate
+monotonically and, at any non-zero level, makes width irrelevant), and width
+(matters ONLY at k=0 - a condition no real recording satisfies). A
+per-channel gate on self-R2 alone stays dead, but the second dimension is
+REDUNDANCY, not width.
+
+NOT ESTABLISHED: the rate is still rising at k=8 (0.309) and was not run
+further, so no saturation ceiling is shown. Duplicates carry the DRIVER's
+signal, so this is redundancy among SOURCES and says nothing about Takens
+redundancy among targets.
+
+Rules added:
+
+108. A prediction that fails in the useful direction is worth more than one
+     that succeeds. C3 predicted AUC would flatter the result; it does not,
+     and that failure eliminated a competing explanation for the
+     synthetic/real tension that no amount of confirming C3 could have.
+
+109. Two levels detect an interaction; they cannot describe one. The crossed
+     run's contradictory strata were both correct - width orders the failure
+     at k=0 and not at k>=1 - and only a five-level axis could show that the
+     transition happens between the two levels it had sampled.
+
+110. Report an estimate's precision before treating its comparison to a bar
+     as decisive. The closure was reported at sensitivity 0.53 against a
+     0.80 bar; the same configuration on different seeds gives 0.667, one
+     standard error away. The verdict survived, but it was stated with more
+     confidence than 30 runs support.

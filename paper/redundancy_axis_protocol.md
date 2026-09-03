@@ -89,3 +89,70 @@ Machinery is `boundary_map`'s, unchanged, as in the crossed run.
 Void if b is not 2V in every cell, if k levels or seeds change after any
 result, if dirty-ghost cells enter R2 or R3, or if R4's declined
 predictions are retrospectively claimed.
+
+---
+
+## Result (2026-09-02): INTERACTION CHARACTERISED.
+
+135 cells, b = 2V throughout, ghost clean everywhere.
+
+  R1  REPRODUCTION: Spearman(source_fp, V) at k = 0 is **+0.681**, against
+      the crossed run's +0.672 on independent cells. The k = 0 width
+      ordering is real and reproduces almost exactly.
+
+  R2  DECISIVE: mean source false-positive rate by redundancy --
+
+          k = 0:  0.122    k = 1:  0.224    k = 2:  0.239
+          k = 4:  0.287    k = 8:  0.309
+
+      Monotone in k. Duplicating a source's signal makes source blindness
+      worse, and it does so smoothly rather than at a threshold.
+
+  R3  The width ordering collapses as soon as any redundancy is present --
+
+          k = 0:  +0.681      k = 1:  +0.258     k = 2:  -0.256
+          k = 4:  +0.133      k = 8:  -0.159
+
+      From +0.681 at k = 0 to values fluctuating around zero for every
+      k >= 1. The ordering does not decay gradually; it is gone by k = 1.
+
+**VERDICT: INTERACTION CHARACTERISED**, and the crossed run's disagreement is
+explained.
+
+### What this resolves
+
+The crossed-saturation run reported a contradiction it could not settle: its
+k = 0 stratum showed a clean width ordering (+0.672) and its k = 2 stratum
+showed none (+0.002), and with only two levels it could not tell which was
+the anomaly. Neither is. **Width orders the failure only in the complete
+absence of redundancy.** One duplicate per source is enough to erase the
+ordering, and further duplicates raise the failure rate without restoring
+it.
+
+The crossed run therefore happened to sample the two levels that disagree
+most -- 0 and 2 -- with nothing between them. Its inconclusive verdict was
+the correct call on the evidence it had.
+
+### What the licensing premise now looks like
+
+Rule 84's first item can be stated more sharply than "at least two
+dimensions". Source blindness fails as a function of:
+
+  * the self-baseline, which sets whether the failure occurs at all;
+  * redundancy, which raises the failure rate monotonically and, at any
+    non-zero level, makes width irrelevant;
+  * width, which matters ONLY at k = 0.
+
+A per-channel gate on self-R2 alone remains dead, for the reason the
+saturation-gate run gave. But the second dimension is redundancy, not width,
+and width is a special case visible only when redundancy is exactly zero --
+a condition no real recording satisfies.
+
+### What is NOT established
+
+R4 declined to predict, and nothing here shows, that any k restores source
+blindness or that the failure saturates at some ceiling: the rate is still
+rising at k = 8 (0.309) and was not run further. The duplicates carry the
+DRIVER's signal, as the protocol states, so this characterises redundancy
+among SOURCES and says nothing about Takens redundancy among targets -- the
+question the boundary map's axis was mistakenly thought to answer.

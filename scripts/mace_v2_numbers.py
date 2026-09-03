@@ -208,6 +208,39 @@ else:
     chk("aggregation: best alternative still below MACE", True,
         float(c.drop("MAX").max()) < 0.976, tol=0)
 
+d = read("ExpOutput/chamber_shape/results.csv")
+if d is None:
+    SKIP.append("chamber_shape results.csv missing")
+else:
+    r = d.set_index("shape")
+    syn = [i for i in r.index if i.startswith("synthetic")][0]
+    cham = [i for i in r.index if i.startswith("chamber (")][0]
+    ch15 = [i for i in r.index if "V=15" in i][0]
+    chk("shape: synthetic sensitivity", 0.667, r.loc[syn, "sensitivity"],
+        tol=0.01)
+    chk("shape: chamber sensitivity", 0.867, r.loc[cham, "sensitivity"],
+        tol=0.01)
+    chk("shape: chamber at V=15 sensitivity", 0.967,
+        r.loc[ch15, "sensitivity"], tol=0.01)
+    chk("shape: chamber AUC", 0.864, r.loc[cham, "auc_median"], tol=0.01)
+    chk("shape: AUC never exceeds sensitivity (C3 failed)", True,
+        bool((r.auc_median <= r.sensitivity + 1e-9).all()), tol=0)
+
+d = read("ExpOutput/redundancy_axis/by_k.csv")
+if d is None:
+    SKIP.append("redundancy_axis by_k.csv missing")
+else:
+    r = d.set_index("k")
+    chk("redundancy: Spearman(fp,V) at k=0", 0.681, r.loc[0, "spearman_V"],
+        tol=0.01)
+    chk("redundancy: Spearman(fp,V) at k=8", -0.159, r.loc[8, "spearman_V"],
+        tol=0.01)
+    chk("redundancy: mean fp at k=0", 0.122, r.loc[0, "mean_fp"], tol=0.005)
+    chk("redundancy: mean fp at k=8", 0.309, r.loc[8, "mean_fp"], tol=0.005)
+    chk("redundancy: fp monotone in k", True,
+        bool(all(r.mean_fp.iloc[i] <= r.mean_fp.iloc[i+1] + 0.02
+                 for i in range(len(r)-1))), tol=0)
+
 # ------------------------------------------------------------ fitness gate
 d = read("ExpOutput/dataset_fitness/reference.csv")
 if d is None:
