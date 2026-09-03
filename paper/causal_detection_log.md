@@ -3138,3 +3138,120 @@ Rules added:
      0.80 bar; the same configuration on different seeds gives 0.667, one
      standard error away. The verdict survived, but it was stated with more
      confidence than 30 runs support.
+
+2026-09-03  REOPEN TEST: REOPENS AT THE CHAMBER SHAPE, by two runs.
+Pre-registration paper/chamber_shape_reopen_protocol.md, seeds 700-829.
+
+  bar = q95(sink) = +0.01498
+  P1 DECISIVE: 25/30 clear -> sensitivity 0.83 [0.66, 0.93] vs 0.80. HOLDS.
+  AUC 0.864, source median +0.02312, sink median +0.00559.
+  Incumbent 3/6/6: 0.53 / 0.667 on its two seed blocks.
+
+VERDICT REOPENS AT THIS SHAPE, by the rule fixed in advance. The interval
+reaches 0.66; this is a pass at the bar, not a comfortable one.
+
+P3 DISCLOSED: the protocol's text names the bar region 0.0113-0.0138; the
+committed script codes 0.008-0.020. The observed +0.01498 passes the coded
+window and would have failed the written one. The coded window governs
+(committed before the run), but the sink bar at this shape now reads
+0.0113, 0.0138, 0.0150 across three seed blocks and is quoted as a range.
+
+Pooled over every 2/11/2 run against every 3/6/6 run at the same bar type
+(54/60 vs 36/60, Fisher p = 0.00025), the shape effect is robust to seed
+block. What it is an effect OF is the subject of the audit below.
+
+2026-09-03  RATIO SWEEP: T2 FAILS. The "opposite directions" mechanism is
+WITHDRAWN. Pre-registration paper/ratio_sweep_protocol.md, seeds 900-1019,
+6 ratios x 40 runs, both variants on identical runs, 32.9 min.
+
+  ratio     1.0    2.0    3.0    5.0    8.0    11.0
+  A1 sens   0.45   0.85   0.95   0.85   0.95   0.75
+  C1 sens   0.90   1.00   1.00   1.00   1.00   0.90
+  A1 AUC    0.594  0.715  0.740  0.844  0.844  1.000
+  C1 AUC    0.795  0.924  0.979  1.000  1.000  1.000
+
+  T1 Spearman +0.265: rises, carried entirely by the ratio-1 cell; flat
+     within noise from ratio 2 on.
+  T2 Spearman +0.941: conditional AUC RISES with the ratio. FAILS.
+  T3 A1-C1 AUC negative at every ratio below 11, tie at 11 (both 1.000).
+     No crossing.
+
+The declared rule has no branch for T1-holds/T2-fails, so there is no
+crossover verdict; the negative is the result. The conditional variant
+dominates the marginal one at every ratio, in AUC and in thresholded rate,
+by 0.16-0.24 AUC on the cells that are interpretable. The manuscript's
+claim that "one structural parameter pushes the two variants in opposite
+directions" (chamber-shape entry above; mace_v2.tex Sections 12 and 15) is
+contradicted on the family it was proposed for and is withdrawn. The
+conditional variant's chamber failure (paper/real_conditional_result.md)
+returns to UNEXPLAINED. The word "mechanism" was applied on 2026-09-02 to
+an argument that fit two points; Rule 109 already said two levels cannot
+describe an interaction, and this entry is what ignoring it costs.
+
+THE SCRIPT PRINTED "CROSSOVER FOUND between ratio 8.0 and 11.0". Wrong, for
+two reasons fixed after the run and disclosed in the script: np.sign of a
+tie is 0 and `signs[i] != signs[i+1]` counted the meeting at the ceiling as
+a crossing; and the verdict never read T2. The fixed verdict, replayed on
+the saved results, prints "T2 FAILS ... no crossover verdict". The wrong
+line stays in ExpOutput/ratio_sweep_run.log (Rule 107).
+
+2026-09-03  GENERATOR AUDIT: a fifth of the source range is phase-locked,
+every dead run has a locked source, the paper's own gate rejects them.
+Post hoc, not pre-registered: scripts/generator_audit.py,
+paper/generator_audit.md. Prompted by the reopen's five failing seeds.
+
+  r ~ U(3.7, 3.9) is locked (Lyapunov <= 0.05 or max|ac| >= 0.9) on
+  [3.7016, 3.7028] u [3.7382, 3.7448] u [3.8284, 3.8569]: 19.2% of the
+  range. P(a locked source per run) = 0.47 at 3 sources, 0.35 at 2.
+
+  sink-bar 3/6/6: 26/60 runs locked; 8 dead runs, 8 locked.
+  reopen 2/11/2:  24/60 runs locked; 4 dead runs, 4 locked.
+  source median by locked count (0/1/2): 0.0125/0.0079/-0.0001 (3/6/6),
+  0.0266/0.0174/-0.0001 (2/11/2).
+  Fitness gate (dR2 from parent lags, the paper's L50 = +0.0136): chaotic
+  parent +0.0211, locked parent +0.0005 with own-lag R2 0.998.
+  Post-hoc clean subsets: 3/6/6 12/17 = 0.71 at the declared bar, 17/17 at
+  a clean-calibrated bar (+0.0056); 2/11/2 19/19 either way.
+
+WHAT IT MEANS. The generator has been supplying systems in which about
+one source in five is undetectable by construction - its sinks predict
+themselves from their own lags to R2 0.998 - and the paper's own dataset
+gate would have refused those sinks. Every synthetic outflow number since
+2026-08-22 was measured on that mixture. The closure at 0.53 is IN DOUBT,
+not overturned: at the same bar the clean subset reaches 0.71, and the
+question is what a bar calibrated on clean sinks does. That is
+pre-registered as paper/clean_generator_protocol.md (seeds 1100-1429,
+launched today) and its entry follows this one.
+
+Two further defects, disclosed and NOT fixed in that re-run: at coupling
+0.50, 83% of sinks spend >30% of steps at the [0,1] clip boundary; and the
+random parent draw leaves 26% of 3/6/6 runs with a source that drives
+nothing, against 0% of 2/11/2 runs, so the shape comparison was not between
+equal generators on two counts. The ratio sweep's ratio-1 cell has 4.1
+orphans and 2.05 locked sources per run out of 12 and is uninterpretable;
+T2's failure does not rest on it.
+
+Rules added:
+
+111. Gate the generator with the paper's own gate. A synthetic family used
+     to test a detector must pass the fitness screen the paper applies to
+     real data, checked per source, before the first run. U(3.7, 3.9) was
+     "the chaotic regime" for a fortnight and nobody scanned it.
+
+112. A tie is not a crossing. Where a metric is bounded, two curves meeting
+     at the bound say nothing about which is ahead; test for a strict sign
+     change and report ties as ties.
+
+113. Verdict code must evaluate every declared prediction and carry a
+     branch for every combination of outcomes, written down in the protocol
+     as a table. A rule with an unstated branch is a hole the script will
+     fall through, and it fell through one today.
+
+114. Save per-run and per-channel data every time. Aggregates cannot be
+     re-analysed when a defect is found later; the ratio sweep's per-run
+     frames are gone and the audit had to replay the generator.
+
+115. Count the truth labels before counting hits. A "source" that drives
+     nothing is not a source; random wiring manufactures such channels at
+     a rate that depends on shape, and any comparison across shapes
+     inherits the difference unless it is reported with the result.

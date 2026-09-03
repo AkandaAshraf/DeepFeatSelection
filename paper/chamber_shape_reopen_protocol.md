@@ -74,3 +74,42 @@ Void if the bar, alpha, coupling, capacity or shape differ from those above;
 if seeds 700-829 have been used by any earlier run; if the outcome is
 reported without the incumbent 3/6/6 figure beside it; or if P1 fails and is
 presented as anything other than the closure standing.
+
+## Result (2026-09-03, seeds 700-829, 60 runs, `ExpOutput/chamber_shape_reopen/`)
+
+  bar = q95(sink, calibration) = +0.01498
+  P1  DECISIVE: 25/30 test runs clear -> sensitivity 0.83, Wilson [0.66, 0.93]
+      vs bar 0.80. HOLDS, by two runs.
+  AUC (per-run source vs sink, median) 0.864; source median +0.02312, sink
+  median +0.00559. Incumbent 3/6/6: 0.53 (sink-bar seeds) / 0.667
+  (chamber-shape seeds).
+  Failing test seeds: 801, 816, 826, 828, 829. Two of them (801, 829) are
+  dead runs (source median +0.0006 and +0.0000); the other three sit
+  between +0.011 and +0.015, just under the bar.
+
+VERDICT: REOPENS AT THIS SHAPE, by the rule fixed above. The margin is two
+runs of thirty, and the interval reaches 0.66, so this is a pass at the
+declared bar and not a demonstration of a comfortable one.
+
+### P3 discrepancy, disclosed
+
+The protocol names the region 0.0113-0.0138 (yesterday's two chamber arms).
+The script committed before the run codes P3 as 0.008 <= bar <= 0.020. The
+observed bar, +0.01498, is inside the coded window and outside the narrower
+one. The coded window is the operative test because it was committed before
+any run; but the reader should know that against the protocol's own words
+P3 would have failed, and that the three sink-bar values now on record for
+this shape (0.0113, 0.0138, 0.0150) span a factor of 1.3 across seed blocks.
+The sink distribution is stable enough for a q95 to be meaningful, not
+stable enough to quote to three figures. The bar is therefore reported as
+"0.011-0.015 across seed blocks" wherever it appears.
+
+### What the generator audit of the same day does to this result
+
+`paper/generator_audit.md`: 24 of these 60 runs contain a phase-locked
+source (see that note for the definition); all four dead runs do. On the 19
+test runs with no locked source, 19/19 clear the same bar. So the result
+above is, if anything, a lower bound on what the statistic does at this
+shape; the pass is not an artefact of locking, but the two-run margin is.
+The pre-registered re-test on a clean generator is
+`paper/clean_generator_protocol.md`.
