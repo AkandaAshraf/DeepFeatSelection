@@ -131,3 +131,86 @@ computed anywhere but the held-out test segment; if the arms do not share the
 generated system and splits within a cell; if the grid, seeds, noise or
 redundancy levels change after any result is seen; if N1 is judged anywhere
 other than redundancy 0 and noise 0.0; or if either graded control is dropped.
+
+---
+
+## Result (2026-09-05): REJECTED. The readout is what must not be amortised.
+
+12 cells, 3.5 min.
+
+  AVERAGE PRECISION, sources positive (chance 0.167, bar 0.333)
+                        INFLOW              OUTFLOW
+  red  noise      RIDGE     UNIFIED      ADD     UNIFIED
+   0    0.00      0.895      0.237      0.828     0.832
+   0    0.05      0.781      0.217      0.242     0.739
+   2    0.00      0.702      0.280      0.882     0.604
+   2    0.05      0.561      0.275      0.398     0.511
+
+  N1 FAILS. Unified inflow 0.237 against the incumbent's 0.895.
+  N5 HOLDS. Unified forecast R2 between 0.876 and 0.974 in every cell, so
+     this is NOT an untrained model. The failure is structural.
+  N2 HOLDS. Outflow 0.786 at redundancy 0, well above the bar.
+  N3 FALLS as predicted, 0.786 to 0.558. The kill condition does not fire.
+  N4 outflow grades with child count: UNIFIED 0.533 and 0.281 at redundancy
+     0 and 2, against ADD's 0.324 and 0.152.
+
+**The declared verdict is REJECTED and it stands.** The combination costs
+inflow, so the two statistics stay on separate machinery.
+
+### Why inflow collapses, and it is not fixable by training harder
+
+scripts/unified_controls.py. Across three seeds at redundancy 0, noise 0:
+
+  Spearman(unified inflow, incumbent ridge inflow)   +0.235, -0.036, -0.220
+  Spearman(unified inflow, shared decoder's own R2)  +0.699, +0.569, +0.610
+
+The unified inflow is not a noisy version of the incumbent. It is
+uncorrelated with it, and strongly correlated with how well the ONE shared
+decoder happens to predict that channel.
+
+The mechanism is the architecture. MACE amortises the ENCODER, one code
+serving every target, but keeps a PER-TARGET readout, a separate cheap ridge
+fit for each variable. The unified model amortises both. A single decoder
+must allocate finite capacity across all V outputs, so a target whose gain is
+small is neglected, and the measured inflow reports the allocation rather
+than the gain.
+
+**This is the run's most useful finding and it vindicates the incumbent's
+design.** Amortisation is safe on the encoder and destroys the statistic on
+the readout. A quantity defined per target needs a per-target fit.
+
+### The redundancy test was too mild to be decisive, and we say so
+
+make_system with redundancy 2 appends one duplicate each for sources 0 and 1
+ONLY. Three of five sources are untouched, so they prop up the aggregate.
+N3's kill condition failing to fire is therefore NOT evidence that ablation
+survives redundancy. The within-cell rank test is the sharp one:
+
+  mean outflow rank among the 5 sources, 5 highest, redundancy 0 -> 2
+                     duplicated        untouched
+  UNIFIED (ablative)  2.58 -> 2.25     3.28 -> 3.50
+  ADD (additive)      2.33 -> 3.25     3.44 -> 2.83
+
+The predicted mechanism IS present for the ablative statistic: duplicated
+sources lose rank while untouched ones gain. It is small because the
+manipulation is small.
+
+The additive statistic moves the OPPOSITE way. A duplicated source's lags now
+also predict its duplicate channel, which inflates its additive outflow. So
+under redundancy the two statistics carry opposite biases, the additive
+inflated and the ablative deflated. Neither is clean, and that pairing is
+worth its own pre-registration rather than a claim here.
+
+### What survives
+
+The outflow half is still the most promising thing in the three-day sequence.
+It beats the additive reference on noise robustness, 0.739 against 0.242 at
+noise 0.05, and on the graded control at both redundancy levels. But it did
+not earn a combination with inflow, and the redundancy question it was built
+to answer remains open because the test was not hard enough.
+
+### Not established
+
+One width, one generating family, three seeds. The redundancy manipulation
+touches two of five sources; a decisive test duplicates every source. The
+inflow diagnosis rests on three seeds in one cell.

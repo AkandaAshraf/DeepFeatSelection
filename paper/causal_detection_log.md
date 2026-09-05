@@ -3652,3 +3652,86 @@ Rules added:
      out-of-distribution shock, not information loss. Train with random input
      removal before reading any ablation, and report the model's own
      held-out performance beside every ablation score.
+
+2026-09-05  UNIFIED MODEL: REJECTED. The readout is what must not be
+amortised. Pre-registration paper/unified_protocol.md, committed before the
+script was written. EXPLORATORY, no adoption possible. 12 cells, 3.5 min,
+V=30, bottleneck 2V.
+
+THE UNIFICATION. The ResNet shortcut and the U-Net skip are the same
+construction at different scales and the masked autoencoder is the encoder
+inside both, so one two-stage model yields both statistics: stage 1 trains
+per-variable skips as an own-history forecaster and FREEZES them, stage 2
+adds a masked-trained bottleneck. Inflow is the stage-2 gain over the frozen
+skip; outflow is ablation damage to the other targets.
+
+  AVERAGE PRECISION, sources positive (chance 0.167, bar 0.333)
+                        INFLOW              OUTFLOW
+  red  noise      RIDGE     UNIFIED      ADD     UNIFIED
+   0    0.00      0.895      0.237      0.828     0.832
+   0    0.05      0.781      0.217      0.242     0.739
+   2    0.00      0.702      0.280      0.882     0.604
+   2    0.05      0.561      0.275      0.398     0.511
+
+N1 FAILS at 0.237 against 0.895. N5 HOLDS with forecast R2 0.876-0.974, so
+the model trains fine and the failure is structural. N2 HOLDS. N3 falls as
+predicted without firing its kill condition. Declared verdict REJECTED.
+
+WHY INFLOW COLLAPSES, AND IT IS NOT AN OPTIMISATION FAILURE
+(unified_controls.py, three seeds at redundancy 0 noise 0):
+
+  Spearman(unified inflow, incumbent ridge inflow)   +0.235, -0.036, -0.220
+  Spearman(unified inflow, shared decoder's own R2)  +0.699, +0.569, +0.610
+
+The unified inflow is UNCORRELATED with the incumbent and strongly correlated
+with how well the one shared decoder predicts that channel. MACE amortises the
+ENCODER, one code serving every target, but keeps a PER-TARGET readout. The
+unified model amortises both, and a single decoder allocating finite capacity
+across V outputs neglects targets whose gain is small, so the score reports
+the allocation rather than the gain. THIS VINDICATES THE INCUMBENT'S
+ARCHITECTURE and names which half of the amortisation is safe.
+
+THE REDUNDANCY TEST WAS TOO MILD AND WE SAY SO. make_system at redundancy 2
+appends one duplicate each for sources 0 and 1 ONLY; three of five sources are
+untouched and prop up the aggregate. N3's kill condition failing to fire is
+therefore NOT evidence that ablation survives redundancy. The within-cell
+rank test is the sharp one:
+
+  mean outflow rank among 5 sources, redundancy 0 -> 2
+                     duplicated        untouched
+  UNIFIED (ablative)  2.58 -> 2.25     3.28 -> 3.50
+  ADD (additive)      2.33 -> 3.25     3.44 -> 2.83
+
+The predicted mechanism IS present for the ablative statistic and small
+because the manipulation is small. The additive statistic moves the OPPOSITE
+way: a duplicated source's lags also predict its duplicate, inflating its
+additive outflow. Under redundancy the two carry opposite biases, additive
+inflated and ablative deflated. That pairing deserves its own
+pre-registration and is not claimed here.
+
+WHAT SURVIVES. The ablative outflow still beats the additive reference on
+noise robustness (0.739 against 0.242 at noise 0.05) and on the graded child
+count control at both redundancy levels (0.533/0.281 against 0.324/0.152). It
+did not earn a combination with inflow, and the redundancy question remains
+open because the test was not hard enough.
+
+NOT ESTABLISHED. One width, one family, three seeds. A decisive redundancy
+test duplicates every source. The inflow diagnosis rests on three seeds in
+one cell.
+
+Rules added:
+
+127. AMORTISE THE ENCODER, NOT THE READOUT. A statistic defined per target
+     needs a per-target fit. Sharing one decoder across targets makes the
+     score report where that decoder spent its capacity rather than what the
+     target gains from the rest of the system: measured at +0.6 correlation
+     with the decoder's own accuracy against -0.2 to +0.2 with the per-target
+     incumbent. Cheap per-target readouts on a shared code are the design,
+     and this is why.
+
+128. A manipulation that touches only part of the positive class cannot be
+     read from the aggregate. Duplicates were added for two of five sources,
+     so the three untouched ones held average precision up and a kill
+     condition failed to fire on a test that was never hard enough. State
+     what fraction of the positive class a manipulation actually reaches, and
+     test within cells when it reaches only some.
