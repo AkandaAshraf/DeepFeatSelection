@@ -3334,3 +3334,54 @@ Rules added:
      goes to zero when one is an orphan and one is weak, so 3/6/6 loses
      runs that 2/11/2 cannot lose. Report the aggregation width alongside
      any rate, and prefer per-channel evidence when the width is small.
+
+2026-09-05  CODE CONCATENATION: C1 holds by the letter, C2 makes it moot.
+Pre-registration paper/code_concat_protocol.md, committed before the run.
+27 cells, 1.5 min. Arms A and B shared identical encoders, so their
+comparison is exactly paired.
+
+  recall, median of 3 seeds     AVERAGE  CONCAT  WIDE
+  V=30                            0.88    0.92   0.92
+  V=60  (decisive cell)           0.18    0.24   0.30
+  V=120                           0.23    0.24   0.24
+
+  C3 HOLDS: precision 1.000, source FP 0.000 in all 27 cells. Nothing was
+     bought by flagging sources.
+  C4 HOLDS: ghost clean everywhere.
+  C1 HOLDS at V=60 by the declared median, but WEAKLY: CONCAT beats AVERAGE
+     in 2 of 3 seeds and is worse in the third (0.14 -> 0.12).
+
+C2, WHICH HAD NO PREDICTION, RESOLVES DECISIVELY. WIDE >= CONCAT in 3 of 3
+seeds, > AVERAGE in 3 of 3, at HALF the encoder cost (2.5s vs 5.1s). One
+encoder at width 64 dominates two at width 32 on recall and cost at once.
+Mechanism: two independently trained 32-codes are partly redundant, so
+concatenating them buys less than a true 64-wide code - CONCAT's 0.24 sits
+between b=32 (0.18) and b=64, as partial redundancy predicts.
+
+INDEPENDENT REPRODUCTION: the bottleneck grid gave V=60 b=32 -> 0.18 and
+b=64 -> 0.34. Today on a different code path AVERAGE (width 32) gives 0.18
+exactly and WIDE (b=64) gives 0.30. The capacity curve reproduces.
+
+WE DO NOT ADOPT CONCATENATION, though the declared rule fires ADOPT. C2
+dominates the contrast C1 was about, and making concatenation the default
+when a cheaper arm beats it in every seed would follow the letter of a
+criterion the experiment outgrew. What is supported: part of the published
+recall shortfall IS an aggregation artefact; the remedy is WIDENING, which
+Section 12.4 already recommends as b ~ 2V; concatenation is an inferior
+partial substitute.
+
+UNREGISTERED AND NOT ACTED ON: MODELS=2 at width b appears dominated by
+MODELS=1 at width 2b on recall and cost. That would change a deployed
+default, so it needs its own pre-registration, more seeds, and an account of
+what the ensemble was for - variance reduction and the cross-model spread
+diagnostic, neither of which recall measures.
+
+NOT ESTABLISHED: 3 seeds, one coupling, one family. At V=120 all three arms
+lie within 0.01; the effect is concentrated at V=60 where b/V leaves headroom.
+
+Rule added:
+
+118. When an arm carrying no prediction dominates the arm the decisive
+     prediction was about, the declared verdict is answering a question the
+     experiment has outgrown. Report the dominance and refuse the verdict,
+     rather than adopting a change that a cheaper arm beat in every seed.

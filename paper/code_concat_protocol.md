@@ -98,3 +98,78 @@ Void if arms A and B are computed from different encoders (they must share
 the identical two), if the grid or seeds change after any result is seen, if
 the ghost panel for an arm is computed with a different aggregation than
 that arm's excess, or if C1 is judged anywhere other than V = 60.
+
+---
+
+## Result (2026-09-05): C1 holds by the letter; C2 makes it moot.
+
+27 cells, 1.5 min. Recall, median over three seeds:
+
+  V      AVERAGE   CONCAT   WIDE
+  30       0.88     0.92    0.92
+  60       0.18     0.24    0.30
+  120      0.23     0.24    0.24
+
+  C3 HOLDS: precision 1.000 and source false positives 0.000 in every arm
+     and every cell. Nothing here was bought by flagging sources.
+  C4 HOLDS: ghost clean in all 27 cells.
+  C1 HOLDS at V=60 by the declared median criterion, 0.24 against 0.18.
+
+### C1 holds weakly, and the per-seed detail matters
+
+  seed      AVERAGE   CONCAT   WIDE
+    0         0.18     0.24    0.30
+    1         0.18     0.46    0.46
+    2         0.14     0.12    0.22
+
+CONCAT beats AVERAGE in two seeds of three and is WORSE in the third. On
+n = 3 with a reversal, the median is thin evidence and is reported as such.
+
+### C2 had no prediction and resolves decisively: width, not diversity
+
+**WIDE is at least as good as CONCAT in three seeds of three, and better in
+two, while costing HALF the encoder time** (2.5 s against 5.1 s). Against
+AVERAGE it wins in three of three. One encoder at width 64 dominates two
+encoders at width 32 on recall and on cost simultaneously.
+
+The mechanism is visible in the numbers. Concatenating two independently
+trained 32-wide codes gives the readout 64 columns, but the two codes are
+partly redundant with one another, so it buys less than a genuine 64-wide
+code. CONCAT at 0.24 sits between b = 32 (0.18) and b = 64, which is exactly
+what partial redundancy predicts.
+
+### An independent reproduction of the bottleneck study
+
+The bottleneck grid measured V = 60 at b = 32 -> 0.18 and b = 64 -> 0.34.
+Today, on a different code path, AVERAGE (readout width 32) gives **0.18
+exactly** and WIDE (b = 64) gives 0.30. The capacity curve reproduces.
+
+### What we actually do, and why it is not what the rule says
+
+The declared rule fires ADOPT: C1 held with C3 and C4 intact. **We are not
+adopting concatenation**, and the reason is that C2 -- the contrast the
+protocol explicitly declined to predict -- dominates the contrast C1 was
+about. Making concatenation the default when a cheaper arm beats it in every
+seed would be following the letter of a criterion the experiment has
+outgrown.
+
+What the experiment supports:
+
+  - Part of the published recall shortfall IS an aggregation artefact.
+    AVERAGE leaves readout capacity unused, and both alternatives recover
+    some of it at no cost to precision or source blindness.
+  - The remedy is WIDENING, which Section 12.4 already recommends as
+    b ~ 2V. Concatenation is an inferior partial substitute for it.
+  - A genuinely new and unregistered observation: MODELS = 2 at width b
+    appears dominated by MODELS = 1 at width 2b, on recall AND on encoder
+    cost. That would change a deployed default, so it is NOT changed here.
+    It needs its own pre-registration, more seeds, and an account of what
+    the ensemble was for -- variance reduction and the cross-model spread
+    diagnostic, neither of which recall measures.
+
+### Not established
+
+Three seeds, one coupling, one generating family, three widths. The
+dominance of WIDE over CONCAT is consistent across all three seeds but three
+is not many, and at V = 120 all three arms are within 0.01, so the effect is
+concentrated at V = 60 where b/V leaves the most headroom.
