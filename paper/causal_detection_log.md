@@ -3571,3 +3571,84 @@ Rules added:
      structural ceiling reached from the other side: there the base rate
      capped the achievable lift, here the selected fraction caps the
      achievable contrast.
+
+2026-09-05  U-NET LEAVE-ONE-OUT: UNINFORMATIVE by the declared rule, and the
+guard caught an artefact. Pre-registration paper/unet_loo_protocol.md,
+committed before the script was written. EXPLORATORY, no adoption possible.
+6 cells x 5 arms, 1.7 min, V=30, bottleneck 2V, redundancy 0.
+
+WHY IT WAS RUN DESPITE TWO CLOSURES. The readout is leave-one-out on a
+trained model, which Mechanism 1 measures collapsing to AUROC 0.500 on three
+worms and which Rule 63 rejected on paper. Both were named in the protocol
+before running. What was new: a per-variable skip means the bottleneck never
+carries a variable's own history, so ablating j can damage k only through a
+cross-variable path - the conditioning the 2026-08-20 rejection lacked, where
+sinks scored as high as sources.
+
+PRIMARY METRIC WAS AVERAGE PRECISION, not AUROC, because the positive class
+is 5 sources of 30. AUROC's false-positive rate is diluted by the large
+negative class. Base rate 0.167 is the chance level, the declared bar was
+twice that, and AP divided by base rate is the same lift the enrichment table
+uses.
+
+  AVERAGE PRECISION      ADD   MASK-SKIP  NOMASK-SKIP  MASK-NOSKIP  NOMASK-NOSKIP
+  noise 0.00            0.828    0.850       0.460        0.534         0.853
+  noise 0.05            0.242    0.714       0.355        0.590         0.817
+  forecast R2, noise 0     --    0.955       0.797        0.725         0.285
+
+U4 HOLDS, U1 HOLDS, U5 FAILS at 0.285, U2 FAILS, U3 FAILS. Declared verdict
+UNINFORMATIVE. Nothing adopted.
+
+THE GUARD FIRED FOR THE RIGHT REASON. U5 is scoped run-wide so one arm's
+failure discards everything, repeating the scoping error Rule 119 recorded
+for a precision floor. But the arm that failed it has the HIGHEST average
+precision and ZERO graded response:
+
+  NOMASK-NOSKIP   AP 0.835   forecast R2 0.275   child-count rho -0.068
+  MASK-SKIP       AP 0.782   forecast R2 0.896   child-count rho +0.498, p 0.005
+
+A model never trained with missing inputs treats a zeroed input as an
+out-of-distribution SHOCK. It separates the classes while carrying nothing
+about how much a source drives.
+
+MASKING HELPS, WHICH REFUTES THE PROTOCOL'S OWN MECHANISM. U2 predicted
+NOMASK would beat MASK because masked training teaches route-around. Under
+SKIP, masking takes AP from 0.460 to 0.850. The route-around effect is real
+in principle and is dominated by the out-of-distribution effect above. The
+protocol declared in advance that this outcome is worth more than the
+statistic, and it is: it says leave-one-out collapse has been measured on
+models for which ablation was never a valid intervention.
+
+GRADED POSITIVE CONTROL, POST HOC AND LABELLED (unet_loo_graded.py). Parent
+assignment is recovered by replaying each seed's draws, giving each source a
+known child count of 2 to 9. Pooling 30 source observations across 6 cells,
+ranked within cell: ADD +0.342 (p 0.064), MASK-SKIP +0.498 (p 0.005), the
+other three between -0.068 and +0.062. Only one arm measures magnitude.
+
+TWO PROPERTIES THE ADDITIVE REFERENCE LACKS (unet_loo_controls.py). At noise
+0.05 ADD collapses to AP 0.242 and AUROC 0.397, BELOW chance, while MASK-SKIP
+holds at 0.714. And ADD correlates with a channel's own self-R2 at +0.685
+against MASK-SKIP's +0.037, so the manuscript's additive outflow largely
+tracks self-predictability while the skip architecture does not.
+
+NOT ESTABLISHED. One width, one family, three seeds, two noise levels. The
+graded control's 30 observations are not independent. REDUNDANCY WAS NOT RUN
+and is the axis most likely to kill this, since duplicated sources are the
+condition under which leave-one-out is expected to die.
+
+Rules added:
+
+124. A guard that every arm must pass has to be scoped PER ARM. Run-wide
+     scoping means one arm's failure discards the others' results, which is
+     Rule 119's error in a new place. Disqualify the arm, not the run.
+
+125. Separating the classes is not measuring the quantity. Any statistic
+     claiming to measure HOW MUCH a variable does something owes a GRADED
+     positive control against a known magnitude, not just a class label. The
+     arm with the best average precision here had zero correlation with child
+     count, and no class-level metric would have revealed it.
+
+126. Ablating an input of a model never trained with missing inputs measures
+     out-of-distribution shock, not information loss. Train with random input
+     removal before reading any ablation, and report the model's own
+     held-out performance beside every ablation score.

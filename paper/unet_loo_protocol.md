@@ -163,3 +163,95 @@ Void if the ablation is computed on anything but the held-out test segment;
 if the arms do not share the same generated system and splits within a cell;
 if the grid, seeds or noise levels change after any result is seen; if U1 is
 judged anywhere other than noise 0.0; or if the ADD reference is dropped.
+
+---
+
+## Result (2026-09-05): UNINFORMATIVE by the declared rule, and the guard was right.
+
+6 cells x 5 arms, 1.7 min.
+
+  AVERAGE PRECISION (chance = base rate = 0.167; bar = 0.333)
+  noise    ADD   MASK-SKIP  NOMASK-SKIP  MASK-NOSKIP  NOMASK-NOSKIP
+  0.00    0.828    0.850       0.460        0.534         0.853
+  0.05    0.242    0.714       0.355        0.590         0.817
+
+  LIFT over base rate
+  0.00    4.97     5.10        2.76         3.21          5.12
+  0.05    1.45     4.29        2.13         3.54          4.90
+
+  MODEL HELD-OUT R2 on its own forecasting task
+  0.00      --     0.955       0.797        0.725         0.285
+  0.05      --     0.837       0.570        0.601         0.265
+
+  U4 HOLDS. ADD reference 0.828 against the 0.333 bar at noise 0.0.
+  U5 FAILS. Minimum U-Net forecast R2 is 0.285.
+  U1 HOLDS. Best U-Net 0.853, and 0.850 excluding the arm that failed U5.
+  U2 FAILS, in the direction the protocol said would matter more than the
+     statistic. Under SKIP, masking takes AP from 0.460 to 0.850.
+  U3 FAILS as stated. SKIP beats NOSKIP only when masked; the two factors
+     interact and the protocol predicted a main effect.
+
+**The declared verdict is UNINFORMATIVE and it stands.** Nothing is adopted.
+
+### The guard fired for exactly the right reason
+
+U5 is scoped run-wide, so one arm's failure discards the run, which repeats
+the scoping error Rule 119 already recorded for a precision floor. But the
+guard was not merely pedantic here. The arm that failed it is the arm with
+the HIGHEST average precision:
+
+  arm             AP      forecast R2   grades with child count
+  NOMASK-NOSKIP  0.835      0.275            rho -0.068
+  MASK-SKIP      0.782      0.896            rho +0.498  (p = 0.005)
+
+A model never trained with missing inputs treats a zeroed input as an
+out-of-distribution shock. Its ablation damage separates sources from driven
+channels while carrying NO information about how much a source actually
+drives. U5 was written to catch a model that cannot forecast, and it caught
+one whose detection score was an artefact.
+
+### The graded positive control, post hoc and labelled
+
+scripts/unet_loo_graded.py. The generator's parent assignment is recovered by
+replaying each seed's draws, so every source has a known child count (2 to 9
+across the cells). A statistic that measures outflow must track HOW MUCH a
+variable drives, not merely which class it is in. Pooling 30 source
+observations across 6 cells, ranked within cell:
+
+  ADD            rho +0.342   p 0.064
+  MASK-SKIP      rho +0.498   p 0.005
+  NOMASK-SKIP    rho -0.020   p 0.917
+  MASK-NOSKIP    rho +0.062   p 0.744
+  NOMASK-NOSKIP  rho -0.068   p 0.722
+
+Only MASK-SKIP grades. Three arms separate the classes to some degree while
+carrying nothing about magnitude.
+
+### Two properties the additive reference does not have
+
+scripts/unet_loo_controls.py.
+
+  1. NOISE ROBUSTNESS. At noise 0.05 the ADD reference collapses to AP 0.242,
+     lift 1.45, and AUROC 0.397 which is BELOW chance. MASK-SKIP holds at
+     0.714, lift 4.29. The manuscript's additive outflow is the arm that
+     fails first here.
+  2. INDEPENDENCE FROM SELF-PREDICTABILITY. Spearman between the score and
+     the channel's own self-R2, across all channels: ADD +0.685, MASK-SKIP
+     +0.037. The additive reference largely tracks how self-predictable a
+     channel is; the skip architecture does not. That is what the skip was
+     argued to do and it is the one prediction of the design that held.
+
+### What this licenses
+
+A powered pre-registration of MASK-SKIP alone, at more widths, a second
+generating family and a redundancy axis, with U5 scoped per arm and the
+graded child-count control declared in advance rather than added after. It
+does not license any claim, any adoption, or any manuscript text.
+
+### Not established
+
+One width, one family, three seeds, redundancy 0, two noise levels. The
+graded control pools five sources per cell and its 30 observations are not
+independent. The ADD collapse at noise 0.05 rests on three seeds. Redundancy
+is the axis most likely to break this and it was not run: duplicated sources
+are exactly the condition under which leave-one-out is expected to die.
