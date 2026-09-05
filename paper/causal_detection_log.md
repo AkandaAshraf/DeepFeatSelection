@@ -3487,3 +3487,87 @@ Rules added:
      cannot be adopted because k is unknown in deployment, but it separates
      ranking quality from threshold selection, and that separation is what
      told us which half of the method the improvement actually touched.
+
+2026-09-05  RESIDUAL SHORTCUT AND TARGET EXCLUSION: both repairs are no-ops,
+the identity path is not. Pre-registration paper/resnet_shortcut_protocol.md,
+committed before the script was written. EXPLORATORY, no adoption rule.
+6 cells x 5 arms, 19.4 min, V=30, b=2V, redundancy 0.
+
+WHY IT WAS RUN. An external audit of the manuscript raised two defects that
+we verified against the text and the implementation: the self-baseline is a
+fixed degree-3 polynomial, not dense in anything, so Proposition 1's
+saturation premise can fail; and the code is computed from the joint state of
+ALL variables despite the abstract calling it the remaining system, so the
+joint readout holds a learned representation of the target's own lags that
+the polynomial baseline lacks. Both let the joint side beat the self side on
+a channel that receives nothing.
+
+THREE CONFIGURATIONS, TWO FAILED THE GUARD. X3 required the learned trunk to
+beat poly3 as a self-predictor. Config 1 fed the trunk poly3 features of data
+clipped at +-20 and reached R2_own 0.014 against 0.117, winning 0% of
+channels. Config 2 used raw scaled lags but 1500 unregularised steps and
+reached -0.022. Config 3 added early stopping on the reserved validation
+fifth: on one diagnosed channel test R2 peaks at 0.165 by step 50 and decays
+to 0.02 by step 1350 while train loss falls throughout. X1 and X2 were not
+read from the failed configs.
+
+X3 HOLDS on config 3: trunk 0.9949 against poly3 0.9930 at noise 0 (99% of
+channels), 0.1402 against 0.1314 at noise 0.3 (78%).
+
+THE DECLARED DECISIVE CELL HAS NO SIGNAL IN IT. AUROC driven vs source:
+
+  arm              noise 0.0   noise 0.3
+  RIDGE-INCL         0.984       0.440
+  RES-SC-INCL        0.976       0.453
+  RES-SC-EXCL        0.976       0.469
+  RES-NOSC-INCL      0.797       0.301
+  RES-NOSC-EXCL      0.704       0.272
+
+At noise 0.30 NO ARM REACHES CHANCE, the incumbent included. X1 and X2 were
+declared to be judged there and are recorded FAILED by the letter and
+UNINFORMATIVE in substance. The cell was chosen because the incumbent's
+source FP is highest there, which selected a floor rather than headroom.
+
+The source-FP readout was independently broken: 25 driven of 30 channels
+means top-k selects 83% of the system, so the metric's chance level is 0.833
+and every arm scored 0.933 to 1.000.
+
+WHAT THE INFORMATIVE CELL SAYS, paired on AUROC:
+
+  contrast                     mean delta   wins   Wilcoxon p
+  target exclusion, SC arms      +0.008      2/6      0.750
+  target exclusion, NOSC arms    -0.061      1/6      0.062
+  identity path vs none          +0.165      5/6      0.062
+  ResNet shortcut vs incumbent   +0.003      2/6      1.000
+
+  1. TAKING THE TARGET OUT OF THE CODE CHANGES NOTHING. Real in theory,
+     negligible here: zeroing one channel of 30 barely moves a 60-dimensional
+     code from an encoder trained at 25% masking, and the effect shrinks as V
+     grows. For the manuscript the "remaining system" wording is a
+     specification error to correct, not a defect that moves any number.
+  2. A BETTER SELF-BASELINE DOES NOT GIVE A BETTER STATISTIC. The trunk wins
+     X3 on 99% of channels and the resulting statistic is indistinguishable
+     from the incumbent. A stronger self-model absorbs the driven channels'
+     signal too and the effects cancel.
+  3. THE IDENTITY PATH CARRIES THE RESULT and X5 declined to predict it.
+     Third time in two days that the unpredicted contrast dominates; Rule 118
+     already names the pattern.
+
+NOT ESTABLISHED. One system, one width, three seeds, redundancy 0. Half the
+grid was a floor. The exclusion null is measured only at V=30.
+
+Rules added:
+
+122. A cell is not decisive unless the INCUMBENT clears chance in it.
+     Choosing the cell with the worst failure rate can select a floor where
+     nothing works, and a contrast judged there measures noise. The highest
+     failure rate marks the most noise, not the most headroom. Check the
+     incumbent's performance in the proposed decisive cell before declaring
+     it decisive, not after.
+
+123. Compute the CHANCE LEVEL of every declared metric before committing to
+     it. A top-k readout with k/V near 1 has a chance level near 1 and cannot
+     discriminate whatever the method does. This is the enrichment table's
+     structural ceiling reached from the other side: there the base rate
+     capped the achievable lift, here the selected fraction caps the
+     achievable contrast.

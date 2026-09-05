@@ -120,3 +120,91 @@ Void if the arms do not share one encoder per cell and one own-trunk per
 target; if the own trunk is not frozen before the code branch is trained; if
 the grid, seeds or noise levels change after any result is seen; or if X1 is
 judged anywhere other than noise 0.30.
+
+---
+
+## Result (2026-09-05): both proposed repairs are no-ops; the identity path is not.
+
+6 cells x 5 arms, 19.4 min. Two configurations failed the X3 guard before the
+third passed, and X1 and X2 were not read from either.
+
+  CONFIG 1  trunk fed poly3 features of data clipped at +-20, spanning
+            several orders of magnitude into a raw linear layer.
+            R2_own 0.014 against poly3's 0.117, winning on 0% of channels.
+  CONFIG 2  raw own lags, scaled, but 1500 unregularised full-batch steps.
+            R2_own -0.022. Worse.
+  CONFIG 3  raw own lags, early stopping on the reserved validation fifth.
+            Diagnosed on one channel: test R2 peaks at 0.165 by step 50 and
+            decays to 0.02 by step 1350 while train loss keeps falling.
+            Weight decay was tried at 1e-4 and 1e-2 and does far less.
+
+X3 HOLDS on config 3. The learned trunk is a genuinely stronger self-baseline:
+
+  noise      poly3 R2_own   trunk R2_own   trunk wins
+  0.0           0.9930         0.9949          99%
+  0.3           0.1314         0.1402          78%
+
+### The declared decisive cell has no signal in it
+
+AUROC, driven against source, mean of three seeds:
+
+  arm              noise 0.0   noise 0.3
+  RIDGE-INCL         0.984       0.440
+  RES-SC-INCL        0.976       0.453
+  RES-SC-EXCL        0.976       0.469
+  RES-NOSC-INCL      0.797       0.301
+  RES-NOSC-EXCL      0.704       0.272
+
+**At noise 0.30 no arm reaches chance, the incumbent included.** X1 and X2
+were declared to be judged there, so both were judged in a cell where nothing
+works. They are recorded as FAILED by the letter and as UNINFORMATIVE in
+substance. The cell was chosen because the incumbent's source false-positive
+rate is highest there, which turns out to select a floor rather than
+headroom: the highest failure rate marks the most noise, not the most room
+to improve.
+
+The source-FP readout was worse than uninformative. With 25 driven channels
+of 30, top-k selects 83% of the system, so the metric's chance level is 0.833
+and every arm scored 0.933 to 1.000. It cannot discriminate and should never
+have been declared.
+
+### What the informative cell says
+
+At noise 0.0, paired across cells, on AUROC:
+
+  contrast                     mean delta   wins   Wilcoxon p
+  target exclusion, SC arms      +0.008      2/6      0.750
+  target exclusion, NOSC arms    -0.061      1/6      0.062
+  identity path vs none          +0.165      5/6      0.062
+  ResNet shortcut vs incumbent   +0.003      2/6      1.000
+
+  1. TAKING THE TARGET OUT OF THE CODE CHANGES NOTHING. The audit's concern
+     is theoretically real, and it is empirically negligible here. Zeroing
+     one channel of 30 from an encoder trained with 25% masking barely moves
+     a 60-dimensional code, and the effect should shrink further as V grows.
+     For the manuscript this means the "remaining system" wording is a
+     specification error to correct, not a defect that moves any number.
+  2. A BETTER SELF-BASELINE DOES NOT GIVE A BETTER STATISTIC. The trunk beats
+     poly3 as a self-predictor at both noise levels and on 99% of channels at
+     noise 0, and the resulting statistic is indistinguishable from the
+     incumbent (+0.003, 2/6, p = 1.000). A stronger self-model absorbs more
+     of the driven channels' signal too, and the two effects cancel.
+  3. THE ARCHITECTURAL IDENTITY PATH CARRIES THE RESULT, and X5 declined to
+     predict it. Removing the identity path costs 0.165 AUROC, the largest
+     effect in the experiment. This is the third experiment in two days in
+     which the contrast carrying no prediction dominates the one the
+     decisive prediction was about; Rule 118 already names the pattern.
+
+### Verdict
+
+No adoption, as declared. Neither repair is worth carrying further in this
+form. The identity-path effect is the only thing here worth a powered
+pre-registration, and it is a statement about estimator architecture rather
+than about either defect the audit raised.
+
+### Not established
+
+One system, one width, three seeds, redundancy 0. Half the grid was a floor.
+The exclusion null is measured only at V = 30, where zeroing one channel is a
+1-in-30 perturbation; it is not evidence about small V, where the same
+perturbation is proportionally much larger.
