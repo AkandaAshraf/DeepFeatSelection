@@ -3385,3 +3385,105 @@ Rule added:
      prediction was about, the declared verdict is answering a question the
      experiment has outgrown. Report the dominance and refuse the verdict,
      rather than adopting a change that a cheaper arm beat in every seed.
+
+2026-09-05  PER-CHANNEL NULL: REJECT by the declared rule, and the gain was
+mostly bar height. Pre-registration paper/per_channel_null_protocol.md,
+committed before the script was written. 27 cells x 3 arms, 61.1 min, S = 99
+shifts per channel, b = 2V, redundancy 0.
+
+FIRST, WHAT WAS ABANDONED UNRUN. The improvement proposed for this slot was
+a regression of ghost excess on donor self-R2, motivated by
+Spearman(self_r2_med, ghost_max) = -0.507 in the crossed cells. Three checks
+against existing outputs killed it before a line was written
+(scripts/self_r2_null_check.py re-derives all three):
+
+  - CONFOUND. Controlling the noise manipulation and width, the partial rank
+    correlation is +0.169, p = 0.11 - not significant, sign FLIPPED. self-R2
+    in that run is a downstream reading of the noise axis. Source FP tracks
+    noise (+0.448) far better than the ghost bar (+0.177, n.s.).
+  - NO LEVERAGE. Replaying each saved seed's donor draw recovers 1485
+    donor-ghost pairs; the donor filter self-R2 > 0.9 leaves the regressor
+    spanning [0.952, 1.000]. Predicting a null at self-R2 = 0.3 is a 14x
+    extrapolation.
+  - ALREADY CLOSED, TWICE, on 2026-08-23 and 2026-09-02.
+
+WHAT RAN INSTEAD. Each channel as its own null: 99 circular shifts of the
+channel's own series, scored exactly as the real channel is. Three arms
+sharing encoders and the excess array, differing only in decision rule -
+GLOBAL-MAX (incumbent), SELF-Q (per-channel bar at the 30/31 quantile,
+matched to max-of-30's expected exceedance level), SELF-BH (per-channel
+permutation p, Benjamini-Hochberg at 0.10).
+
+  source FP by noise    GLOBAL-MAX  SELF-Q  SELF-BH
+    0.00                   0.000     0.061   0.233
+    0.05                   0.128     0.083   0.133
+    0.30                   0.244     0.161   0.150
+  recall by noise
+    0.00                   0.812     0.959   0.980
+    0.05                   0.389     0.422   0.599
+    0.30                   0.092     0.121   0.112
+
+  P1 HOLDS at every width. P2 HOLDS in the opposite direction to its risk.
+  P4 FAILS at 0.917. P5 locked fraction 0.100, null inflated +0.00169 on
+  locked channels - real, predicted in direction, below the 0.005 bar.
+  P6's arithmetic was WRONG as declared: the ratio is 99V/30, not S/30.
+
+THE VERDICT IS REJECT AND IT STANDS. P4 failed entirely because of SELF-BH
+(0 of 9 cells below 0.95 for GLOBAL-MAX and SELF-Q; 4 of 9 for SELF-BH), and
+it failed for our own error: SELF-BH's realised FDR was 0.045 against its
+declared bound of 0.10, and controlling FDR at 0.10 permits precision 0.90,
+so a 0.95 floor and an FDR-0.10 arm cannot both be satisfied. SELF-BH could
+fail P4 while behaving exactly as specified, and did. That does NOT license
+adopting SELF-Q here; the protocol says every arm, and SELF-Q needs its own
+pre-registration on fresh seeds with a coherent floor.
+
+THE ADVERSARIAL CONTROL THE PROTOCOL LACKED, POST HOC AND LABELLED
+(scripts/per_channel_matched_bar.py). SELF-Q flags more channels than the
+incumbent (56.0 against 47.9 at noise 0.0). Lowering the global bar to flag
+the SAME NUMBER, by taking top-k on excess:
+
+  matched count      SELF-Q rec  top-k rec   SELF-Q srcFP  top-k srcFP
+    noise 0.00          0.959      0.963        0.061        0.039
+    noise 0.05          0.422      0.413        0.083        0.128
+    noise 0.30          0.121      0.104        0.161        0.244
+
+MOST OF THE HEADLINE RECALL GAIN IS BAR HEIGHT. At noise 0.0 the matched
+global bar is slightly better than SELF-Q on both metrics. In 19 of 27 cells
+the per-channel null selects exactly the same set as top-k. It differs in 8,
+winning 7-1 on recall (Wilcoxon p = 0.039) and 7-1 on source FP (p = 0.10),
+concentrated where noise makes source blindness the problem.
+
+ESTABLISHED. The incumbent's global maximum is TOO CONSERVATIVE: it is a
+family-wise bar across 30 donor channels applied as a per-channel bar, and
+it costs recall the ranking had already earned (0.812 against 0.963 at a
+matched count). MACE's ranking is already good and the per-channel null adds
+little to it. The null's real contribution is choosing HOW MANY to flag
+without a tuning constant, which top-k cannot do because k is exactly what
+deployment does not know - so the control bounds the claim without replacing
+the method. At 261x the null cost that contribution is not yet worth paying
+for, and a cheaper route to the same threshold selection is the obvious next
+pre-registration.
+
+NOT ESTABLISHED. Three seeds, one family, one coupling, redundancy 0. The
+matched-count control is post hoc and its two tests rest on the 8 disagreeing
+cells. Phase-lock inflation was not probed at the locked windows on purpose.
+
+Rules added:
+
+119. A disqualifying precision floor must be arithmetically consistent with
+     any false-discovery rate the same protocol declares. Declaring FDR q
+     and precision >= 1 - q' with q' < q sets that arm up to fail by
+     behaving correctly, and the failure says nothing about the method.
+     Check the two clauses against each other before committing.
+
+120. When a proposed rule flags MORE items than the incumbent, the control
+     is the incumbent at a MATCHED flag count, not the incumbent at its own
+     threshold. Without it a change in bar height is indistinguishable from
+     a change in what is being measured. Here the matched control absorbed
+     most of an apparent 0.15 recall gain, and it should have been declared
+     in the protocol rather than added afterwards.
+
+121. A control that is not itself deployable still bounds the claim. Top-k
+     cannot be adopted because k is unknown in deployment, but it separates
+     ranking quality from threshold selection, and that separation is what
+     told us which half of the method the improvement actually touched.
