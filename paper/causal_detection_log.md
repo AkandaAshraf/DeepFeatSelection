@@ -4028,3 +4028,48 @@ Rule added:
      defect itself, and here it deserved more: verifying it by direct
      enumeration rather than by a second arithmetic derivation is what
      caught the residual 1-sample overlap arithmetic alone did not surface.
+
+
+2026-09-06  FULL-SERIES SCALING: A SEPARATE PROVENANCE CONCERN, DISCLOSED,
+NOT FIXED. Flagged as out of scope for the embargo fix by an independent
+review: a boundary gap between splits does not establish the absence of all
+leakage, and the standardisation step is a real, distinct one.
+
+CONFIRMED IN ALL THREE AFFECTED SCRIPTS. Before differencing and embedding,
+each of scripts/celegans_detect.py, scripts/celegans_excess.py and
+scripts/circadian_detect.py standardises using MEAN AND STANDARD DEVIATION
+COMPUTED OVER THE WHOLE RECORDING:
+
+  z = (x - x.mean(0)) / (x.std(0) + 1e-12)      # celegans_detect.py, l.134
+                                                  # celegans_excess.py, l.155
+  z = ((matrix.T - matrix.T.mean())
+       / (matrix.T.std() + 1e-12))               # circadian_detect.py, l.148
+
+before any train/validation/test split is applied. A SECOND standardisation,
+on the embedded manifold, IS train-only in all three (`joint[tr].mean(0)`
+etc.) -- but by then every value has already been rescaled by statistics that
+validation and test rows helped compute. This is not the seam-overlap defect
+Rule 132 fixed; it is a global leak, present regardless of embargo size,
+because it touches every value in the series rather than a handful of rows
+at a boundary.
+
+NOT PRESENT IN THE SYNTHETIC PIPELINE. boundary_map.py's `embed()` and
+splitting logic compute `mu, sd = emb[tr].mean(0), emb[tr].std(0)` on the
+embedded manifold's TRAINING rows only, with no full-series step preceding
+it. The defect is specific to the three real-data scripts, which need a
+per-variable rescale before delay-embedding raw recordings that the
+synthetic generator does not.
+
+WHY THIS IS NOT FIXED HERE. Unlike the embargo gap, whose maximum possible
+effect was bounded at a handful of rows out of thousands, a full-series
+rescale changes every value fed to every downstream computation in these
+three pipelines. There is no small-magnitude argument available to disclose
+instead of re-running: fixing this properly means re-deriving the
+standardisation with train-only statistics and RE-RUNNING the worm and
+circadian pipelines to know whether any reported number moves, which is a
+real GPU cost rather than an arithmetic correction. That decision is left to
+be made explicitly rather than taken by default.
+
+NOT ESTABLISHED. Whether this leak is large enough to matter is unmeasured.
+The circular ghost construction was also named as a separate concern needing
+its own check and is not audited here.

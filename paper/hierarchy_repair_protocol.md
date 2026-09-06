@@ -78,8 +78,9 @@ DISTRIBUTION of module widths a random assignment would produce against
 clustering's. It does NOT match the width any SPECIFIC target receives: a
 target that lands in a size-9 module under clustering may land in a size-2
 module under HIER-RAND-SIZED, because sizes are drawn to targets at random
-rather than by identity. So a size-matched comparison bounds how much of the
-clustering effect is attributable to the AGGREGATE width distribution: it
+rather than by identity. The comparison COMPARES CLUSTERING AFTER MATCHING
+THE AGGREGATE SIZE DISTRIBUTION -- nothing stronger. It supplies no
+quantitative bound on how much of any effect is attributable to width, and
 does not isolate a "pure width effect" free of which target got which
 module, since module membership and width co-vary by construction in both
 arms. This limitation is stated here rather than discovered after the run.
@@ -90,7 +91,16 @@ arms. This limitation is stated here rather than discovered after the run.
   WIDTH    V in {30, 60}; system bottleneck 2V
   MODULE BOTTLENECK  $\max(4,\, 2|\text{module}|)$ for every module including
            singletons, exactly the archived formula. A singleton module gets
-           bottleneck 4, not 2.
+           bottleneck 4, not 2. The ACTUAL bottleneck width used for every
+           module, in every arm and cell, is reported in a table -- not just
+           asserted from the formula -- so a singleton floor taking effect is
+           visible rather than inferred.
+  RAW/TRAIN CUTOFF  the exclusive raw-row cutoff used to fit
+           HIER-CLUST-TRAIN's clustering is an explicit integer, computed once
+           per cell as `int(0.6 * m)` on the embedded manifold length `m`
+           (matching the encoder's own train slice), and is SAVED alongside
+           the module labels for that cell so it can be checked rather than
+           re-derived from prose.
   NOISE    {0.0, 0.05}
   CLUSTERS m = V // 6, fixed, unchanged from the archived run
   SEEDS    0, 1, 2 — the archived seeds, and only these
@@ -101,18 +111,27 @@ arms. This limitation is stated here rather than discovered after the run.
 
 ## Guards and artifacts declared before running
 
-  FLAT FIDELITY GUARD. FLAT's detection average precision in this run must
-  match the archived FLAT's in the same cell within tolerance 0.03 (the
-  generator is seeded identically, so a large gap means the pipeline changed
-  in some way besides the intended repairs, and the comparison is void until
-  that is found).
+  FLAT FIDELITY GUARD, ON RAW SCORES, NOT ONLY THE SUMMARY. FLAT's detection
+  average precision must match the archived FLAT's in the same cell within
+  tolerance 0.03, AND the raw per-channel excess array must match the
+  archived one within numerical tolerance ($10^{-6}$, allowing for
+  nondeterministic GPU reduction order). Average precision alone can hide a
+  changed score: two different rankings can produce the same summary number,
+  so the array comparison is not a redundant check, and if only the AP
+  matched the pipeline could have silently changed by something other than
+  intended repairs. Either mismatch voids the comparison until found.
 
   TRAIN-ONLY INVARIANCE TEST, run once before the main script and its result
   reported alongside it: perturb every value in the validation and test rows
   with independent noise, re-run HIER-CLUST-TRAIN's clustering step on the
-  perturbed array, and confirm the resulting module labels are IDENTICAL to
-  the unperturbed run's. If they are not, training-row-only fitting is not
-  actually achieved and the repair has not repaired defect 1.
+  perturbed array, and compare the resulting partition to the unperturbed
+  one by ADJUSTED RAND INDEX, not by counting unequal numeric labels --
+  cluster label numbers are arbitrary (permuting them describes the identical
+  partition), so a naive label-equality count can report spurious
+  "differences" that are really the same partition relabelled. The test
+  passes only at ARI $= 1.0$ (partitions identical up to relabelling). If it
+  is not, training-row-only fitting is not actually achieved and the repair
+  has not repaired defect 1.
 
   SAVED PARTITIONS. The module-label array (`lab`) for every arm, in every
   cell, is written to the output `.npz` alongside the raw excess arrays. This
@@ -145,17 +164,28 @@ cannot discriminate and is not used.
                components a ratio can hide. No exclusion is chosen after
                seeing which cells it would remove.
   GRADED       within-cell Spearman between a module's fraction of in-module
-               parents and its share, reported per cell and summarised by
-               seed (3 numbers: one median per seed across that seed's 4
-               cells). No pooled p-value; no significance claim from 3 seeds.
+               parents and its OWN share (that module's mean $e_2$ over that
+               module's mean $e_2+e_3$, restricted to its driven members),
+               reported per cell and summarised by seed (3 numbers: one
+               median per seed across that seed's 4 cells). No pooled
+               p-value; no significance claim from 3 seeds. PER-MODULE
+               DEGENERATE HANDLING, separate from the cell-level rule above:
+               any module whose own $|{\rm mean}(e_2)+{\rm mean}(e_3)| <
+               10^{-5}$, or that has fewer than 2 driven members (Spearman is
+               undefined on a single point), is excluded from that cell's
+               correlation with the exclusion count reported alongside the
+               correlation, never silently.
 
 ## What is predicted, and what is deliberately not claimed
 
   D1  FLAT FIDELITY. Stated above as a guard, not a finding.
   D2  Repair 1 (train-only clustering) is expected to change module
       assignments somewhat from the archived transductive ones, and the
-      degree of change is reported descriptively (fraction of targets whose
-      module label differs). No prediction on direction or size.
+      degree of change is reported descriptively as the ADJUSTED RAND INDEX
+      between the archived partition and the train-only one, per cell --
+      not a fraction of unequal numeric labels, since module numbering is
+      arbitrary and a relabelled-but-identical partition would otherwise
+      register as changed. No prediction on direction or size.
   D3  Under HIER-RAND-SIZED, module share is expected to sit between
       HIER-RAND-BAL's and HIER-CLUST-TRAIN's, since it inherits clustering's
       width distribution without clustering's target-to-module assignment.
