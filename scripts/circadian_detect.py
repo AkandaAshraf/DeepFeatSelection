@@ -105,9 +105,15 @@ def parse_geo(root: Path) -> pd.DataFrame:
 
 
 def splits_for(n: int) -> tuple[slice, slice, slice]:
+    """Embargo (E-1)*TAU raw samples at each seam -- the full delay-vector
+    span -- not E. An earlier version embargoed E, which under-embargoed by
+    (E-1)*TAU - E samples whenever TAU>1 (3 samples short at each seam here,
+    TAU=3, E=3); fixed 2026-09-06, see paper/mace_v2.tex's Splits paragraph.
+    """
+    span = (E - 1) * TAU
     a = int(TRAIN_FRACTION * n)
     b = int((TRAIN_FRACTION + VAL_FRACTION) * n)
-    return slice(0, a - E), slice(a, b - E), slice(b, n)
+    return slice(0, a - span), slice(a, b - span), slice(b, n)
 
 
 def main() -> int:

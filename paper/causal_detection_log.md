@@ -3923,3 +3923,35 @@ Rule added:
      write-up computed. A control that could not have failed by construction
      is not a control, and this is the second instance of that error inside a
      week (see Rule 129).
+
+2026-09-06  TEMPORAL EMBARGO CORRECTED: an audit defect confirmed and fixed
+without a GPU run. An external reader observed that the manuscript's stated
+"embargo of E samples" does not, by itself, ensure the promised separation of
+delay vectors when tau > 1, since the delay vector spans (E-1)*tau samples.
+Verified against scripts/celegans_detect.py, scripts/celegans_excess.py and
+scripts/circadian_detect.py, all with E=3, TAU=3: `splits_for` embargoed E=3
+raw samples at each seam where (E-1)*TAU=6 were required, a shortfall of 3 per
+seam. Two seams per split means at most 6 manifold rows in the whole recording
+could share a raw sample with the opposite split - 0.2-0.3% of rows on the
+smallest of these recordings (n~2000-3000) and falling as n grows toward the
+28,000 used elsewhere.
+
+FIXED IN BOTH PLACES. The manuscript's Splits paragraph now states the
+embargo as (E-1)*tau with the shortfall disclosed by name and magnitude,
+matching the disclosure convention Rule 116 established. All three scripts'
+`splits_for` now compute `span = (E-1)*TAU` instead of `E`, matching the
+convention `embed()` already uses in boundary_map.py.
+
+NOT RE-RUN. Given the size of the effect - a handful of rows out of thousands,
+falling with n - and given the concurrent cost-consciousness the user has
+raised this week, we did not spend a GPU run re-verifying that no published
+worm, zebrafish or circadian number moves. The bound is visible from the
+arithmetic alone: the affected row count cannot exceed 6 in any of these
+recordings, which is far too small to move a median, an AUROC, or a
+percentile rank reported to two decimal places. If a future run touches these
+pipelines for another reason, the fixed embargo is now the default and no
+separate confirmation step is needed.
+
+Audit gate extended with the arithmetic itself (133 passed, up from 129):
+required embargo, previously coded value, shortfall, and maximum affected row
+count are each an independent check rather than an assertion.

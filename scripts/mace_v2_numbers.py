@@ -437,6 +437,15 @@ if p.exists():
 else:
     SKIP.append("resnet shortcut cells.csv absent")
 
+# ------------------------------------------------ embargo arithmetic (2026-09-06)
+# Splits paragraph, sec:methods:hyper. The required embargo is (E-1)*tau, the
+# full delay-vector span; the coded one was E, which coincides only at tau=1.
+E_, TAU_ = 3, 3
+chk("embargo: required (E-1)*tau at tau=3", 6, (E_ - 1) * TAU_, tol=0)
+chk("embargo: earlier coded value was E", 3, E_, tol=0)
+chk("embargo: shortfall per seam", 3, (E_ - 1) * TAU_ - E_, tol=0)
+chk("embargo: max affected rows, 2 seams", 6, 2 * ((E_ - 1) * TAU_ - E_), tol=0)
+
 # ---------------------------------------------------------------- report
 print("MACE v2 audit gate\n")
 for line in OK:
