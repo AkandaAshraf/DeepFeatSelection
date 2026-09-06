@@ -399,6 +399,44 @@ else:
     chk("clean generator: orphan sources score ~zero", 0.0,
         float(orph.outflow.median()), tol=0.002)
 
+# ------------------------------------- premises measured, not assumed
+# Section sec:practice:premises and the ghost-calibration table in
+# sec:theory:finite. Added 2026-09-06 with the audit repairs.
+p = Path("ExpOutput/per_channel_null/cells.csv")
+if p.exists():
+    d = pd.read_csv(p)
+    inc = d[d.arm == "GLOBAL-MAX"]
+    chk("ghost calibration: nominal level at K=30", 0.032, 1 / 31, tol=5e-4)
+    for nz, want in [(0.05, 0.128), (0.30, 0.244)]:
+        chk(f"ghost calibration: measured source FP at noise {nz}", want,
+            float(inc[inc.noise == nz].source_fp.mean()), tol=5e-4)
+    chk("ghost calibration: ghost diagnostic clean in those cells", True,
+        bool((inc[inc.noise > 0].ghost_med <= 0.005).all()), tol=0)
+else:
+    SKIP.append("per-channel null cells.csv absent")
+
+p = Path("ExpOutput/resnet_shortcut/cells.csv")
+if p.exists():
+    d = pd.read_csv(p)
+    # V=30 throughout that run; 6 paired cells = 2 noise levels x 3 seeds
+    piv = d.pivot_table(index=["noise", "seed"], columns="arm", values="auroc")
+    for label, a, b, want in [
+            ("learned self-baseline for the fixed cubic",
+             "RES-SC-INCL", "RIDGE-INCL", 0.003),
+            ("target withheld from the code",
+             "RES-SC-EXCL", "RES-SC-INCL", 0.008)]:
+        chk(f"premise repair: {label}, change in ranking accuracy", want,
+            float((piv[a] - piv[b]).mean()), tol=5e-4)
+        chk(f"premise repair: {label}, cells won", 2,
+            int((piv[a] > piv[b]).sum()), tol=0)
+        chk(f"premise repair: {label}, cells total", 6, len(piv), tol=0)
+    ch = pd.read_csv("ExpOutput/resnet_shortcut/channels.csv")
+    z0 = ch[ch.noise == 0.0]
+    chk("premise repair: learned trunk beats the cubic on 99% of channels",
+        0.99, float((z0.r2_trunk_own > z0.r2_ridge_own).mean()), tol=0.005)
+else:
+    SKIP.append("resnet shortcut cells.csv absent")
+
 # ---------------------------------------------------------------- report
 print("MACE v2 audit gate\n")
 for line in OK:

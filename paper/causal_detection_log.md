@@ -3820,3 +3820,56 @@ Rules added:
      useful reduction, so the declared metric could not separate what the
      application separates. Ask what someone would do with the number before
      choosing how to score it.
+
+2026-09-06  MANUSCRIPT REPAIRS from the external audit. Five defects were
+raised against mace_v2.tex by an outside reader, all five verified against the
+text and the implementation before any edit, and all five now repaired. The
+audit gate grew from 118 to 129 checks because the repairs quote new numbers
+and every quoted number is re-derived from a primary output file.
+
+  1. PROPOSITION 2 assumed density for the joint readout and used the
+     conditional-variance identity for the SELF term, which needs the same
+     assumption. Added as hypothesis (iii), and Eq.~\ref{eq:approxgap} now
+     states the signed error explicitly: the estimate moves by
+     (a_self - a_joint)/Var(Y), so approximation can push it EITHER way. The
+     "false negatives, never false positives" claim appeared in three places
+     and is now conditioned in all three. The self side is named as the
+     exception that can manufacture false positives.
+  2. AUTONOMY was defined so that any invertible whole system satisfies it for
+     every variable at once, taking M_q = M, psi = Phi, eta = h_q. The
+     definition was vacuous on exactly the real deployments, whose time-Delta
+     maps the paper states are diffeomorphisms. Now E-autonomy, requiring
+     d_q < E/2, which at E=3 means a subsystem of dimension below 1.5. The
+     target is relative to the lag budget by construction and the synchrony
+     collapse is restated as the definition behaving as written.
+  3. THE GHOST'S 1/(K+1) LEVEL is withdrawn. Exchangeability fails because
+     donors are drawn deliberately from saturating channels while targets are
+     not, and the paper's own argument about non-saturating DONORS applies
+     verbatim to non-saturating TARGETS. Replaced with the measurement: at
+     K=30 the nominal level is 0.032 and the measured source false-positive
+     rate is 0.128 at noise 0.05 and 0.244 at 0.30, with the ghost diagnostic
+     CLEAN in every one of those cells. A dirty ghost is decisive; a clean
+     ghost licenses nothing.
+  4. THE GAUSSIAN TRANSFER-ENTROPY EQUIVALENCE was wrong in two places.
+     T = (1/2) log(sigma2_self / sigma2_joint) is not the R2 difference, and
+     the two do not induce the same ranking: variances 0.9/0.8 give the same
+     excess as 0.2/0.1 with sixfold different transfer entropy. Barnett et al.
+     relate the LOG-VARIANCE-RATIO form of Granger causality to transfer
+     entropy, which licenses no equality for an R2 difference.
+  5. "ENTIRE REMAINING SYSTEM" described a code computed from the joint state
+     WITH the target included. Wording corrected in the abstract and the
+     related-work section, with the amortisation reason stated: excluding each
+     target in turn would cost V encoders instead of one.
+
+TWO PREMISES NOW MEASURED RATHER THAN ASSUMED, new subsection
+sec:practice:premises. Neither obvious repair helps. Replacing the fixed cubic
+self-baseline with a learned trunk moves ranking accuracy by +0.003 and wins 2
+cells of 6, despite the trunk beating the cubic on 99% of channels in the
+noise-free cells; a stronger self-model absorbs the driven channels' signal
+too and the effects cancel. Withholding the target from the code moves it by
++0.008 and wins 2 of 6. The saturation premise is a real limit, not a bug with
+a cheap fix, which is why the claims are about ranking and triage rather than
+calibrated detection.
+
+WHAT THE AUDIT DID NOT TOUCH: no measurement changed, and no empirical claim
+was withdrawn. The repairs narrow the theory to what the evidence supports.
