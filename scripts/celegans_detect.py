@@ -79,12 +79,19 @@ def load_connectome(path: Path) -> tuple[set[tuple[str, str]], set[str]]:
 
 
 def splits_for(n: int) -> tuple[slice, slice, slice]:
-    """Embargo (E-1)*TAU raw samples at each seam -- the full delay-vector
-    span -- not E. An earlier version embargoed E, which under-embargoed by
-    (E-1)*TAU - E samples whenever TAU>1 (3 samples short at each seam here,
-    TAU=3, E=3); fixed 2026-09-06, see paper/mace_v2.tex's Splits paragraph.
+    """Embargo (E-1)*TAU + 1 raw samples at each seam.
+
+    This pipeline DIFFERENCES before embedding (np.diff, below), and that is
+    the +1: a differenced sample at index d touches RAW indices {d, d+1}, so
+    a manifold row spanning differenced indices [i, i+span] touches RAW
+    indices [i, i+span+1] -- one more than the embedding span alone. A first
+    correction on 2026-09-06 used embargo=span and missed this, leaving a
+    1-sample overlap at TAU=1 (where the ARCHIVED embargo=E had actually been
+    exactly right) and at TAU=3 (reducing but not closing the archived gap of
+    4 samples per seam to 1). Verified by direct enumeration of raw index
+    support, not by arithmetic alone: scripts/test_embargo_boundary.py.
     """
-    span = (E - 1) * TAU
+    span = (E - 1) * TAU + 1
     a = int(TRAIN_FRACTION * n)
     b = int((TRAIN_FRACTION + VAL_FRACTION) * n)
     return slice(0, a - span), slice(a, b - span), slice(b, n)

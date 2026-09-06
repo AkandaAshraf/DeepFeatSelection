@@ -438,13 +438,36 @@ else:
     SKIP.append("resnet shortcut cells.csv absent")
 
 # ------------------------------------------------ embargo arithmetic (2026-09-06)
-# Splits paragraph, sec:methods:hyper. The required embargo is (E-1)*tau, the
-# full delay-vector span; the coded one was E, which coincides only at tau=1.
+# Splits paragraph, sec:methods:hyper. This pipeline differences before
+# embedding, so the required embargo is (E-1)*tau + 1, not (E-1)*tau: a
+# differenced sample at index d depends on RAW indices d and d+1, so a
+# manifold row spanning differenced indices [i, i+span] touches raw indices
+# [i, i+span+1]. Two numbers went through two states each before this:
+#   archived embargo = E              -> exactly right at tau=1, 4 short at tau=3
+#   first correction  = (E-1)*tau     -> 1 sample short at EVERY tau
+#   final             = (E-1)*tau + 1 -> verified disjoint by direct
+#                                        enumeration, not by this arithmetic
+#                                        alone: scripts/test_embargo_boundary.py
 E_, TAU_ = 3, 3
-chk("embargo: required (E-1)*tau at tau=3", 6, (E_ - 1) * TAU_, tol=0)
-chk("embargo: earlier coded value was E", 3, E_, tol=0)
-chk("embargo: shortfall per seam", 3, (E_ - 1) * TAU_ - E_, tol=0)
-chk("embargo: max affected rows, 2 seams", 6, 2 * ((E_ - 1) * TAU_ - E_), tol=0)
+required = (E_ - 1) * TAU_ + 1
+chk("embargo: required (E-1)*tau+1 at tau=3", 7, required, tol=0)
+chk("embargo: archived coded value was E", 3, E_, tol=0)
+chk("embargo: archived shortfall per seam at tau=3", 4, required - E_, tol=0)
+chk("embargo: first correction shortfall per seam (every tau)", 1,
+    required - (E_ - 1) * TAU_, tol=0)
+chk("embargo: max affected rows under archived embargo, 2 seams", 8,
+    2 * (required - E_), tol=0)
+
+# The behavioral claim itself, not just the constants: run the actual
+# enumeration and require it to report zero overlap under the final embargo.
+sys.path.insert(0, "scripts")
+import test_embargo_boundary as _emb  # noqa: E402
+_ok13, _ = _emb.check(3, 3, required)
+_ok11, _ = _emb.check(3, 1, (3 - 1) * 1 + 1)
+chk("embargo: enumerated disjoint at tau=3 under final embargo", True, _ok13,
+    tol=0)
+chk("embargo: enumerated disjoint at tau=1 under final embargo", True, _ok11,
+    tol=0)
 
 # ---------------------------------------------------------------- report
 print("MACE v2 audit gate\n")

@@ -3955,3 +3955,76 @@ separate confirmation step is needed.
 Audit gate extended with the arithmetic itself (133 passed, up from 129):
 required embargo, previously coded value, shortfall, and maximum affected row
 count are each an independent check rather than an assertion.
+
+
+2026-09-06  EMBARGO CORRECTION, ROUND TWO: the first fix was itself
+incomplete, and a second correction found it via direct enumeration rather
+than by trusting the arithmetic. An independent review of the 2026-09-06
+embargo fix (Rule 131's neighbor) checked the raw index support of each
+manifold row by simulation rather than accepting the stated formula, and
+found a 1-sample overlap the first correction had not closed.
+
+RE-DERIVED INDEPENDENTLY BEFORE ACTING ON IT. time_delay_embed's row i covers
+differenced indices [i, i+span] (verified from the function's own
+`times = arange(span, n)` construction). These three scripts difference the
+series BEFORE embedding, and a differenced sample at index d depends on RAW
+indices d and d+1, so a manifold row's raw support is [i, i+span+1] -- one
+more than the embedding span alone. The first correction embargoed `span`
+raw samples; the correct value is `span + 1`.
+
+TWO NUMBERS EACH HAD TWO WRONG STATES:
+  archived embargo (E)         exactly right at tau=1, 4 samples short at
+                                tau=3 (not the 3 first reported, which
+                                compared against span alone, not span+1)
+  first correction (span)      1 sample short at EVERY tau, including
+                                tau=1 -- WORSE than the archived value there,
+                                since archived E happened to equal span+1
+                                at tau=1 by coincidence
+  final (span + 1)             verified disjoint by direct enumeration,
+                                scripts/test_embargo_boundary.py, at both
+                                tau=1 and tau=3, not by arithmetic alone
+
+A BEHAVIORAL REGRESSION TEST now exists and is wired into the audit gate
+itself (scripts/mace_v2_numbers.py imports it and asserts zero overlap),
+rather than the gate re-deriving a formula that could itself be wrong in the
+same way twice. This is the fix for the fix: Rule 130 said score the
+quantity a deployment would use; the analogous move here is verify the
+CLAIM a formula makes, not the formula's arithmetic in isolation.
+
+MAGNITUDE, RECOMPUTED. Under the archived embargo, up to 8 manifold rows in
+the whole recording (2 seams x 4 samples, not the 6 first reported) could
+share a raw sample with the opposite split: 0.03-0.4% of rows across the
+n=2,000 to n=28,000 range of these recordings, falling with n. Still not
+re-run: the size does not change the earlier judgement that a GPU run to
+confirm this is not worth its cost, and the corrected bound is disclosed
+alongside the two prior wrong ones rather than shown alone.
+
+A SEPARATE, UNRELATED DEFECT was found and fixed while verifying this: the
+paragraph reporting the first embargo fix had been patched via a Python
+heredoc that silently converted every `\t` inside a LaTeX macro name into a
+literal tab character, turning `\textbf`, `\tau` and `\to` into stray tab
+characters followed by plain text (`\tau` becoming a tab plus "au", etc.).
+This produces no compile error -- LaTeX just typesets the leftover letters
+as prose -- so it is invisible without either reading the rendered PDF
+closely or grepping the source for the literal tab byte. Found by grepping
+the whole manuscript for tab characters after this correction, not by the
+embargo review itself: two occurrences in an unrelated EEG paragraph (from
+an earlier, unrelated edit) were caught by the same sweep and fixed
+alongside these. All edits from here forward that touch LaTeX or regex
+content go through the Write/Edit tools or a script file, never a heredoc,
+per the standing note this project already carries about heredoc backslash
+mangling.
+
+Audit gate: 133 to 136 passed, the four new checks re-deriving the corrected
+numbers plus two that invoke the actual enumeration function.
+
+Rule added:
+
+132. A CORRECTION IS A CLAIM LIKE ANY OTHER AND NEEDS ITS OWN CHECK. The
+     first embargo fix was accepted on the strength of matching an existing
+     convention (`embed()`'s span formula) without asking whether THIS
+     pipeline's extra differencing step made that convention inapplicable.
+     A fix for a defect found by review deserves the same suspicion as the
+     defect itself, and here it deserved more: verifying it by direct
+     enumeration rather than by a second arithmetic derivation is what
+     caught the residual 1-sample overlap arithmetic alone did not surface.
