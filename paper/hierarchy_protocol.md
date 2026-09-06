@@ -207,3 +207,87 @@ disqualifying non-inferiority clause, and H5's per-arm guard. Detection
 saturated at 1.000 in the smoke cell, so H1 may prove uninformative at
 V=30 and noise 0; that is a property of the cell, not a reason to change the
 clause, and the harder cells are already in the declared grid.
+
+---
+
+## Result (2026-09-06): EMPTY by the declared rule, and the control was mis-designed.
+
+12 cells x 4 arms, 9.8 min.
+
+  DETECTION, average precision, sources positive (chance 0.167)
+  V   noise    FLAT   HIER-CLUST   HIER-RAND   HIER-TRUE
+  30  0.00    0.895     0.895        0.951       0.976
+  30  0.05    0.781     0.819        0.681       0.757
+  60  0.00    0.973     0.964        0.970       0.990
+  60  0.05    0.387     0.391        0.484       0.527
+
+  H1 HOLDS. HIER-CLUST 0.767 against FLAT 0.759. The hierarchy costs
+     nothing in detection, which is what the merge failed to manage.
+  H5 HOLDS for every arm. The module level is informative in all three.
+  H2 HOLDS. Localisation AUROC 0.905.
+  H3 ALSO CLEARS at 0.929, which fires the EMPTY verdict.
+
+**The declared verdict is EMPTY and it stands.** Nothing is adopted.
+
+### The control could not have failed, and that is our design error
+
+H3 assumed that randomising the modules would break the localisation signal.
+It cannot. The target is "is my parent in MY module", which is defined
+relative to whichever partition the arm chose, so randomising the partition
+changes the QUESTION rather than removing the signal. A sound mechanism
+answers both versions correctly, and a higher AUROC for the random arm simply
+reflects an easier discrimination: with random modules only 8 to 13 percent of
+parents are in-module, so the positives are rare and distinctive, against 68
+to 70 percent under clustering where the negatives are the rare class.
+
+The control was built to test whether the mechanism depends on modules being
+meaningful. It instead tested whether the mechanism works at all, and it does.
+
+### What did discriminate, and it was declared before the remaining 11 cells
+
+MODULE SHARE, the fraction of total inflow captured at the module level:
+
+  HIER-RAND   0.382
+  HIER-CLUST  0.923
+  HIER-TRUE   1.127
+
+The predicted ordering RAND < CLUST < TRUE holds. Two checks before believing
+it (scripts/hierarchy_controls.py):
+
+  SIZE. Mean module size is 6.0 in every arm, so the ordering is not a code
+  width artefact. Only the size VARIANCE differs, 4.55 for clustering against
+  0.00 for random and 2.03 for the oracle, and that unevenness is a real
+  limitation noted below.
+
+  GRADED (Rule 125). Within an arm, a module holding a higher fraction of its
+  members' parents captures more of their inflow: rho +0.555 within
+  clustering, +0.277 within random modules at p = 0.009, and +0.605 pooled
+  across both at p = 5e-17 over 157 modules. The magnitude relationship the
+  refused localisation metric could not supply.
+
+The oracle's system-level excess is NEGATIVE at -0.00052. With a perfect
+module the global code becomes a liability, its extra parameters costing
+held-out accuracy. That is the signature of a sufficient conditioning set and
+it is the cleanest single number in the run.
+
+### The metric that matters was never measured
+
+Under clustering, 70 percent of parents sit in the target's module and the
+statistic says which at AUROC 0.905. A hit therefore narrows the search from
+V candidates to the module's members. That is search-space reduction, this
+project's own framing, and it is the quantity a deployment would use. It was
+not scored, because the protocol posed localisation as a ranking problem
+instead. Both arms answer the ranking question; only clustering delivers a
+useful reduction, because the random arm's hits are rare.
+
+That is a pre-registration for another day, not a claim here.
+
+### Not established
+
+Two widths, two noise levels, three seeds, one generating family, redundancy
+0. The cluster count was fixed at V/6, which matches the generator's source
+count and is an advantage handed to the method. Clustered modules are very
+uneven, standard deviation 4.55 against a mean of 6.0, so "search within the
+module" is not uniformly a six-candidate reduction. Detection saturates at
+V=30 noise 0 and collapses at V=60 noise 0.05, so H1 was informative in only
+part of the grid.

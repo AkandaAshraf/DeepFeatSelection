@@ -3735,3 +3735,88 @@ Rules added:
      condition failed to fire on a test that was never hard enough. State
      what fraction of the positive class a manipulation actually reaches, and
      test within cells when it reaches only some.
+
+2026-09-06  NESTED CODES (HIERARCHY): EMPTY by the declared rule, and the
+control could not have failed. Pre-registration paper/hierarchy_protocol.md,
+committed before the script was written, amended once before the full run and
+after one smoke cell with the full smoke output recorded. EXPLORATORY, no
+adoption possible. 12 cells x 4 arms, 9.8 min, V in {30,60}, redundancy 0.
+
+WHY A HIERARCHY. The 2026-09-05 flat merge was rejected because one shared
+decoder reported where it spent capacity rather than what each target gained
+(Rule 127). A hierarchy composes the approaches without that error: only the
+CODES nest, every level keeps its own per-target ridge readout. Three levels:
+own lags, a module code with the target's own columns zeroed, and the global
+code as the incumbent computes it.
+
+THE AMENDMENT, and it was our error under Rule 123. A smoke cell exposed two
+arithmetic defects in the declared localisation metric. The oracle builds
+modules from the parent map so every parent is in-module, base rate 1.000 and
+no negatives exist to score. And average precision caps lift at 1/base_rate,
+so with clustering at 76% in-module the ceiling was 1.32 while the bar was
+1.5: the deployable arm could not have passed whatever it measured. Metric
+changed to AUROC, bar 0.65, with the full smoke output recorded in the
+protocol so the change is checkable.
+
+  DETECTION, average precision, sources positive (chance 0.167)
+  V   noise    FLAT   HIER-CLUST   HIER-RAND   HIER-TRUE
+  30  0.00    0.895     0.895        0.951       0.976
+  30  0.05    0.781     0.819        0.681       0.757
+  60  0.00    0.973     0.964        0.970       0.990
+  60  0.05    0.387     0.391        0.484       0.527
+
+H1 HOLDS at 0.767 against FLAT's 0.759, so the hierarchy costs nothing in
+detection where the flat merge cost everything. H5 holds for every arm. H2
+holds at AUROC 0.905. H3 ALSO CLEARS at 0.929, firing EMPTY.
+
+THE CONTROL COULD NOT HAVE FAILED. The target "is my parent in MY module" is
+defined relative to whichever partition the arm chose, so randomising the
+partition changes the QUESTION rather than removing the signal. A sound
+mechanism answers both correctly. The random arm's HIGHER AUROC reflects an
+easier discrimination: 8-13% of parents in-module makes the positives rare
+and distinctive, against 68-70% under clustering where the negatives are rare.
+
+WHAT DID DISCRIMINATE, declared before the remaining 11 cells ran. Module
+share, the fraction of total inflow captured at the module level: RAND 0.382,
+CLUST 0.923, TRUE 1.127, the predicted ordering. Not a width artefact - mean
+module size is 6.0 in every arm (hierarchy_controls.py). Graded, per Rule
+125: a module holding more of its members' parents captures more of their
+inflow, rho +0.555 within clustering, +0.277 within RANDOM modules at
+p = 0.009, +0.605 pooled over 157 modules at p = 5e-17.
+
+THE ORACLE'S SYSTEM-LEVEL EXCESS IS NEGATIVE, -0.00052. With a perfect module
+the global code becomes a liability whose extra parameters cost held-out
+accuracy. That is the signature of a sufficient conditioning set and the
+cleanest number in the run.
+
+THE METRIC THAT MATTERS WAS NEVER MEASURED. Under clustering 70% of parents
+sit in the target's module and the statistic says which at AUROC 0.905, so a
+hit narrows the search from V candidates to the module. That is search-space
+reduction, this project's own framing and what a deployment would use. Both
+arms answer the ranking question; only clustering delivers a useful reduction
+because the random arm's hits are rare. Pre-registration for another day.
+
+NOT ESTABLISHED. Two widths, two noise levels, three seeds, one family. The
+cluster count was fixed at V/6, matching the generator's source count, an
+advantage handed to the method. Clustered modules are very uneven, sd 4.55
+against mean 6.0, so search-within-module is not uniformly a six-candidate
+reduction. Detection saturates at V=30 noise 0 and collapses at V=60 noise
+0.05, so H1 was informative in only part of the grid.
+
+Rules added:
+
+129. A CONTROL THAT REDEFINES THE QUESTION IS NOT A CONTROL. When the target
+     is defined relative to a choice the arm makes, randomising that choice
+     changes what is being asked rather than removing the signal, and a sound
+     mechanism answers both versions correctly. Here "is my parent in my
+     module" was scored against modules the arm itself chose, so the random
+     control tested whether the mechanism works at all rather than whether it
+     depends on structure. Design a control to break the mechanism, not to
+     relabel the target.
+
+130. SCORE THE QUANTITY THE DEPLOYMENT WOULD USE. Localisation was posed as a
+     ranking problem when the deployable question is how far the search space
+     shrinks. Both arms answered the ranking question and only one delivers a
+     useful reduction, so the declared metric could not separate what the
+     application separates. Ask what someone would do with the number before
+     choosing how to score it.
