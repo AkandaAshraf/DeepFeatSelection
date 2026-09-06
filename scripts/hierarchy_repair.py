@@ -1,0 +1,518 @@
+"""Repair of the 2026-09-06 hierarchy result: three defects, one script.
+
+Pre-registration: paper/hierarchy_repair_protocol.md, committed before this
+was written. BOUNDED DIAGNOSTIC on the ORIGINAL 12 cells and ORIGINAL seeds
+-- not a reopening of the rejected architecture, not a confirmatory study.
+No verdict word (adopt/reject/close/width/repaired) appears in this script's
+output; see the protocol's "Language" section for what is licensed instead.
+
+Three repairs, five arms:
+
+  FLAT               unchanged incumbent. Fidelity-checked against the
+                     archived run (raw array AND summary, not summary alone).
+  HIER-CLUST-TRAIN   repair 1: module clustering fit on TRAINING RAW ROWS
+                     ONLY (the same numeric cutoff the encoder's own train
+                     slice uses), never on validation or test rows.
+  HIER-RAND-BAL      the archived control, unchanged: balanced random
+                     modules, equal sizes.
+  HIER-RAND-SIZED    repair 2's control: random modules whose SIZE VECTOR
+                     matches HIER-CLUST-TRAIN's in that cell (built from the
+                     new train-only clustering, not the archive), targets
+                     assigned to those sizes at random.
+  HIER-TRUE          unchanged oracle from the true parent map.
+
+Repair 3 (statistics) is not a code change to the readout; it is how results
+are aggregated in `report()`: within-cell correlations only, no pooling
+across modules or cells, no p-value from three seeds.
+
+    python scripts/hierarchy_repair.py
+"""
+
+from __future__ import annotations
+
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import (adjusted_rand_score, average_precision_score,
+                             roc_auc_score)
+from scipy.stats import spearmanr
+
+sys.path.insert(0, str(Path(__file__).parent))
+from boundary_map import (BATCH, DEV, E, EPOCHS, MASK, embed,  # noqa: E402
+                          make_system, poly3, ridge_r2)
+from wormwideweb_gate import MaskedAE  # noqa: E402
+
+ARCHIVE = Path("ExpOutput/hierarchy")           # read-only, never written
+OUT = Path("ExpOutput/hierarchy_repair")        # new directory
+N, COUPLING = 4000, 0.20
+WIDTHS = (30, 60)
+NOISES = (0.0, 0.05)
+SEEDS = (0, 1, 2)
+MOD_EPOCHS = 12
+FLAT_AP_TOL = 0.03
+FLAT_ARR_TOL = 1e-6
+SHARE_DENOM_EPS = 1e-5
+
+ARMS = ["FLAT", "HIER-CLUST-TRAIN", "HIER-RAND-BAL", "HIER-RAND-SIZED",
+       "HIER-TRUE"]
+
+
+# --------------------------------------------------------------- shared
+
+def train_code(zs, tr, d_in, b, seed, epochs=EPOCHS):
+    """One masked autoencoder, returning the net and full-length codes.
+    Identical to the archived implementation -- nothing about the encoder
+    changes in this repair."""
+    v = d_in // E
+    torch.manual_seed(seed)
+    net = MaskedAE(d_in, b).to(DEV)
+    opt = torch.optim.Adam(net.parameters(), lr=3e-3)
+    g = torch.Generator().manual_seed(seed)
+    ztr = torch.as_tensor(zs[tr], device=DEV)
+    for _ in range(epochs):
+        perm = torch.randperm(ztr.shape[0], generator=g)
+        for i in range(0, len(perm), BATCH):
+            bt = ztr[perm[i:i + BATCH]]
+            msk = torch.rand(bt.shape[0], v, device=DEV) < MASK
+            mc = msk.repeat_interleave(E, dim=1)
+            loss = ((net(bt.masked_fill(mc, 0.0)) - bt)[mc] ** 2).mean()
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+    with torch.no_grad():
+        return net, net.enc(torch.as_tensor(zs, device=DEV)).cpu().numpy()
+
+
+# ------------------------------------------------------- module assignment
+
+def cluster_train_only(x_raw: np.ndarray, raw_cutoff: int, m: int) -> np.ndarray:
+    """Repair 1. Correlate diffs of x_raw[:raw_cutoff] ONLY -- validation and
+    test raw rows never enter this computation, unlike the archived
+    `modules_for`, which correlated over the full recording."""
+    d = np.diff(x_raw[:raw_cutoff], axis=0)
+    c = np.nan_to_num(np.corrcoef(d.T), nan=0.0)
+    return AgglomerativeClustering(
+        n_clusters=m, metric="precomputed", linkage="average"
+    ).fit_predict(1.0 - np.abs(c))
+
+
+def balanced_random(Vt: int, m: int, rng: np.random.Generator) -> np.ndarray:
+    lab = np.arange(Vt) % m
+    rng.shuffle(lab)
+    return lab
+
+
+def sized_random(sizes: np.ndarray, Vt: int,
+                 rng: np.random.Generator) -> np.ndarray:
+    """Repair 2's control. A random partition whose size MULTISET matches
+    `sizes` exactly: which targets get which size, and which size lands in
+    which module id, are both randomised -- only the width distribution is
+    matched, never a specific target's width (stated in the protocol)."""
+    order = rng.permutation(len(sizes))
+    perm = rng.permutation(Vt)
+    lab = np.empty(Vt, int)
+    pos = 0
+    for new_id, orig_id in enumerate(order):
+        s = int(sizes[orig_id])
+        lab[perm[pos:pos + s]] = new_id
+        pos += s
+    return lab
+
+
+def true_modules(Vt: int, m: int, parent: np.ndarray, n_src: int) -> np.ndarray:
+    lab = np.empty(Vt, int)
+    lab[:n_src] = np.arange(n_src) % m
+    lab[n_src:] = [lab[p] for p in parent]
+    return lab
+
+
+def size_stats(lab: np.ndarray, Vt: int, is_driven: np.ndarray) -> dict:
+    sizes = np.bincount(lab, minlength=int(lab.max()) + 1)
+    per_target = sizes[lab]
+    return dict(
+        unweighted_mean=float(sizes.mean()),
+        target_weighted=float((sizes.astype(float) ** 2).sum() / Vt),
+        driven_weighted=float(per_target[is_driven].mean()),
+        sizes=sizes)
+
+
+# ---------------------------------------------------------- module readout
+
+def module_readout(lab, zs, own, lead, base, tr, tr_i, te_i, sys_code, Vt,
+                   seed_tag):
+    """Given a partition `lab`, train one small encoder per module (module
+    code, target's own columns zeroed) and compute e2/e3 for every target.
+    Identical arithmetic to the archived script; only which partition is
+    passed in differs by arm."""
+    m = int(lab.max()) + 1
+    e2 = np.zeros(Vt)
+    e3 = np.zeros(Vt)
+    widths = np.zeros(m, dtype=int)
+    for mod in range(m):
+        members = np.where(lab == mod)[0]
+        if len(members) == 0:
+            continue
+        b = max(4, 2 * len(members))            # the archived formula
+        widths[mod] = b
+        cols = np.concatenate([np.arange(j * E, (j + 1) * E)
+                               for j in members])
+        zsm = zs[:, cols]
+        net, _ = train_code(zsm, tr, zsm.shape[1], b,
+                            seed_tag * 1000 + mod, epochs=MOD_EPOCHS)
+        for q in members:
+            zq = zsm.copy()                     # zero q before its module
+            loc = int(np.where(members == q)[0][0])
+            zq[:, loc * E:(loc + 1) * E] = 0.0
+            with torch.no_grad():
+                cq = net.enc(torch.as_tensor(zq, device=DEV)).cpu().numpy()
+            r_om = ridge_r2(
+                np.hstack([own[q][tr_i], cq[tr_i]]), lead[tr_i + 1, q],
+                np.hstack([own[q][te_i], cq[te_i]]), lead[te_i + 1, q])
+            r_oms = ridge_r2(
+                np.hstack([own[q][tr_i], cq[tr_i], sys_code[tr_i]]),
+                lead[tr_i + 1, q],
+                np.hstack([own[q][te_i], cq[te_i], sys_code[te_i]]),
+                lead[te_i + 1, q])
+            e2[q] = r_om - base[q]
+            e3[q] = r_oms - r_om
+    return e2, e3, widths
+
+
+# ------------------------------------------------------ train-only guard
+
+def invariance_test(V: int = 30, noise: float = 0.0, seed: int = 0,
+                    n_trials: int = 3) -> tuple[bool, list[dict]]:
+    """Perturb every raw value AT OR AFTER the train cutoff with independent
+    noise, recompute HIER-CLUST-TRAIN's clustering, and require the
+    resulting partition to be IDENTICAL (ARI = 1.0) to the unperturbed run's.
+    Runs on CPU only (AgglomerativeClustering), no torch/GPU touched.
+    Repeated with several perturbation draws, not just one, since a single
+    lucky draw passing would be weak evidence."""
+    x, _, _ = make_system(N, V, COUPLING, 0, seed)
+    if noise:
+        x = x + noise * np.random.default_rng(seed + 777).standard_normal(
+            x.shape)
+    Vt = x.shape[1]
+    m = max(2, V // 6)
+    mrows = embed(x).shape[0]
+    raw_cutoff = int(0.6 * mrows)
+
+    base_lab = cluster_train_only(x, raw_cutoff, m)
+    results = []
+    all_ok = True
+    for trial in range(n_trials):
+        xp = x.copy()
+        rng = np.random.default_rng(9000 + trial)
+        xp[raw_cutoff:] += rng.standard_normal(xp[raw_cutoff:].shape) * 5.0
+        pert_lab = cluster_train_only(xp, raw_cutoff, m)
+        ari = float(adjusted_rand_score(base_lab, pert_lab))
+        ok = ari == 1.0
+        all_ok &= ok
+        results.append(dict(trial=trial, ari=ari, ok=ok))
+    return all_ok, results
+
+
+# ------------------------------------------------------------------ cell
+
+def cell(V: int, noise: float, seed: int) -> tuple[list[dict], dict]:
+    x, is_driven, is_source = make_system(N, V, COUPLING, 0, seed)
+    Vt = x.shape[1]
+    n_src = max(3, V // 6)
+    rng_g = np.random.default_rng(seed)
+    _ = rng_g.uniform(0.2, 0.8, V)
+    _ = rng_g.uniform(3.6, 3.9, V)
+    parent = rng_g.integers(0, n_src, V - n_src)
+    if noise:
+        x = x + noise * np.random.default_rng(seed + 777).standard_normal(
+            x.shape)
+
+    emb = embed(x)
+    mrows = emb.shape[0]
+    a, bnd = int(0.6 * mrows), int(0.8 * mrows)
+    raw_cutoff = a                     # the protocol's raw/train cutoff
+    tr = slice(0, a)
+    tr_i, te_i = np.arange(0, a - 1), np.arange(bnd, mrows - 1)
+    mu, sd = emb[tr].mean(0), emb[tr].std(0) + 1e-12
+    zs = np.clip(np.nan_to_num((emb - mu) / sd), -20, 20).astype(np.float32)
+    lead = zs[:, [j * E for j in range(Vt)]]
+    own = [poly3(zs[:, q * E:(q + 1) * E]) for q in range(Vt)]
+    base = np.array([ridge_r2(own[q][tr_i], lead[tr_i + 1, q],
+                              own[q][te_i], lead[te_i + 1, q])
+                     for q in range(Vt)])
+
+    t0 = time.time()
+    _, sys_code = train_code(zs, tr, zs.shape[1], 2 * V, seed * 100)
+    t_sys = time.time() - t0
+
+    flat = np.array([
+        ridge_r2(np.hstack([own[q][tr_i], sys_code[tr_i]]), lead[tr_i + 1, q],
+                 np.hstack([own[q][te_i], sys_code[te_i]]), lead[te_i + 1, q])
+        - base[q] for q in range(Vt)])
+
+    # ---- FLAT FIDELITY GUARD against the archived run, same cell
+    guard = dict(V=V, noise=noise, seed=seed, archive_found=False,
+                ap_diff=np.nan, arr_max_abs_diff=np.nan,
+                ap_ok=None, arr_ok=None)
+    arch_path = ARCHIVE / f"raw_V{V}_nz{noise}_s{seed}.npz"
+    if arch_path.exists():
+        za = np.load(arch_path)
+        arch_flat = za["FLAT"]
+        arch_ap = float(average_precision_score(za["is_source"], -arch_flat))
+        new_ap = float(average_precision_score(is_source, -flat))
+        arr_diff = float(np.max(np.abs(flat - arch_flat)))
+        guard.update(archive_found=True,
+                     ap_diff=abs(new_ap - arch_ap),
+                     arr_max_abs_diff=arr_diff,
+                     ap_ok=bool(abs(new_ap - arch_ap) <= FLAT_AP_TOL),
+                     arr_ok=bool(arr_diff <= FLAT_ARR_TOL))
+
+    m = max(2, V // 6)
+    rows = [dict(V=V, noise=noise, seed=seed, arm="FLAT",
+                 ap_source=float(average_precision_score(is_source, -flat)),
+                 ap_driven=float(average_precision_score(is_driven, flat)),
+                 mod_share=np.nan, mean_e2_driven=np.nan,
+                 mean_e3_driven=np.nan, share_excluded=False, secs=t_sys)]
+    raw = {"FLAT": flat, "is_driven": is_driven, "is_source": is_source,
+          "parent": parent, "raw_cutoff": raw_cutoff}
+    size_rows = []
+    graded_rows = []       # per-module rows for the within-cell Spearman
+
+    # HIER-CLUST-TRAIN first: HIER-RAND-SIZED needs its size vector
+    lab_clust = cluster_train_only(x, raw_cutoff, m)
+    e2c, e3c, wc = module_readout(lab_clust, zs, own, lead, base, tr, tr_i,
+                                  te_i, sys_code, Vt, seed)
+    clust_sizes = np.bincount(lab_clust, minlength=m)
+
+    partitions = {
+        "HIER-CLUST-TRAIN": (lab_clust, e2c, e3c, wc),
+    }
+    t0 = time.time()
+    rng = np.random.default_rng(seed + 31)
+    lab_bal = balanced_random(Vt, m, rng)
+    e2b, e3b, wb = module_readout(lab_bal, zs, own, lead, base, tr, tr_i,
+                                  te_i, sys_code, Vt, seed)
+    partitions["HIER-RAND-BAL"] = (lab_bal, e2b, e3b, wb)
+
+    lab_sz = sized_random(clust_sizes, Vt, np.random.default_rng(seed + 41))
+    e2s, e3s, ws = module_readout(lab_sz, zs, own, lead, base, tr, tr_i,
+                                  te_i, sys_code, Vt, seed)
+    partitions["HIER-RAND-SIZED"] = (lab_sz, e2s, e3s, ws)
+
+    lab_true = true_modules(Vt, m, parent, n_src)
+    e2t, e3t, wt = module_readout(lab_true, zs, own, lead, base, tr, tr_i,
+                                  te_i, sys_code, Vt, seed)
+    partitions["HIER-TRUE"] = (lab_true, e2t, e3t, wt)
+    secs_hier = time.time() - t0
+
+    for arm, (lab, e2, e3, widths) in partitions.items():
+        tot2 = float(e2[is_driven].mean())
+        tot3 = float(e3[is_driven].mean())
+        denom = tot2 + tot3
+        share_excluded = abs(denom) < SHARE_DENOM_EPS
+        mod_share = np.nan if share_excluded else float(tot2 / denom)
+        total = e2 + e3
+        rows.append(dict(
+            V=V, noise=noise, seed=seed, arm=arm,
+            ap_source=float(average_precision_score(is_source, -total)),
+            ap_driven=float(average_precision_score(is_driven, total)),
+            mod_share=mod_share, mean_e2_driven=tot2, mean_e3_driven=tot3,
+            share_excluded=share_excluded, secs=secs_hier / 4))
+        sz = size_stats(lab, Vt, is_driven)
+        size_rows.append(dict(V=V, noise=noise, seed=seed, arm=arm,
+                              unweighted_mean=sz["unweighted_mean"],
+                              target_weighted=sz["target_weighted"],
+                              driven_weighted=sz["driven_weighted"],
+                              n_modules=len(sz["sizes"]),
+                              min_width=int(widths[widths > 0].min())
+                              if (widths > 0).any() else 0,
+                              max_width=int(widths.max())))
+        raw[arm + "_e2"] = e2
+        raw[arm + "_e3"] = e3
+        raw[arm + "_lab"] = lab
+        raw[arm + "_widths"] = widths
+
+        # per-module rows for the GRADED within-cell correlation
+        for mod in range(int(lab.max()) + 1):
+            members = np.where(lab == mod)[0]
+            drv = members[is_driven[members]]
+            if len(drv) == 0:
+                continue
+            # drv holds DRIVEN indices only (is_driven is false for every
+            # source), so every q in drv satisfies q >= n_src and
+            # parent[q - n_src] is always a valid lookup.
+            frac_in = float(np.mean(
+                [lab[parent[q - n_src]] == mod for q in drv]))
+            m_tot2, m_tot3 = float(e2[drv].mean()), float(e3[drv].mean())
+            m_denom = m_tot2 + m_tot3
+            excluded = abs(m_denom) < SHARE_DENOM_EPS or len(drv) < 2
+            m_share = np.nan if excluded else float(m_tot2 / m_denom)
+            graded_rows.append(dict(
+                V=V, noise=noise, seed=seed, arm=arm, module=mod,
+                n_driven=len(drv), frac_parent_in=frac_in, share=m_share,
+                excluded=excluded))
+
+    # D2: ARI between archived HIER-CLUST (transductive) and the new
+    # HIER-CLUST-TRAIN partition, descriptive only
+    d2_ari = np.nan
+    if arch_path.exists():
+        za = np.load(arch_path)
+        if "HIER-CLUST_lab" in za:
+            d2_ari = float(adjusted_rand_score(za["HIER-CLUST_lab"], lab_clust))
+
+    np.savez_compressed(OUT / f"raw_V{V}_nz{noise}_s{seed}.npz", **raw)
+    return rows, dict(guard=guard, sizes=size_rows, graded=graded_rows,
+                      d2_ari=d2_ari)
+
+
+# ------------------------------------------------------------------ main
+
+def run_invariance_precheck() -> bool:
+    print("TRAIN-ONLY INVARIANCE PRECHECK (CPU only, run before the main "
+         "script)")
+    ok, trials = invariance_test()
+    for t in trials:
+        print(f"   trial {t['trial']}: ARI={t['ari']:.6f}  "
+             f"{'PASS' if t['ok'] else 'FAIL'}")
+    print(f"   -> {'ALL PASS' if ok else 'FAILURE: clustering is not '
+         'train-only'}\n")
+    return ok
+
+
+def main() -> int:
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    if not run_invariance_precheck():
+        print("VOID per protocol: the train-only invariance test failed, "
+             "so defect 1 is not repaired. Not proceeding.")
+        return 1
+
+    print(f"device: {DEV}   BOUNDED DIAGNOSTIC, original 12 cells, "
+         f"original seeds\n")
+    recs, guards, size_recs, graded_recs, d2_recs = [], [], [], [], []
+    t0 = time.time()
+    for V in WIDTHS:
+        for nz in NOISES:
+            for s in SEEDS:
+                r, extra = cell(V, nz, s)
+                recs += r
+                guards.append(extra["guard"])
+                size_recs += extra["sizes"]
+                graded_recs += extra["graded"]
+                d2_recs.append(dict(V=V, noise=nz, seed=s,
+                                    d2_ari=extra["d2_ari"]))
+                g = extra["guard"]
+                print(f"  V={V} noise={nz:<5} seed={s}   "
+                     f"FLAT-guard[ap_ok={g['ap_ok']} arr_ok={g['arr_ok']}]"
+                     f"   ({(time.time()-t0)/60:.1f}m)", flush=True)
+                pd.DataFrame(recs).to_csv(OUT / "cells.csv", index=False)
+                pd.DataFrame(guards).to_csv(OUT / "flat_guard.csv",
+                                           index=False)
+                pd.DataFrame(size_recs).to_csv(OUT / "sizes.csv", index=False)
+                pd.DataFrame(graded_recs).to_csv(OUT / "graded.csv",
+                                                index=False)
+                pd.DataFrame(d2_recs).to_csv(OUT / "d2_ari.csv", index=False)
+
+    d = pd.DataFrame(recs)
+    gdf = pd.DataFrame(guards)
+    print(f"\n({(time.time()-t0)/60:.1f} min)\n")
+
+    print("FLAT FIDELITY GUARD (against the archived run, same 12 cells)")
+    found = gdf[gdf.archive_found]
+    if len(found):
+        print(f"   archive found for {len(found)}/{len(gdf)} cells")
+        print(f"   AP guard:  {'ALL PASS' if found.ap_ok.all() else 'FAILURES PRESENT'}"
+             f"  (max |diff| {found.ap_diff.max():.4f}, tol {FLAT_AP_TOL})")
+        print(f"   ARR guard: {'ALL PASS' if found.arr_ok.all() else 'FAILURES PRESENT'}"
+             f"  (max |diff| {found.arr_max_abs_diff.max():.2e}, tol "
+             f"{FLAT_ARR_TOL:.0e})")
+        if not (found.ap_ok.all() and found.arr_ok.all()):
+            print("   VOID per protocol: FLAT fidelity guard failed. "
+                 "Comparisons below are not meaningful until this is found.")
+    else:
+        print("   no archived cells found to compare against")
+
+    print("\nDETECTION: average precision, sources positive (chance 0.167)")
+    print("   " + d.pivot_table(index=["V", "noise"], columns="arm",
+                                values="ap_source")[ARMS].round(3)
+         .to_string().replace("\n", "\n   "))
+
+    sdf = pd.DataFrame(size_recs)
+    print("\nTARGET-WEIGHTED MODULE SIZE (first-class table, per Rule 131)")
+    print("   " + sdf.groupby("arm")[["unweighted_mean", "target_weighted",
+                                      "driven_weighted"]].mean()
+         .round(3).to_string().replace("\n", "\n   "))
+    print("\nACTUAL MODULE BOTTLENECK WIDTHS (min/max seen, per arm)")
+    print("   " + sdf.groupby("arm")[["min_width", "max_width"]].agg(
+        ["min", "max"]).to_string().replace("\n", "\n   "))
+
+    h = d[d.arm != "FLAT"]
+    print("\nMODULE SHARE (unbounded ratio; NaN rows are predefined "
+         "exclusions)")
+    excl = h.groupby("arm").mean_e2_driven.apply(
+        lambda s: int(s.isna().sum()))
+    print(f"   share-undefined cells excluded, by arm: "
+         f"{excl.to_dict()}")
+    print("   " + h.pivot_table(index=["V", "noise"], columns="arm",
+                                values="mod_share").round(3)
+         .to_string().replace("\n", "\n   "))
+
+    print("\nDESCRIPTIVE COMPARISON: does clustering after matching the "
+         "aggregate size distribution attenuate, persist, or reverse "
+         "against the size-matched random control?")
+    piv = h.pivot_table(index=["V", "noise", "seed"], columns="arm",
+                        values="mod_share")
+    comparable = piv.dropna(subset=["HIER-CLUST-TRAIN", "HIER-RAND-SIZED"])
+    persists = int((comparable["HIER-CLUST-TRAIN"]
+                   > comparable["HIER-RAND-SIZED"]).sum())
+    reverses = int((comparable["HIER-CLUST-TRAIN"]
+                   < comparable["HIER-RAND-SIZED"]).sum())
+    print(f"   HIER-CLUST-TRAIN > HIER-RAND-SIZED in {persists} of "
+         f"{len(comparable)} comparable cells (persists)")
+    print(f"   HIER-CLUST-TRAIN < HIER-RAND-SIZED in {reverses} of "
+         f"{len(comparable)} comparable cells (reverses)")
+    print("   No pooled test statistic, no adopt/reject/close/repaired "
+         "wording -- descriptive counts only, per the protocol's Language "
+         "section.")
+
+    gr = pd.DataFrame(graded_recs)
+    gr_ok = gr[~gr.excluded].dropna(subset=["frac_parent_in", "share"])
+    print(f"\nGRADED (within cell, per-module exclusions: "
+         f"{int(gr.excluded.sum())} of {len(gr)} modules)")
+    by_seed = []
+    for (arm, seed), g in gr_ok.groupby(["arm", "seed"]):
+        cell_rhos = []
+        for (V, nz), gg in g.groupby(["V", "noise"]):
+            if gg.frac_parent_in.nunique() > 1 and len(gg) >= 3:
+                r, _ = spearmanr(gg.frac_parent_in, gg.share)
+                cell_rhos.append(r)
+        if cell_rhos:
+            by_seed.append(dict(arm=arm, seed=seed,
+                                median_rho=float(np.nanmedian(cell_rhos)),
+                                n_cells=len(cell_rhos)))
+    bsdf = pd.DataFrame(by_seed)
+    if len(bsdf):
+        print("   " + bsdf.pivot_table(index="seed", columns="arm",
+                                       values="median_rho").round(3)
+             .to_string().replace("\n", "\n   "))
+    print("   No pooled p-value across modules or seeds, per Rule 131 / "
+         "repair 3.")
+
+    d2 = pd.DataFrame(d2_recs)
+    print("\nD2 (descriptive): ARI between archived transductive partition "
+         "and the new train-only one, per cell")
+    print(f"   median {d2.d2_ari.median():.3f}   "
+         f"range [{d2.d2_ari.min():.3f}, {d2.d2_ari.max():.3f}]")
+
+    print("\nNo adopt/reject/close/width-as-verdict/repaired language "
+         "follows. This diagnostic supports only the descriptive "
+         "statements above.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
