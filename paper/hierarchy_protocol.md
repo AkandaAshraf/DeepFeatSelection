@@ -142,3 +142,68 @@ Void if any readout is shared across targets; if module assignment for
 HIER-CLUST uses any ground truth; if the grid, seeds, noise levels or
 cluster count change after any result is seen; if H2 is judged on any arm
 other than HIER-CLUST; or if the random-module control is dropped.
+
+---
+
+## AMENDMENT, 2026-09-06, before the full run and after ONE smoke cell
+
+A single smoke cell (V=30, noise 0, seed 0) was run to price the experiment
+and it exposed a metric specification error. The amendment rests on
+arithmetic that was available before any data, and it is recorded here with
+what was actually observed so the change is checkable rather than trusted.
+
+WHAT WAS OBSERVED IN THAT CELL, in full:
+
+  arm          AP_src   loc_base   loc_lift    e2        e3
+  FLAT         1.000       --         --        --        --
+  HIER-CLUST   1.000     0.760      1.31     +0.00231  +0.00141
+  HIER-RAND    1.000     0.080     12.50     +0.00034  +0.00285
+  HIER-TRUE    1.000     1.000       nan     +0.00341  +0.00056
+
+TWO DEFECTS, both arithmetic and both my error under Rule 123.
+
+  1. THE ORACLE'S LOCALISATION IS UNDEFINED BY CONSTRUCTION. HIER-TRUE builds
+     modules from the parent map, so every driven channel's parent is in its
+     module, the base rate is 1.000 and there are no negatives. H4 as written
+     cannot be computed for any dataset.
+  2. THE BAR SAT ABOVE THE CEILING. Average precision is capped at 1.0, so
+     lift is capped at 1/base_rate. With clustering putting 76% of parents
+     in-module the ceiling is 1.32x, and H2 demanded 1.5x. HIER-CLUST could
+     not have passed H2 whatever it measured. Base rates also differ across
+     arms by an order of magnitude, 0.08 to 1.00, so lift is not comparable
+     between arms in the first place.
+
+AMENDED METRIC for localisation, among driven channels only:
+
+  PRIMARY   AUROC of (excess_2 - excess_3) for "parent is in my module".
+            Chance is 0.5 whatever the base rate, which is what makes the
+            arms comparable when their base rates differ tenfold. Positive
+            and negative counts are reported per cell so the imbalance the
+            user rightly flagged stays visible.
+  BAR       AUROC >= 0.65 for H2, and the same bar for the H3 control.
+  SECONDARY average precision with its per-cell base rate, retained because
+            AUROC flatters an imbalanced problem and both numbers together
+            say more than either.
+  H4        BECOMES DESCRIPTIVE. The oracle's localisation is undefined, so
+            HIER-TRUE serves only as the upper bound on detection and on
+            module-level informativeness.
+
+ADDED SECONDARY, and it was suggested by the smoke cell rather than declared
+before it. Labelled accordingly.
+
+  MODULE SHARE = mean excess_2 / (mean excess_2 + mean excess_3) on driven
+  channels: what fraction of the total inflow the module level captures.
+  It is defined for every arm including the oracle, which is what the
+  localisation metric is not.
+
+  PREDICTION, fixed now and before the remaining 11 cells: the ordering is
+  HIER-RAND < HIER-CLUST < HIER-TRUE. Better modules should capture more of
+  the drive at the module level. The smoke cell gives 0.11, 0.62 and 0.86,
+  and one cell is not a result; the prediction is that the ordering survives
+  12 cells, two widths and two noise levels.
+
+NOT AMENDED: the arms, the grid, the seeds, the cluster count, H1's
+disqualifying non-inferiority clause, and H5's per-arm guard. Detection
+saturated at 1.000 in the smoke cell, so H1 may prove uninformative at
+V=30 and noise 0; that is a property of the cell, not a reason to change the
+clause, and the harder cells are already in the declared grid.
