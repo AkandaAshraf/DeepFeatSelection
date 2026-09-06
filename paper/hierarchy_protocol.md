@@ -294,7 +294,7 @@ part of the grid.
 
 ---
 
-## CORRECTION, 2026-09-06, raised by Codex (task C01), verified independently
+## CORRECTION, 2026-09-06, raised in independent review, re-derived from artifacts
 
 Two defects in the result above are confirmed by re-derivation from the
 archived NPZ files, not by argument. Per Rule 116 this is appended rather than

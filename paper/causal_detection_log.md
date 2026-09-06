@@ -3874,8 +3874,8 @@ calibrated detection.
 WHAT THE AUDIT DID NOT TOUCH: no measurement changed, and no empirical claim
 was withdrawn. The repairs narrow the theory to what the evidence supports.
 
-2026-09-06  HIERARCHY RESULT CORRECTED (task C01, raised by Codex, verified
-independently). Two defects in the 2026-09-06 nested-codes run confirmed by
+2026-09-06  HIERARCHY RESULT CORRECTED. An independent review raised two
+defects in the 2026-09-06 nested-codes run confirmed by
 re-deriving directly from the 12 archived NPZ files.
 
 THE SIZE CONTROL WAS VACUOUS. "Mean module size is 6.0 in every arm" used the
