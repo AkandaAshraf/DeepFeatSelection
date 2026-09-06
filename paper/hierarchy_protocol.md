@@ -291,3 +291,46 @@ uneven, standard deviation 4.55 against a mean of 6.0, so "search within the
 module" is not uniformly a six-candidate reduction. Detection saturates at
 V=30 noise 0 and collapses at V=60 noise 0.05, so H1 was informative in only
 part of the grid.
+
+---
+
+## CORRECTION, 2026-09-06, raised by Codex (task C01), verified independently
+
+Two defects in the result above are confirmed by re-derivation from the
+archived NPZ files, not by argument. Per Rule 116 this is appended rather than
+edited into the original text, alongside what depended on it.
+
+**The size control was vacuous.** The claim above, "mean module size is 6.0 in
+every arm, so the ordering is not a width artefact," compared UNWEIGHTED mean
+module size, which equals $V/m$ for every partition of $V$ items into $m$
+groups and therefore reads 6.0 before any data exists. It could not have
+discriminated. The quantity that matters is the width each TARGET sits in:
+
+  arm          unweighted mean   target-weighted   driven-weighted
+  CLUST             6.000            9.972             9.742
+  RAND              6.000            6.000             6.000
+  TRUE              6.000            6.706             6.847
+
+Clustered modules are lopsided (`[16, 9, 2, 2, 1]` at V=30 seed 0 against
+random's `[6, 6, 6, 6, 6]`), so a clustered target receives a module code about
+1.66x wider on average. **The module-share ordering RAND < CLUST < TRUE is
+confounded with module width and the "not a width artefact" claim is
+WITHDRAWN.** Whether the ordering survives width-matching is now the open
+question, addressed in paper/hierarchy_repair_protocol.md.
+
+**The pooled graded-control p-value is invalid.** The reported
+$\rho = +0.605$, $p = 5\times10^{-17}$ over 157 pooled modules treated modules
+within a cell as independent observations. They are not: modules in a cell
+share one generated system, one encoder and one train/validation/test split.
+This is Rule 101's error in a new place. The correlation itself may still be
+real; the stated significance is not defensible and is withdrawn. The repair
+protocol tests within-cell instead.
+
+**Clustering was also transductive**, fit on the full recording rather than
+the training segment, which is a third defect in the same run and is repaired
+in the same protocol.
+
+**What is NOT withdrawn:** H1 (detection cost), H5 (module-level
+informativeness), the oracle's negative system-level excess, and the
+qualitative observation that a graded relationship exists — only its stated
+significance.

@@ -3873,3 +3873,53 @@ calibrated detection.
 
 WHAT THE AUDIT DID NOT TOUCH: no measurement changed, and no empirical claim
 was withdrawn. The repairs narrow the theory to what the evidence supports.
+
+2026-09-06  HIERARCHY RESULT CORRECTED (task C01, raised by Codex, verified
+independently). Two defects in the 2026-09-06 nested-codes run confirmed by
+re-deriving directly from the 12 archived NPZ files.
+
+THE SIZE CONTROL WAS VACUOUS. "Mean module size is 6.0 in every arm" used the
+UNWEIGHTED mean, which equals V/m for any partition and therefore reads 6.0
+before any data exists - it could not have discriminated. The quantity that
+matters is the width each TARGET sits in:
+
+  arm          unweighted mean   target-weighted   driven-weighted
+  CLUST             6.000            9.972             9.742
+  RAND              6.000            6.000             6.000
+  TRUE              6.000            6.706             6.847
+
+Clustered modules are lopsided ([16,9,2,2,1] at V=30 seed 0 against random's
+[6,6,6,6,6]), so a clustered target receives a code about 1.66x wider on
+average. THE MODULE-SHARE ORDERING RAND < CLUST < TRUE IS CONFOUNDED WITH
+WIDTH and the "not a width artefact" claim is WITHDRAWN.
+
+THE POOLED GRADED-CONTROL P-VALUE IS INVALID. rho +0.605, p 5e-17 over 157
+pooled modules treated modules within a cell as independent. They are not:
+modules in a cell share one system, one encoder, one split. RULE 101'S ERROR
+IN A NEW PLACE. The correlation may still be real; the stated significance is
+withdrawn.
+
+A THIRD DEFECT IN THE SAME RUN: clustering was transductive, fit on the full
+recording rather than the training segment.
+
+NOT WITHDRAWN: H1 (detection cost nothing), H5 (module-level informativeness
+in every arm), the oracle's negative system-level excess, and that a graded
+relationship exists at all - only its stated significance and the
+width-artefact conclusion.
+
+All three repaired together in paper/hierarchy_repair_protocol.md, committed
+before any script, with train-only clustering, a size-matched random control
+built from the new (not archived) clustering, and cell-level rather than
+pooled significance. Fresh confirmatory seeds (10,11,12) are held separate
+from the diagnostic rerun of the original seeds (0,1,2).
+
+Rule added:
+
+131. RE-DERIVE A CLAIMED CONTROL FROM THE RAW ARTIFACT BEFORE TRUSTING IT,
+     not just its summary statistic. "Mean size matches" was true and
+     uninformative because the mean of any partition into m equal-ish groups
+     is fixed by V/m; the confound was visible only in the per-target
+     weighting and the size distribution, neither of which the original
+     write-up computed. A control that could not have failed by construction
+     is not a control, and this is the second instance of that error inside a
+     week (see Rule 129).
