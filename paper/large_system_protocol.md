@@ -151,3 +151,23 @@ count or data length is reduced to fit; if the grid, seeds or arms change
 after any result is seen; if a hardware-limited width is described as
 tested; if the provenance preflight is skipped; or if any verdict word
 appears in the writeup.
+
+---
+
+## AMENDMENT, 2026-09-07, before any run
+
+Two definitional corrections found on re-reading the script against this
+document, before any cell was computed. Recorded here rather than silently
+edited because the protocol is the thing the run is held to.
+
+  GPU CAP METRIC. The cap was written as "peak allocated + reserved".
+  PyTorch's reserved pool already contains allocated memory, so that sum
+  double-counts and would trip the 7.0 GB cap at roughly 3.5 GB of real use.
+  The metric is peak RESERVED, which is the true footprint on the card. The
+  cap value is unchanged.
+
+  DEPLOYED-RULE RECALL is reported for FLAT only. The rule is FLAT's own
+  ghost panel threshold; applying that number to the hierarchy arms' total
+  excess, a different statistic with its own null, is not the deployed rule
+  and was never calibrated for it. Hierarchy arms report average precision
+  and module share, as C01 did.
