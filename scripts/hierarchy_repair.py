@@ -471,8 +471,12 @@ def _proc_alive(pid: int) -> bool:
 _LOCK_TOKEN: str | None = None                # ours, in memory only
 
 
-def acquire_lock() -> bool:
+def acquire_lock(what: str = "hierarchy_repair") -> bool:
     """Acquire .agent-lock atomically, or fail closed.
+
+    `what` names the run in the lock file so a reader knows WHICH script
+    holds it; callers importing this from another script must pass their
+    own name, or the lock misreports what is live.
 
     Never unlinks a lock this process does not own. An earlier version
     removed a lock whose pid looked dead, which races: two contenders can
@@ -487,7 +491,7 @@ def acquire_lock() -> bool:
     global _LOCK_TOKEN
     token = uuid.uuid4().hex
     payload = json.dumps({"pid": os.getpid(), "token": token,
-                          "what": "hierarchy_repair", "started": time.time()})
+                          "what": what, "started": time.time()})
     try:
         fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         with os.fdopen(fd, "w") as f:

@@ -397,7 +397,7 @@ def _run() -> int:
     if not provenance_preflight():
         print("Not proceeding: provenance preflight failed.")
         return 1
-    if not HR.acquire_lock():
+    if not HR.acquire_lock(what="large_system"):
         return 1
     print(f"device: {DEV}   caps: GPU {CAP_GPU_MB:.0f} MB, RSS {CAP_RSS_MB:.0f} "
           f"MB, free>={CAP_FREE_MB:.0f} MB, {CAP_CELL_SEC//60} min/cell\n")
