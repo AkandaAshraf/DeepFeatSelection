@@ -34,6 +34,7 @@ import json
 import os
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -436,24 +437,28 @@ def run_invariance_precheck() -> bool:
 
 
 def _proc_alive(pid: int) -> bool:
-    """Windows-safe liveness check without psutil (absent in this venv).
-    OpenProcess on a dead PID fails; STILL_ACTIVE distinguishes a running
-    process from a finished-but-not-reaped handle."""
+    """Liveness, FAILING CLOSED. Anything that is not a definitive 'this pid
+    does not exist' is reported as alive: on Windows OpenProcess can fail
+    with ACCESS_DENIED for a live process owned by another user, and
+    treating that as dead would let a second run seize a held lock."""
     if pid <= 0:
         return False
     if os.name != "nt":
         try:
             os.kill(pid, 0)
             return True
-        except (ProcessLookupError, PermissionError) as exc:
-            return isinstance(exc, PermissionError)
-        except OSError:
+        except ProcessLookupError:
             return False
+        except PermissionError:
+            return True                       # exists, not ours
+        except OSError:
+            return True                       # unknown -> assume alive
     import ctypes
     k = ctypes.windll.kernel32
+    ERROR_INVALID_PARAMETER = 87              # the only "no such pid" answer
     h = k.OpenProcess(0x1000, False, pid)     # PROCESS_QUERY_LIMITED_INFO
     if not h:
-        return False
+        return k.GetLastError() != ERROR_INVALID_PARAMETER
     try:
         code = ctypes.c_ulong()
         if k.GetExitCodeProcess(h, ctypes.byref(code)):
@@ -463,57 +468,69 @@ def _proc_alive(pid: int) -> bool:
         k.CloseHandle(h)
 
 
-def acquire_lock() -> bool:
-    """Atomically acquire .agent-lock, or explain why not.
+_LOCK_TOKEN: str | None = None                # ours, in memory only
 
-    An earlier version only REJECTED existing locks and never created one,
-    so two runs could both pass the check and start together. Ownership is
-    recorded as pid plus this process's own start marker, and a lock is
-    only treated as stale when its pid is verifiably not alive -- a pid
-    alone can be reused by an unrelated process.
+
+def acquire_lock() -> bool:
+    """Acquire .agent-lock atomically, or fail closed.
+
+    Never unlinks a lock this process does not own. An earlier version
+    removed a lock whose pid looked dead, which races: two contenders can
+    both see it as stale, and the second unlink destroys the first's freshly
+    created lock. A lock held by anyone else -- live, dead, or unreadable --
+    stops the run and is left for a human to clear deliberately.
+
+    Ownership is a random token held in memory AND written to the file, so
+    release can prove the file is still the one we created; a pid alone is
+    not enough, since pids are reused.
     """
-    payload = json.dumps({"pid": os.getpid(), "what": "hierarchy_repair",
-                          "started": time.time()})
-    for attempt in (1, 2):
-        try:
-            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            with os.fdopen(fd, "w") as f:
-                f.write(payload)
-            return True
-        except FileExistsError:
-            pass
-        try:
-            info = json.loads(Path(LOCK).read_text())
-            pid = int(info.get("pid", -1))
-        except (OSError, ValueError):
-            print(f"PREFLIGHT: {LOCK} exists but is unreadable; not "
-                 f"removing it automatically.")
-            return False
-        if pid == os.getpid():
-            return True                        # already ours
-        if _proc_alive(pid):
-            age = (time.time() - info.get("started", 0)) / 60
-            print(f"PREFLIGHT: {LOCK} held by LIVE pid {pid} "
-                 f"({info.get('what')}, {age:.0f} min). Not starting.")
-            return False
-        if attempt == 1:
-            print(f"PREFLIGHT: {LOCK} held by pid {pid}, which is NOT "
-                 f"alive. Recovering the stale lock.")
-            try:
-                os.unlink(LOCK)
-            except OSError:
-                return False
+    global _LOCK_TOKEN
+    token = uuid.uuid4().hex
+    payload = json.dumps({"pid": os.getpid(), "token": token,
+                          "what": "hierarchy_repair", "started": time.time()})
+    try:
+        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w") as f:
+            f.write(payload)
+        _LOCK_TOKEN = token
+        return True
+    except FileExistsError:
+        pass
+
+    try:
+        info = json.loads(Path(LOCK).read_text())
+    except (OSError, ValueError):
+        print(f"PREFLIGHT: {LOCK} exists and is unreadable. Not starting; "
+             f"clear it deliberately once you know no run is live.")
+        return False
+
+    if _LOCK_TOKEN is not None and info.get("token") == _LOCK_TOKEN:
+        return True                                    # already ours
+
+    pid = int(info.get("pid", -1))
+    alive = _proc_alive(pid)
+    age = (time.time() - float(info.get("started", 0))) / 60
+    state = "LIVE" if alive else "not detectably alive"
+    print(f"PREFLIGHT: {LOCK} held by pid {pid} ({state}, "
+         f"{info.get('what')}, {age:.0f} min). NOT starting and NOT "
+         f"removing it: a lock is only ever cleared deliberately, because "
+         f"auto-recovery races another contender doing the same.")
     return False
 
 
 def release_lock() -> None:
-    """Release only if the lock is still ours; never remove someone else's."""
+    """Release only if the file still carries OUR token."""
+    global _LOCK_TOKEN
+    if _LOCK_TOKEN is None:
+        return
     try:
         info = json.loads(Path(LOCK).read_text())
-        if int(info.get("pid", -1)) == os.getpid():
+        if info.get("token") == _LOCK_TOKEN:
             os.unlink(LOCK)
     except (OSError, ValueError):
         pass
+    finally:
+        _LOCK_TOKEN = None
 
 
 # ------------------------------------------------------- per-cell bundles
@@ -534,20 +551,109 @@ def save_bundle(V, noise, seed, rows, extra) -> None:
     os.replace(tmp, bundle_path(V, noise, seed))    # atomic
 
 
-def load_bundle(V, noise, seed):
-    """Return a validated bundle, or None if absent/incomplete/corrupt."""
-    p = bundle_path(V, noise, seed)
-    if not p.exists() or not (OUT / f"raw_V{V}_nz{noise}_s{seed}.npz").exists():
-        return None
+def _quarantine(p: Path, why: str) -> None:
+    """Move an invalid artifact aside instead of deleting or trusting it, so
+    the evidence survives for inspection and the cell is recomputed."""
+    if not p.exists():
+        return
+    qdir = OUT / "quarantine"
+    qdir.mkdir(parents=True, exist_ok=True)
+    dest = qdir / f"{p.name}.{int(time.time())}"
     try:
-        b = json.loads(p.read_text())
-    except (OSError, ValueError):
+        os.replace(p, dest)
+        print(f"   QUARANTINED {p.name} -> {dest.relative_to(OUT)}: {why}")
+    except OSError as exc:
+        print(f"   could not quarantine {p.name}: {exc}")
+
+
+def load_bundle(V, noise, seed):
+    """Return a bundle only if it is complete AND self-consistent.
+
+    Checked: the JSON parses; it names the cell actually requested; its rows
+    carry exactly the expected arm set with no duplicates; the guard is
+    present, finite and PASSING; the size and D2 tables exist; and the
+    companion NPZ is readable with the arrays and shapes a finished cell
+    must have. Anything else is quarantined and the cell recomputed --
+    a partially written cell must never be mistaken for a finished one.
+    """
+    bp = bundle_path(V, noise, seed)
+    npz = OUT / f"raw_V{V}_nz{noise}_s{seed}.npz"
+    if not bp.exists():
         return None
-    if not all(k in b for k in ("rows", "guard", "sizes", "graded",
-                                "d2_ari")):
+    tag = f"V{V} nz{noise} s{seed}"
+
+    def bad(why):
+        print(f"   bundle {tag} rejected: {why}")
+        _quarantine(bp, why)
+        _quarantine(npz, "companion of an invalid bundle")
         return None
-    if len(b["rows"]) != len(ARMS) or not b["sizes"]:
-        return None                                 # incomplete cell
+
+    try:
+        b = json.loads(bp.read_text())
+    except (OSError, ValueError) as exc:
+        return bad(f"unreadable JSON ({exc})")
+
+    for k in ("rows", "guard", "sizes", "graded", "d2_ari", "V", "noise",
+              "seed"):
+        if k not in b:
+            return bad(f"missing key '{k}'")
+    if (b["V"], float(b["noise"]), b["seed"]) != (V, float(noise), seed):
+        return bad(f"wrong cell: bundle says V{b['V']} nz{b['noise']} "
+                   f"s{b['seed']}")
+
+    arms = [r.get("arm") for r in b["rows"]]
+    if len(arms) != len(set(arms)):
+        return bad(f"duplicate arm rows: {arms}")
+    if set(arms) != set(ARMS):
+        return bad(f"arm set mismatch: {sorted(set(arms))}")
+
+    g = b["guard"]
+    if not isinstance(g, dict) or not g.get("archive_found"):
+        return bad("guard missing or archive_found false")
+    if not (g.get("ap_ok") and g.get("arr_ok")):
+        return bad("guard did not pass (ap_ok/arr_ok false)")
+    for k in ("ap_diff", "arr_max_abs_diff"):
+        v = g.get(k)
+        if v is None or not np.isfinite(float(v)):
+            return bad(f"guard field '{k}' is not finite: {v}")
+
+    if not b["sizes"]:
+        return bad("empty size table")
+    if b["d2_ari"] is None:
+        return bad("missing d2_ari")
+
+    if not npz.exists():
+        return bad("companion NPZ missing")
+    # Validate inside the context, but report OUTSIDE it: quarantining while
+    # the file is still open fails on Windows (the handle blocks the move).
+    npz_problem = None
+    try:
+        with np.load(npz) as z:
+            need = ["FLAT", "is_driven", "is_source", "parent", "raw_cutoff"]
+            need += [f"{a}_lab" for a in ARMS if a != "FLAT"]
+            missing = [k for k in need if k not in z]
+            if missing:
+                npz_problem = f"NPZ lacks {missing}"
+            else:
+                n = z["FLAT"].shape[0]
+                if (z["is_driven"].shape[0] != n
+                        or z["is_source"].shape[0] != n):
+                    npz_problem = "NPZ label arrays disagree with FLAT length"
+                elif not np.all(np.isfinite(z["FLAT"])):
+                    npz_problem = "NPZ FLAT contains nonfinite values"
+                else:
+                    for a in ARMS:
+                        if a == "FLAT":
+                            continue
+                        if z[f"{a}_lab"].shape[0] != n:
+                            npz_problem = (f"NPZ '{a}_lab' length "
+                                           f"{z[f'{a}_lab'].shape[0]} != {n}")
+                            break
+    except Exception as exc:                        # noqa: BLE001
+        npz_problem = f"unreadable NPZ ({exc})"
+    if npz_problem:
+        return bad(npz_problem)
+
     return b
 
 
@@ -559,8 +665,8 @@ def preflight() -> bool:
     done = [(V, nz, s) for V in WIDTHS for nz in NOISES for s in SEEDS
             if load_bundle(V, nz, s) is not None]
     orphan = [p for p in OUT.glob("raw_V*_nz*_s*.npz")
-              if not p.with_name(p.name.replace("raw_", "cell_")
-                                 .replace(".npz", ".json")).exists()]
+              if not (OUT / p.name.replace("raw_", "cell_")
+                      .replace(".npz", ".json")).exists()]
     if done:
         print(f"PREFLIGHT: {len(done)} of "
              f"{len(WIDTHS) * len(NOISES) * len(SEEDS)} cells already "
@@ -647,6 +753,9 @@ def _run() -> int:
     # Summaries are rebuilt from EVERY completed cell, resumed ones
     # included, so a restart cannot silently drop earlier rows.
     pd.DataFrame(recs).to_csv(OUT / "cells.csv", index=False)
+    # Rebuilt here too, so an all-complete resume (which computes no cell
+    # and so never enters the per-cell writer) still refreshes it.
+    pd.DataFrame(guards).to_csv(OUT / "flat_guard_summary.csv", index=False)
     pd.DataFrame(size_recs).to_csv(OUT / "sizes.csv", index=False)
     pd.DataFrame(graded_recs).to_csv(OUT / "graded.csv", index=False)
     pd.DataFrame(d2_recs).to_csv(OUT / "d2_ari.csv", index=False)
