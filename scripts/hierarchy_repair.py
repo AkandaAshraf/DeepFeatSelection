@@ -30,6 +30,8 @@ across modules or cells, no p-value from three seeds.
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -57,6 +59,7 @@ MOD_EPOCHS = 12
 FLAT_AP_TOL = 0.03
 FLAT_ARR_TOL = 1e-6
 SHARE_DENOM_EPS = 1e-5
+LOCK = ".agent-lock"
 
 ARMS = ["FLAT", "HIER-CLUST-TRAIN", "HIER-RAND-BAL", "HIER-RAND-SIZED",
        "HIER-TRUE"]
@@ -432,37 +435,145 @@ def run_invariance_precheck() -> bool:
     return ok
 
 
-def preflight() -> bool:
-    """Reboot safety. This machine has crashed mid-run before, so before
-    spending GPU time: report any completed artifacts already on disk (they
-    are NOT overwritten or recomputed), and check .agent-lock against a
-    live process rather than assuming a lock file means a live run."""
-    OUT.mkdir(parents=True, exist_ok=True)
-    done = sorted(OUT.glob("raw_V*_nz*_s*.npz"))
-    if done:
-        print(f"PREFLIGHT: {len(done)} completed cell artifact(s) already "
-             f"present in {OUT}:")
-        for p in done:
-            print(f"   {p.name}")
-        print("   These are NOT recomputed and NOT overwritten; their cells "
-             "are skipped.")
-    lock = Path(".agent-lock")
-    if lock.exists():
-        txt = lock.read_text(errors="replace").strip()
-        age = time.time() - lock.stat().st_mtime
-        print(f"PREFLIGHT: .agent-lock present ({age / 60:.0f} min old): "
-             f"{txt}")
-        if age < 2 * 3600:
-            print("   Lock is recent. Not starting: another run may be live. "
-                 "Clear it deliberately if the holder is gone.")
-            return False
-        print("   Lock is stale (>2h). Verify no live process holds it "
-             "before clearing; not clearing it automatically.")
+def _proc_alive(pid: int) -> bool:
+    """Windows-safe liveness check without psutil (absent in this venv).
+    OpenProcess on a dead PID fails; STILL_ACTIVE distinguishes a running
+    process from a finished-but-not-reaped handle."""
+    if pid <= 0:
         return False
-    return True
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, PermissionError) as exc:
+            return isinstance(exc, PermissionError)
+        except OSError:
+            return False
+    import ctypes
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, pid)     # PROCESS_QUERY_LIMITED_INFO
+    if not h:
+        return False
+    try:
+        code = ctypes.c_ulong()
+        if k.GetExitCodeProcess(h, ctypes.byref(code)):
+            return code.value == 259          # STILL_ACTIVE
+        return True
+    finally:
+        k.CloseHandle(h)
 
 
-def main() -> int:
+def acquire_lock() -> bool:
+    """Atomically acquire .agent-lock, or explain why not.
+
+    An earlier version only REJECTED existing locks and never created one,
+    so two runs could both pass the check and start together. Ownership is
+    recorded as pid plus this process's own start marker, and a lock is
+    only treated as stale when its pid is verifiably not alive -- a pid
+    alone can be reused by an unrelated process.
+    """
+    payload = json.dumps({"pid": os.getpid(), "what": "hierarchy_repair",
+                          "started": time.time()})
+    for attempt in (1, 2):
+        try:
+            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w") as f:
+                f.write(payload)
+            return True
+        except FileExistsError:
+            pass
+        try:
+            info = json.loads(Path(LOCK).read_text())
+            pid = int(info.get("pid", -1))
+        except (OSError, ValueError):
+            print(f"PREFLIGHT: {LOCK} exists but is unreadable; not "
+                 f"removing it automatically.")
+            return False
+        if pid == os.getpid():
+            return True                        # already ours
+        if _proc_alive(pid):
+            age = (time.time() - info.get("started", 0)) / 60
+            print(f"PREFLIGHT: {LOCK} held by LIVE pid {pid} "
+                 f"({info.get('what')}, {age:.0f} min). Not starting.")
+            return False
+        if attempt == 1:
+            print(f"PREFLIGHT: {LOCK} held by pid {pid}, which is NOT "
+                 f"alive. Recovering the stale lock.")
+            try:
+                os.unlink(LOCK)
+            except OSError:
+                return False
+    return False
+
+
+def release_lock() -> None:
+    """Release only if the lock is still ours; never remove someone else's."""
+    try:
+        info = json.loads(Path(LOCK).read_text())
+        if int(info.get("pid", -1)) == os.getpid():
+            os.unlink(LOCK)
+    except (OSError, ValueError):
+        pass
+
+
+# ------------------------------------------------------- per-cell bundles
+
+def bundle_path(V, noise, seed) -> Path:
+    return OUT / f"cell_V{V}_nz{noise}_s{seed}.json"
+
+
+def save_bundle(V, noise, seed, rows, extra) -> None:
+    """Persist EVERYTHING this cell produced, atomically. Written last, after
+    the npz, so a cell counts as complete only if both exist and this
+    validates -- a crash mid-write cannot leave a half-valid cell."""
+    payload = {"V": V, "noise": noise, "seed": seed, "rows": rows,
+               "guard": extra["guard"], "sizes": extra["sizes"],
+               "graded": extra["graded"], "d2_ari": extra["d2_ari"]}
+    tmp = bundle_path(V, noise, seed).with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, default=float))
+    os.replace(tmp, bundle_path(V, noise, seed))    # atomic
+
+
+def load_bundle(V, noise, seed):
+    """Return a validated bundle, or None if absent/incomplete/corrupt."""
+    p = bundle_path(V, noise, seed)
+    if not p.exists() or not (OUT / f"raw_V{V}_nz{noise}_s{seed}.npz").exists():
+        return None
+    try:
+        b = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+    if not all(k in b for k in ("rows", "guard", "sizes", "graded",
+                                "d2_ari")):
+        return None
+    if len(b["rows"]) != len(ARMS) or not b["sizes"]:
+        return None                                 # incomplete cell
+    return b
+
+
+def preflight() -> bool:
+    """Reboot safety. This machine has crashed mid-run, so before spending
+    GPU time: report validated completed cells (they are neither recomputed
+    nor overwritten) and acquire the lock atomically."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    done = [(V, nz, s) for V in WIDTHS for nz in NOISES for s in SEEDS
+            if load_bundle(V, nz, s) is not None]
+    orphan = [p for p in OUT.glob("raw_V*_nz*_s*.npz")
+              if not p.with_name(p.name.replace("raw_", "cell_")
+                                 .replace(".npz", ".json")).exists()]
+    if done:
+        print(f"PREFLIGHT: {len(done)} of "
+             f"{len(WIDTHS) * len(NOISES) * len(SEEDS)} cells already "
+             f"complete and validated; they are skipped, not recomputed.")
+    if orphan:
+        print(f"PREFLIGHT: {len(orphan)} npz without a valid bundle "
+             f"(interrupted mid-cell); those cells WILL be recomputed:")
+        for p in orphan:
+            print(f"   {p.name}")
+    return acquire_lock()
+
+
+def _run() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
 
     if not preflight():
@@ -480,9 +591,19 @@ def main() -> int:
     for V in WIDTHS:
         for nz in NOISES:
             for s in SEEDS:
-                if (OUT / f"raw_V{V}_nz{nz}_s{s}.npz").exists():
-                    print(f"  V={V} noise={nz:<5} seed={s}   SKIP "
-                         f"(artifact already complete)", flush=True)
+                cached = load_bundle(V, nz, s)
+                if cached is not None:
+                    # Load it back into the aggregates. Skipping without
+                    # loading is what made resume lossy: the CSVs were then
+                    # rewritten from only the newly computed cells.
+                    recs += cached["rows"]
+                    guards.append(cached["guard"])
+                    size_recs += cached["sizes"]
+                    graded_recs += cached["graded"]
+                    d2_recs.append(dict(V=V, noise=nz, seed=s,
+                                        d2_ari=cached["d2_ari"]))
+                    print(f"  V={V} noise={nz:<5} seed={s}   RESUMED "
+                         f"(validated bundle, no retraining)", flush=True)
                     continue
                 try:
                     r, extra = cell(V, nz, s)
@@ -498,6 +619,7 @@ def main() -> int:
                 graded_recs += extra["graded"]
                 d2_recs.append(dict(V=V, noise=nz, seed=s,
                                     d2_ari=extra["d2_ari"]))
+                save_bundle(V, nz, s, r, extra)
                 g = extra["guard"]
                 print(f"  V={V} noise={nz:<5} seed={s}   "
                      f"FLAT-guard[ap_ok={g['ap_ok']} arr_ok={g['arr_ok']}]"
@@ -512,9 +634,22 @@ def main() -> int:
                                                 index=False)
                 pd.DataFrame(d2_recs).to_csv(OUT / "d2_ari.csv", index=False)
 
+    if not recs:
+        print("\nNo cell results available: nothing was computed and no "
+             "validated bundle was found. Not writing empty summaries.")
+        return 1
     d = pd.DataFrame(recs)
     gdf = pd.DataFrame(guards)
     print(f"\n({(time.time()-t0)/60:.1f} min)\n")
+    print(f"cells in summary: {len(d) // len(ARMS)} "
+         f"(resumed + newly computed)")
+
+    # Summaries are rebuilt from EVERY completed cell, resumed ones
+    # included, so a restart cannot silently drop earlier rows.
+    pd.DataFrame(recs).to_csv(OUT / "cells.csv", index=False)
+    pd.DataFrame(size_recs).to_csv(OUT / "sizes.csv", index=False)
+    pd.DataFrame(graded_recs).to_csv(OUT / "graded.csv", index=False)
+    pd.DataFrame(d2_recs).to_csv(OUT / "d2_ari.csv", index=False)
 
     print("FLAT FIDELITY GUARD (against the archived run, same 12 cells)")
     found = gdf[gdf.archive_found]
@@ -652,6 +787,17 @@ def main() -> int:
          "follows. This diagnostic supports only the descriptive "
          "statements above.")
     return 0
+
+
+
+
+def main() -> int:
+    """Wrapper so the lock is released on every exit path, including an
+    exception -- a crash must not leave a lock that blocks the next run."""
+    try:
+        return _run()
+    finally:
+        release_lock()
 
 
 if __name__ == "__main__":
