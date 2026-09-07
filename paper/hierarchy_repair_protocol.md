@@ -224,3 +224,79 @@ and `paper/causal_detection_log.md`.
 
 Separately recorded and NOT changed here: the shared ridge helper has no
 intercept and uses sample variance. A fidelity issue for its own protocol.
+
+
+---
+
+## Result (2026-09-07): the three repairs, run on the original 12 cells
+
+Bounded diagnostic, original grid and seeds, 5 arms. Descriptive only; no
+verdict word is licensed and none is used.
+
+FLAT FIDELITY GUARD: archive found for 12/12 cells, AP max |diff| 0.0000
+(tol 0.03), raw array max |diff| 0.00e+00 (tol 1e-6). FLAT reproduces the
+archived run exactly, so the pipeline differs from the archive only in the
+intended repairs.
+
+TRAIN-ONLY INVARIANCE: ARI = 1.000000 on every perturbation trial, so
+clustering demonstrably never reads validation or test rows.
+
+TARGET-WEIGHTED MODULE SIZE (the quantity Rule 131 showed was the one that
+matters, unweighted mean being V/m for every arm by construction):
+
+  arm                unweighted   target-weighted   driven-weighted
+  HIER-CLUST-TRAIN       6.000          8.750             8.573
+  HIER-RAND-BAL          6.000          6.000             6.000
+  HIER-RAND-SIZED        6.000          8.750             8.682
+  HIER-TRUE              6.000          6.706             6.847
+
+**The size-matched control now matches on the quantity that was confounded.**
+HIER-RAND-SIZED reaches target-weighted 8.750 against HIER-CLUST-TRAIN's
+8.750; the archived comparison had 6.000 against 9.972.
+
+MODULE SHARE, per cell:
+
+  V   noise   CLUST-TRAIN   RAND-BAL   RAND-SIZED   TRUE
+  30  0.00       0.584       0.154       0.217      0.887
+  30  0.05       0.836       0.438       0.456      0.965
+  60  0.00       0.608       0.171       0.255      0.970
+  60  0.05       1.370       0.766       0.855      1.686
+
+No cell was excluded by the near-zero-denominator rule (0 of 12 per arm).
+
+DESCRIPTIVE COMPARISON. HIER-CLUST-TRAIN exceeds HIER-RAND-SIZED in 12 of 12
+comparable cells and falls below it in 0. **The effect persists under the
+size-matched control**, on cells where the aggregate width distribution is
+matched. This is a descriptive count over 12 cells built from 3 seeds, not a
+rate, and it licenses nothing beyond the sentence just written.
+
+GRADED, within cell, median by seed (status 'ok' cells only; 36 of 48 cells
+'ok', 12 'constant_frac_parent_in'; 9 of 360 modules excluded):
+
+  seed   CLUST-TRAIN   RAND-BAL   RAND-SIZED
+   0        0.835       0.438       0.724
+   1        0.894       0.483       0.439
+   2        0.932       0.709       0.506
+
+D2, descriptive: ARI between the archived transductive partition and the
+train-only one, median 0.550, range [0.219, 0.969]. Train-only clustering
+produces a materially different partition, which is why the archived result
+could not have stood as evidence for a train-only deployment.
+
+### What this does and does not support
+
+It supports: the module-share ordering survives matching the aggregate size
+distribution, on this grid, on these three seeds. It does not support any
+statement about width causing or not causing the effect, because
+HIER-RAND-SIZED matches the width DISTRIBUTION and not which target receives
+which width, and module membership and width co-vary in both arms. Three
+seeds do not establish a rate. A powered confirmatory study on independent
+systems remains separate future work with its own pre-registration.
+
+### Not established
+
+One generating family, one coupling, redundancy 0, twelve cells from three
+seeds. The cluster count is fixed at V/6, matching the generator's source
+count, an advantage handed to the method and not removed here. Twelve of the
+48 arm-cells could not yield a within-cell correlation because every module
+had the same in-module-parent fraction.

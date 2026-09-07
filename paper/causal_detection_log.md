@@ -4073,3 +4073,46 @@ be made explicitly rather than taken by default.
 NOT ESTABLISHED. Whether this leak is large enough to matter is unmeasured.
 The circular ghost construction was also named as a separate concern needing
 its own check and is not audited here.
+
+
+2026-09-07  HIERARCHY REPAIR RUN: the three defects repaired, original 12
+cells, and the module-share ordering persists under a size-matched control.
+Pre-registration paper/hierarchy_repair_protocol.md. BOUNDED DIAGNOSTIC, no
+verdict word licensed or used.
+
+FLAT reproduced the archived run EXACTLY (raw array max |diff| 0.00e+00
+across 12/12 cells, AP max |diff| 0.0000), so the only differences from the
+archive are the intended repairs. Train-only clustering verified by
+perturbation at ARI = 1.000000.
+
+THE SIZE CONTROL NOW CONTROLS. Rule 131 showed the archived comparison was
+confounded: clustered targets sat in modules of target-weighted width 9.972
+against random's 6.000. The size-matched arm now reaches 8.750 against
+clustering's 8.750, matched on the quantity that was confounded.
+
+  module share      CLUST-TRAIN  RAND-BAL  RAND-SIZED  TRUE
+  V=30 noise 0.00      0.584      0.154      0.217     0.887
+  V=30 noise 0.05      0.836      0.438      0.456     0.965
+  V=60 noise 0.00      0.608      0.171      0.255     0.970
+  V=60 noise 0.05      1.370      0.766      0.855     1.686
+
+HIER-CLUST-TRAIN exceeds HIER-RAND-SIZED in 12 of 12 cells, below in 0. The
+effect PERSISTS under the size-matched control. Within-cell graded medians by
+seed: 0.835/0.894/0.932 for clustering against 0.438/0.483/0.709 balanced and
+0.724/0.439/0.506 size-matched.
+
+WHAT IT DOES NOT SUPPORT, stated because the temptation is obvious: nothing
+about width causing or not causing the effect. The control matches the width
+DISTRIBUTION, not which target receives which width, and membership and width
+co-vary in both arms. Three seeds are not a rate. No adoption, no reopening;
+a powered confirmatory study on independent systems is separate future work.
+
+D2: ARI between the archived transductive partition and the train-only one,
+median 0.550, range [0.219, 0.969]. The archived partition was materially
+different, which is why it could not stand as evidence for a train-only
+deployment.
+
+NOT ESTABLISHED. One family, one coupling, redundancy 0, 12 cells from 3
+seeds. Cluster count fixed at V/6, matching the generator's source count, an
+advantage not removed here. Twelve of 48 arm-cells yielded no within-cell
+correlation (every module had the same in-module-parent fraction).
