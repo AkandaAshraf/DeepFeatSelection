@@ -64,6 +64,20 @@ ARMS = ["FLAT", "HIER-CLUST-TRAIN", "HIER-RAND-BAL", "HIER-RAND-SIZED",
 
 # --------------------------------------------------------------- shared
 
+class FlatGuardError(RuntimeError):
+    """FLAT fidelity guard failed. Raised BEFORE any module training so no
+    GPU time is spent on comparisons the protocol already voids."""
+
+
+def _persist_guard(guard: dict) -> None:
+    """Append the guard diagnostic immediately, so a failure is on disk even
+    though the run stops right after."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    p = OUT / "flat_guard.csv"
+    df = pd.DataFrame([guard])
+    df.to_csv(p, mode="a", header=not p.exists(), index=False)
+
+
 def train_code(zs, tr, d_in, b, seed, epochs=EPOCHS):
     """One masked autoencoder, returning the net and full-length codes.
     Identical to the archived implementation -- nothing about the encoder
@@ -254,22 +268,56 @@ def cell(V: int, noise: float, seed: int) -> tuple[list[dict], dict]:
                  np.hstack([own[q][te_i], sys_code[te_i]]), lead[te_i + 1, q])
         - base[q] for q in range(Vt)])
 
-    # ---- FLAT FIDELITY GUARD against the archived run, same cell
+    # ---- FLAT FIDELITY GUARD against the archived run, same cell.
+    # FAILS CLOSED: any of missing archive, shape mismatch, label mismatch,
+    # nonfinite scores, AP mismatch or array mismatch raises FlatGuardError,
+    # which stops this cell BEFORE any module training and makes the run
+    # exit nonzero. Continuing past a failed fidelity check would spend GPU
+    # time producing comparisons that are void by the protocol anyway.
     guard = dict(V=V, noise=noise, seed=seed, archive_found=False,
                 ap_diff=np.nan, arr_max_abs_diff=np.nan,
-                ap_ok=None, arr_ok=None)
+                ap_ok=False, arr_ok=False, reason="")
     arch_path = ARCHIVE / f"raw_V{V}_nz{noise}_s{seed}.npz"
-    if arch_path.exists():
-        za = np.load(arch_path)
-        arch_flat = za["FLAT"]
-        arch_ap = float(average_precision_score(za["is_source"], -arch_flat))
-        new_ap = float(average_precision_score(is_source, -flat))
-        arr_diff = float(np.max(np.abs(flat - arch_flat)))
-        guard.update(archive_found=True,
-                     ap_diff=abs(new_ap - arch_ap),
-                     arr_max_abs_diff=arr_diff,
-                     ap_ok=bool(abs(new_ap - arch_ap) <= FLAT_AP_TOL),
-                     arr_ok=bool(arr_diff <= FLAT_ARR_TOL))
+
+    def _fail(reason: str):
+        guard["reason"] = reason
+        _persist_guard(guard)
+        raise FlatGuardError(f"V={V} noise={noise} seed={seed}: {reason}")
+
+    if not np.all(np.isfinite(flat)):
+        _fail(f"nonfinite FLAT scores: {int((~np.isfinite(flat)).sum())} of "
+              f"{flat.size}")
+    if not arch_path.exists():
+        _fail(f"archived cell missing: {arch_path}")
+
+    za = np.load(arch_path)
+    for key in ("FLAT", "is_source", "is_driven"):
+        if key not in za:
+            _fail(f"archived cell lacks '{key}'")
+    arch_flat = za["FLAT"]
+    if arch_flat.shape != flat.shape:
+        _fail(f"shape mismatch: archived {arch_flat.shape} vs new "
+              f"{flat.shape}")
+    if not np.array_equal(za["is_source"], is_source):
+        _fail("label mismatch: is_source differs from the archived cell")
+    if not np.array_equal(za["is_driven"], is_driven):
+        _fail("label mismatch: is_driven differs from the archived cell")
+    if not np.all(np.isfinite(arch_flat)):
+        _fail("nonfinite scores in the archived FLAT array")
+
+    arch_ap = float(average_precision_score(za["is_source"], -arch_flat))
+    new_ap = float(average_precision_score(is_source, -flat))
+    arr_diff = float(np.max(np.abs(flat - arch_flat)))
+    ap_diff = abs(new_ap - arch_ap)
+    guard.update(archive_found=True, ap_diff=ap_diff,
+                 arr_max_abs_diff=arr_diff,
+                 ap_ok=bool(ap_diff <= FLAT_AP_TOL),
+                 arr_ok=bool(arr_diff <= FLAT_ARR_TOL))
+    if not guard["ap_ok"]:
+        _fail(f"AP mismatch {ap_diff:.5f} > tol {FLAT_AP_TOL}")
+    if not guard["arr_ok"]:
+        _fail(f"array mismatch {arr_diff:.3e} > tol {FLAT_ARR_TOL:.0e}")
+    _persist_guard(guard)
 
     m = max(2, V // 6)
     rows = [dict(V=V, noise=noise, seed=seed, arm="FLAT",
@@ -354,6 +402,7 @@ def cell(V: int, noise: float, seed: int) -> tuple[list[dict], dict]:
             graded_rows.append(dict(
                 V=V, noise=noise, seed=seed, arm=arm, module=mod,
                 n_driven=len(drv), frac_parent_in=frac_in, share=m_share,
+                mod_e2=m_tot2, mod_e3=m_tot3, mod_denom=m_denom,
                 excluded=excluded))
 
     # D2: ARI between archived HIER-CLUST (transductive) and the new
@@ -383,8 +432,41 @@ def run_invariance_precheck() -> bool:
     return ok
 
 
+def preflight() -> bool:
+    """Reboot safety. This machine has crashed mid-run before, so before
+    spending GPU time: report any completed artifacts already on disk (they
+    are NOT overwritten or recomputed), and check .agent-lock against a
+    live process rather than assuming a lock file means a live run."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    done = sorted(OUT.glob("raw_V*_nz*_s*.npz"))
+    if done:
+        print(f"PREFLIGHT: {len(done)} completed cell artifact(s) already "
+             f"present in {OUT}:")
+        for p in done:
+            print(f"   {p.name}")
+        print("   These are NOT recomputed and NOT overwritten; their cells "
+             "are skipped.")
+    lock = Path(".agent-lock")
+    if lock.exists():
+        txt = lock.read_text(errors="replace").strip()
+        age = time.time() - lock.stat().st_mtime
+        print(f"PREFLIGHT: .agent-lock present ({age / 60:.0f} min old): "
+             f"{txt}")
+        if age < 2 * 3600:
+            print("   Lock is recent. Not starting: another run may be live. "
+                 "Clear it deliberately if the holder is gone.")
+            return False
+        print("   Lock is stale (>2h). Verify no live process holds it "
+             "before clearing; not clearing it automatically.")
+        return False
+    return True
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+
+    if not preflight():
+        return 1
 
     if not run_invariance_precheck():
         print("VOID per protocol: the train-only invariance test failed, "
@@ -398,7 +480,18 @@ def main() -> int:
     for V in WIDTHS:
         for nz in NOISES:
             for s in SEEDS:
-                r, extra = cell(V, nz, s)
+                if (OUT / f"raw_V{V}_nz{nz}_s{s}.npz").exists():
+                    print(f"  V={V} noise={nz:<5} seed={s}   SKIP "
+                         f"(artifact already complete)", flush=True)
+                    continue
+                try:
+                    r, extra = cell(V, nz, s)
+                except FlatGuardError as exc:
+                    print(f"\nFLAT FIDELITY GUARD FAILED: {exc}")
+                    print("Stopped before module training. Diagnostic "
+                         "persisted to flat_guard.csv. Per the protocol the "
+                         "comparison is void until this is understood.")
+                    return 2
                 recs += r
                 guards.append(extra["guard"])
                 size_recs += extra["sizes"]
@@ -410,8 +503,10 @@ def main() -> int:
                      f"FLAT-guard[ap_ok={g['ap_ok']} arr_ok={g['arr_ok']}]"
                      f"   ({(time.time()-t0)/60:.1f}m)", flush=True)
                 pd.DataFrame(recs).to_csv(OUT / "cells.csv", index=False)
-                pd.DataFrame(guards).to_csv(OUT / "flat_guard.csv",
-                                           index=False)
+                # flat_guard.csv is the append-only record written by
+                # _persist_guard (including failures); this is the summary.
+                pd.DataFrame(guards).to_csv(
+                    OUT / "flat_guard_summary.csv", index=False)
                 pd.DataFrame(size_recs).to_csv(OUT / "sizes.csv", index=False)
                 pd.DataFrame(graded_recs).to_csv(OUT / "graded.csv",
                                                 index=False)
@@ -453,28 +548,42 @@ def main() -> int:
     h = d[d.arm != "FLAT"]
     print("\nMODULE SHARE (unbounded ratio; NaN rows are predefined "
          "exclusions)")
-    excl = h.groupby("arm").mean_e2_driven.apply(
-        lambda s: int(s.isna().sum()))
-    print(f"   share-undefined cells excluded, by arm: "
-         f"{excl.to_dict()}")
-    print("   " + h.pivot_table(index=["V", "noise"], columns="arm",
-                                values="mod_share").round(3)
-         .to_string().replace("\n", "\n   "))
+    # Count the EXCLUSION FLAG and the share itself, not mean_e2_driven:
+    # e2 can be finite while the share is undefined (near-zero denominator),
+    # so counting e2's NaNs would report zero exclusions on exactly the
+    # cells the predefined rule removes.
+    excl = h.groupby("arm").apply(
+        lambda g: int((g.share_excluded | g.mod_share.isna()).sum()),
+        include_groups=False)
+    print(f"   share-undefined cells excluded, by arm: {excl.to_dict()}")
+    share_piv = h.pivot_table(index=["V", "noise"], columns="arm",
+                              values="mod_share")
+    print("   " + (share_piv.round(3).to_string().replace("\n", "\n   ")
+                   if len(share_piv) else "no defined shares to tabulate"))
 
     print("\nDESCRIPTIVE COMPARISON: does clustering after matching the "
          "aggregate size distribution attenuate, persist, or reverse "
          "against the size-matched random control?")
     piv = h.pivot_table(index=["V", "noise", "seed"], columns="arm",
                         values="mod_share")
-    comparable = piv.dropna(subset=["HIER-CLUST-TRAIN", "HIER-RAND-SIZED"])
-    persists = int((comparable["HIER-CLUST-TRAIN"]
-                   > comparable["HIER-RAND-SIZED"]).sum())
-    reverses = int((comparable["HIER-CLUST-TRAIN"]
-                   < comparable["HIER-RAND-SIZED"]).sum())
-    print(f"   HIER-CLUST-TRAIN > HIER-RAND-SIZED in {persists} of "
-         f"{len(comparable)} comparable cells (persists)")
-    print(f"   HIER-CLUST-TRAIN < HIER-RAND-SIZED in {reverses} of "
-         f"{len(comparable)} comparable cells (reverses)")
+    need = ["HIER-CLUST-TRAIN", "HIER-RAND-SIZED"]
+    missing = [a for a in need if a not in piv.columns]
+    if missing:
+        print(f"   cannot compare: no defined shares for {missing}")
+    else:
+        comparable = piv.dropna(subset=need)
+        if not len(comparable):
+            print("   cannot compare: zero cells have both arms defined")
+        else:
+            persists = int((comparable[need[0]] > comparable[need[1]]).sum())
+            reverses = int((comparable[need[0]] < comparable[need[1]]).sum())
+            ties = len(comparable) - persists - reverses
+            print(f"   HIER-CLUST-TRAIN > HIER-RAND-SIZED in {persists} of "
+                 f"{len(comparable)} comparable cells (persists)")
+            print(f"   HIER-CLUST-TRAIN < HIER-RAND-SIZED in {reverses} of "
+                 f"{len(comparable)} comparable cells (reverses)")
+            if ties:
+                print(f"   exactly equal in {ties} cells")
     print("   No pooled test statistic, no adopt/reject/close/repaired "
          "wording -- descriptive counts only, per the protocol's Language "
          "section.")
@@ -483,24 +592,55 @@ def main() -> int:
     gr_ok = gr[~gr.excluded].dropna(subset=["frac_parent_in", "share"])
     print(f"\nGRADED (within cell, per-module exclusions: "
          f"{int(gr.excluded.sum())} of {len(gr)} modules)")
-    by_seed = []
-    for (arm, seed), g in gr_ok.groupby(["arm", "seed"]):
-        cell_rhos = []
-        for (V, nz), gg in g.groupby(["V", "noise"]):
-            if gg.frac_parent_in.nunique() > 1 and len(gg) >= 3:
-                r, _ = spearmanr(gg.frac_parent_in, gg.share)
-                cell_rhos.append(r)
-        if cell_rhos:
-            by_seed.append(dict(arm=arm, seed=seed,
-                                median_rho=float(np.nanmedian(cell_rhos)),
-                                n_cells=len(cell_rhos)))
-    bsdf = pd.DataFrame(by_seed)
-    if len(bsdf):
-        print("   " + bsdf.pivot_table(index="seed", columns="arm",
-                                       values="median_rho").round(3)
+
+    # PER-CELL Spearman persisted with an explicit status, exclusion counts
+    # and the module inputs, rather than only a printed seed median: a
+    # constant-input or too-few-modules cell must be visible as such, not
+    # silently absent from an aggregate.
+    per_cell = []
+    for (arm, V, nz, seed), gg_all in gr.groupby(["arm", "V", "noise",
+                                                  "seed"]):
+        gg = gg_all[~gg_all.excluded].dropna(
+            subset=["frac_parent_in", "share"])
+        n_excl = int(gg_all.excluded.sum()) + int(
+            gg_all[~gg_all.excluded][["frac_parent_in", "share"]]
+            .isna().any(axis=1).sum())
+        rho, status = np.nan, ""
+        if len(gg) < 3:
+            status = f"too_few_modules({len(gg)})"
+        elif gg.frac_parent_in.nunique() < 2:
+            status = "constant_frac_parent_in"
+        elif gg.share.nunique() < 2:
+            status = "constant_share"
+        else:
+            r, _ = spearmanr(gg.frac_parent_in, gg.share)
+            if np.isfinite(r):
+                rho, status = float(r), "ok"
+            else:
+                status = "nonfinite_rho"
+        per_cell.append(dict(arm=arm, V=V, noise=nz, seed=seed, rho=rho,
+                             status=status, n_modules_used=len(gg),
+                             n_modules_total=len(gg_all),
+                             n_excluded=n_excl))
+    pcdf = pd.DataFrame(per_cell)
+    pcdf.to_csv(OUT / "graded_per_cell.csv", index=False)
+    print("   per-cell status counts: "
+         f"{pcdf.status.value_counts().to_dict()}")
+
+    ok_cells = pcdf[pcdf.status == "ok"]
+    if len(ok_cells):
+        by_seed = (ok_cells.groupby(["arm", "seed"]).rho.median()
+                   .reset_index())
+        print("   median within-cell rho, by seed (cells with status 'ok' "
+             "only):")
+        print("   " + by_seed.pivot_table(index="seed", columns="arm",
+                                          values="rho").round(3)
              .to_string().replace("\n", "\n   "))
+    else:
+        print("   no cell reached status 'ok'; nothing to summarise")
     print("   No pooled p-value across modules or seeds, per Rule 131 / "
-         "repair 3.")
+         "repair 3. Full per-cell detail in graded_per_cell.csv; raw "
+         "module e2/e3 in graded.csv.")
 
     d2 = pd.DataFrame(d2_recs)
     print("\nD2 (descriptive): ARI between archived transductive partition "
