@@ -115,8 +115,13 @@ fits total.
             5 minutes is generous headroom over the expected single-digit
             seconds.
   RSS       <= 500 MB process RSS at any point, checked after every cell.
-  DISK      no file under Data/ or ExpOutput/ is read or written. Output
-            is ONE compact summary CSV under 50 KB (one row per
+  DISK      CORRECTED, self-contradictory as first written: no file under
+            Data/, and no file under any PRIOR experiment's output
+            directory (ExpOutput/large_system/ in particular, whose
+            results this run must not read, write, or overwrite), is
+            touched. This run's OWN new, declared output is exempted from
+            that restriction by construction: ExpOutput/ridge_alpha_scaling/
+            cells.csv, ONE compact summary CSV under 50 KB (one row per
             p/seed/arm/p=1-control cell: p, seed, arm, alpha_used, r2) --
             no raw arrays, no per-cell model objects, no cache files.
             PYTHONDONTWRITEBYTECODE=1 for the run itself.
@@ -175,8 +180,12 @@ it automatically.
 
 ## Void conditions
 
-Void if any file under Data/ or ExpOutput/ is read or written by the
-script; if the local ridge formula's arithmetic differs from
+Void if any file under Data/, or under any prior experiment's output
+directory including ExpOutput/large_system/, is read or written by the
+script -- this run's own declared new output,
+ExpOutput/ridge_alpha_scaling/cells.csv, is exempted by construction, per
+the DISK cap correction above; if the local ridge formula's arithmetic
+differs from
 boundary_map.ridge_r2's own formula in anything but taking alpha as a
 parameter (checked by the pre-flight equivalence test, not asserted); if
 the grid, seeds, signal strength, alpha choices or resource caps change
