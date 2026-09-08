@@ -171,3 +171,131 @@ edited because the protocol is the thing the run is held to.
   excess, a different statistic with its own null, is not the deployed rule
   and was never calibrated for it. Hierarchy arms report average precision
   and module share, as C01 did.
+
+---
+
+## Result (2026-09-08): descriptive only, as declared. No verdict word below.
+
+All 12 cells completed (V in {120, 240, 500, 1000} x seeds 100/101/102), all
+6 arms in every cell, 72 rows in cells.csv. failures.csv and
+hardware_limits.csv are both empty: no cap breach at any width, including
+V=1000. Verified from primary output files only
+(ExpOutput/large_system/{cells,capacity,failures,hardware_limits}.csv and
+the raw NPZ archives); no cell was rerun and no result file was touched to
+produce this report.
+
+### Caps observed vs. declared -- V=1000 was not hardware-limited
+
+  metric                     worst observed    declared cap
+  GPU peak reserved             964 MB           7000 MB
+  host RSS                     1813 MB           2500 MB
+  per-cell wall clock          32.4 min           60 min
+
+Every degradation below happened at a fraction of every resource cap, at
+every V tested. The statistical and compute questions this document keeps
+apart give different answers: compute had headroom throughout; the
+statistics did not.
+
+### Capacity, per E4 and E6
+
+  V                         120     240     500    1000
+  capacity_ratio           9.25    4.80    2.35    1.19
+  cell_secs, mean of 3    108.3   258.5   677.9  1900.9
+
+capacity_ratio is training rows divided by (system code width + own-lag
+feature count); it was declared to fall as V grows under the fixed n=4000
+policy, and it does, reaching 1.19 at V=1000 -- rows and ridge parameters
+nearly equal. E4 (a V=1000 cell in 20-40 min) holds: 1874-1942 s, i.e.
+31.2-32.4 min. E6 (V=1000 most likely hardware-limited, on host RAM) does
+not materialise: nothing was hardware-limited at any width; the caps table
+above shows why.
+
+### E1 -- FLAT recall_rule keeps falling: holds
+
+  V                  120     240     500    1000
+  mean (3 seeds)    0.883   0.653   0.095   0.005
+
+Falls further at every step. Magnitudes are not compared against the
+archived map (fresh seeds, b=2V rather than the archive's b=32, as
+declared).
+
+### E2 -- FLAT's source AP stays well above prevalence: holds through V=240,
+### does not hold at V=500 or V=1000
+
+  V           prevalence     FLAT ap_source (min-max, 3 seeds)
+  120           0.167              0.881 - 1.000
+  240           0.167              0.793 - 0.810
+  500           0.166              0.110 - 0.115
+  1000          0.166              0.095 - 0.099
+
+At V=500 and V=1000, FLAT's ranking sits AT OR BELOW the chance level set by
+prevalence, not above it. This is the sharpest divergence from a stated
+expectation in this run, and it is stated plainly because the expectation
+was stated plainly.
+
+### E3 -- HIER-CLUST-TRAIN exceeds HIER-RAND-SIZED on module share, V>=120:
+### holds at V=120 and V=240, reverses at V=500 and V=1000
+
+  V       HIER-CLUST-TRAIN higher     HIER-RAND-SIZED higher
+  120           3 of 3                          0 of 3
+  240           3 of 3                          0 of 3
+  500           0 of 3                          3 of 3
+  1000          0 of 3                          3 of 3
+
+mod_share turns negative for both hierarchy arms at V=500 and V=1000 (e.g.
+V=500 seed=100: HIER-CLUST-TRAIN -1.958, HIER-RAND-SIZED -0.184), a range
+the C01 test was never run in. Whether a sign flip in that regime is a
+meaningful reversal of the V=120/240 pattern, or an artefact of the
+underlying e2/e3 terms both turning negative once the whole system is
+capacity-starved, is not established by this run. share_excluded is False
+throughout, so the near-zero-denominator guard never fired even at these
+extreme values -- worth a second look before this metric is read again at
+V>=500.
+
+### E5 -- no expectation was stated on either baseline against FLAT; what
+### was observed
+
+  V        SELFR2   LAGCORR    FLAT   HIER-CLUST-TRAIN  HIER-RAND-SIZED  HIER-TRUE
+  120      0.908     0.786    0.960        0.994             0.953          0.991
+  240      0.759     0.654    0.801        0.879             0.819          0.958
+  500      0.789     0.626    0.113        0.148             0.116          0.736
+  1000     0.796     0.658    0.096        0.098             0.097          0.105
+
+SELFR2 (cost: zero, it is the self-R2 already computed) and LAGCORR (cost:
+one O(V^2) pass on training rows) stay within a narrow band across all four
+widths. FLAT and every hierarchy arm, including the oracle HIER-TRUE, fall
+toward or below prevalence at V=1000. At the largest width tested, both
+zero/near-zero-cost baselines rank sources well above every trained arm,
+including the oracle.
+
+### Source blindness, checked throughout though not a declared expectation
+
+FLAT's source_fp_rule is 0.000 in all 12 cells, at every width. Recall falls
+to zero without ever inventing a false positive.
+
+### A data caveat, traced to source rather than assumed
+
+torch.cuda.reset_peak_memory_stats() runs immediately before FLAT and before
+each hierarchy arm (large_system.py:289, :325) but NOT before SELFR2 or
+LAGCORR, which run first in every cell and touch no GPU. Their gpu_peak_mb
+is therefore the watermark left by the PREVIOUS cell's last arm, not a
+measurement of their own footprint -- confirmed by matching every value: 10
+of 11 width/seed transitions show SELFR2's reading equal to the prior cell's
+HIER-TRUE reading exactly (e.g. V=120 seed=101 SELFR2 reads 74.0, matching
+V=120 seed=100's HIER-TRUE exactly). The one exception, V=500 seed=102 ->
+V=1000 seed=100 (358.0 -> 22.0, resetting to the same low value seen at the
+very first cell of the run), lines up exactly with the machine-crash and
+resume already reported for this run between the V=500 and V=1000 stages:
+a fresh process starts its CUDA peak counter fresh. Treat SELFR2/LAGCORR's
+memory column as uninformative, not as zero, and treat the V=500/V=1000
+boundary as a process boundary when reading any watermark-style column
+across it.
+
+### Not established
+
+Three seeds, one generating family, one coupling, one data-length policy
+(n=4000 fixed at every V, declared in advance to capacity-starve the
+largest widths by construction rather than adjusted to compensate). No
+noise axis was crossed. The mod_share sign flip at V>=500 is observed, not
+explained. Nothing here licenses a claim about any V not tested, and per
+this document's own scope nothing here is confirmatory of anything.
