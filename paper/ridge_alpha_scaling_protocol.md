@@ -110,11 +110,24 @@ fits total.
 
 ## Resource caps, fixed now, stop rather than shrink on breach
 
+AMENDED after one blocked run, resource caps only -- no grid, seed, alpha,
+signal, split or prediction changed. The first RSS cap below was set
+without measuring this machine's baseline import cost. Measured before
+amending, not guessed: importing numpy+pandas+torch alone, before any
+project code or ridge fit, costs 508.1 MB RSS; the first declared cell
+(p=1, seed=0) then breached at 782.2 MB against the original 500 MB cap.
+Authorised correction: RSS cap raised to 1536 MiB (room above the measured
+508 MB baseline plus the grid's largest cell, p=2000, three float64
+n_train x p design matrices at once for the largest arm), and a FREE-RAM
+floor added, matching the large_system precedent's own style of capping
+both process RSS and system headroom rather than RSS alone.
+
   RUNTIME   <= 5 minutes wall-clock for the entire script, pre-flight
-            included. This is a CPU-only, at-most-2000-feature ridge grid;
-            5 minutes is generous headroom over the expected single-digit
-            seconds.
-  RSS       <= 500 MB process RSS at any point, checked after every cell.
+            included. Unchanged.
+  RSS       <= 1536 MiB process RSS at any point, checked after every
+            cell. Was 500 MB; corrected as above.
+  FREE RAM  >= 1024 MiB system free at every checkpoint where RSS is
+            checked. NEW.
   DISK      CORRECTED, self-contradictory as first written: no file under
             Data/, and no file under any PRIOR experiment's output
             directory (ExpOutput/large_system/ in particular, whose
@@ -188,8 +201,16 @@ the DISK cap correction above; if the local ridge formula's arithmetic
 differs from
 boundary_map.ridge_r2's own formula in anything but taking alpha as a
 parameter (checked by the pre-flight equivalence test, not asserted); if
-the grid, seeds, signal strength, alpha choices or resource caps change
-after any result is seen; if A1 is judged anywhere other than p=2000; if
+the grid, seeds, signal strength or alpha choices change after any
+SCIENTIFIC result -- an r2 value, a prediction outcome -- is seen. A
+resource cap is explicitly NOT a scientific result: the one amendment
+above was made after a resource breach with zero declared cells computed
+and zero r2 values observed, on measured infrastructure evidence (the
+508 MB import baseline) rather than on anything the experiment was
+designed to test, and is recorded as such rather than silently folded in.
+A second cap amendment, on the same reasoning, would need the same
+labelled treatment, not a standing licence to keep adjusting. If A1 is
+judged anywhere other than p=2000; if
 the P range or seed count is expanded after seeing a partial result --
 this run is fixed in scope from the moment it starts, not adaptively
 grown; or if any conclusion about the REAL system code, rather than this
