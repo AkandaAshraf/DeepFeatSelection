@@ -299,3 +299,166 @@ largest widths by construction rather than adjusted to compensate). No
 noise axis was crossed. The mod_share sign flip at V>=500 is observed, not
 explained. Nothing here licenses a claim about any V not tested, and per
 this document's own scope nothing here is confirmatory of anything.
+
+---
+
+## Post hoc diagnosis (2026-09-08): the V=500/1000 collapse, adversarially checked
+
+Requested separately from the run above: why does ranking collapse toward
+or below chance at V=500 and V=1000, for every trained arm including the
+oracle, while two near-zero-cost baselines do not degrade at all. No cell
+was rerun; everything below is recomputed from the untouched saved arrays
+in ExpOutput/large_system/raw_*.npz and from scripts/boundary_map.py and
+scripts/hierarchy_repair.py as they stand. Disk growth from this diagnosis:
+this section plus one new pre-registration, both plain text, well under
+100 KB combined.
+
+### The leading candidate, and precisely what is and is not established
+
+boundary_map.ridge_r2 uses a FIXED penalty, ALPHA = 1.0, unconditional on
+feature count, at every V. Three checks below converge on this as a
+PLAUSIBLE mechanism. None of them, individually or together, proves fixed
+alpha caused the real run's collapse -- (1) and (2) are POST HOC exploration
+of the archived arrays, not pre-registered, and (3) reproduces a possible
+mechanism on synthetic noise columns, not the real learned system code.
+What they DO establish, without qualification, is that e2 (a small,
+V-independent ridge) and e3 (a ridge conditioned on the full, V-scaled
+system code) behave very differently as V grows -- that part is a direct
+reading of the saved arrays, not an inference.
+
+**1. The saved e2/e3 decomposition separates a small, stable ridge from a
+large, V-scaled one, and only the large one fails.** hierarchy_repair.py's
+module_readout computes two increments per target: e2 = r_om - base, a
+ridge over own-lags (19 features) plus one small module code (~12-30
+features depending on module size) -- feature count essentially
+independent of V; and e3 = r_oms - r_om, which ADDS the full system code
+(width 2V) to that same ridge -- feature count scaling directly with V.
+Mean e2 on driven channels, 3-seed mean per width:
+
+  V           120       240       500      1000
+  e2       +0.0016   +0.0014   +0.0013   +0.0012    (HIER-CLUST-TRAIN)
+  e2       +0.0035   +0.0036   +0.0034   +0.0036    (HIER-TRUE, oracle)
+
+e2 is essentially FLAT across an 8x change in V, for both arms. e3 on the
+same channels, driven against source, 3-seed mean:
+
+  V              120       240       500      1000
+  e3 driven   +0.0011   +0.0003   -0.0024   -0.0163    (HIER-CLUST-TRAIN)
+  e3 source   -0.0002   -0.0005   -0.0013   -0.0084
+  e3 driven   -0.0001   -0.0008   -0.0024   -0.0128    (HIER-TRUE, oracle)
+  e3 source   -0.0002   -0.0005   -0.0012   -0.0068
+
+By V=1000, e3 on driven channels (-0.0178 to -0.0128 across the three
+hierarchy arms) is MORE negative than e3 on sources (-0.0084 to -0.0068):
+the system-code-conditioned term does not merely lose signal, it inverts,
+scoring the channels it should flag lowest, on average, below the channels
+it should never flag.
+
+**2. POST HOC exploration, not pre-registered: recomputing AP from the
+saved arrays alone, dropping e3 entirely, recovers the oracle from failing
+to strong.** No retraining; this is arithmetic on data already on disk,
+3-seed mean. Reported because it is a striking pattern in already-collected
+data, not as a confirmed result -- e2-alone was never a declared scoring
+rule for any arm, and this comparison was constructed after seeing the
+collapse it explains.
+
+  V                 120     240     500    1000
+  deployed (e2+e3) 0.991   0.958   0.736   0.105
+  e2 alone         0.993   0.845   0.862   0.881
+
+HIER-TRUE's deployed score falls from 0.958 to 0.105 between V=240 and
+V=1000 -- to below the 0.166 prevalence floor. Scored on e2 alone, the same
+arm holds at 0.845-0.993 across that entire range, INCLUDING at V=1000
+where it reaches 0.881. Adding the system-code-conditioned term is net
+NEGATIVE by V=500 for the oracle, not merely diminishing; the additive
+combination e2+e3 is not robust to the regime where e3's own ridge is
+poorly conditioned. HIER-CLUST-TRAIN (deployed 0.994/0.879/0.148/0.098
+against e2-alone 0.284/0.283/0.337/0.405) and HIER-RAND-SIZED (deployed
+0.953/0.819/0.116/0.097 against e2-alone 0.178/0.205/0.216/0.205) show the
+same direction -- e2-alone AP exceeds deployed AP at V=500 and V=1000 for
+both -- with lower absolute values throughout, consistent with their
+weaker underlying e2 signal rather than a different mechanism.
+
+**3. A synthetic check, using the deployed ridge_r2 helper unmodified,
+establishes that fixed alpha CAN produce this failure mode in isolation --
+not that it DID, on the real system code.** One genuinely informative
+column (fixed signal strength, R2 ceiling 0.028 alone) buried among p-1
+pure-noise columns, alpha=1.0, n_train=2397 matching large_system's actual
+value:
+
+  p          20     100     500    1000    2000    2400    3000
+  R2      0.010   0.000   0.000   0.000   0.000   0.000   0.000
+
+Held-out R2 is driven to the helper's own zero-clamp by p=100 -- p/n_train
+= 0.042, far below where p approaches n_train (V=500's actual own+sys_code
+width is ~1019, V=1000's is ~2019). This is a LOWER bound on how early the
+effect can bite: the real system code is a learned, correlated
+representation, not i.i.d. noise, so whether it fails earlier or later than
+this synthetic check is not established here -- but the check shows the
+mechanism is a generic property of this fixed-alpha estimator, not
+something specific to large_system's pipeline, the generator, or the
+embedding.
+
+### Ruled out by this diagnosis, not merely unconsidered
+
+  SCORING / CLASS ORIENTATION, checked as directed, against the code and
+  against the archived arrays. Traced the sign convention through every
+  arm: FLAT (average_precision_score(is_source, -flat), flat = joint minus
+  own R2, high = driven, correctly negated for a SOURCE-positive AP);
+  SELFR2 (-base fed to record(), double negation resolves to raw self-R2,
+  sources ARE well-predicted by their own history, correctly oriented);
+  LAGCORR (best cross-corr minus own autocorr, high = driven, correctly
+  negated); every HIER arm scores e2+e3 with the same convention as FLAT,
+  confirmed by recomputing cells.csv's own ap_source column from the
+  archived is_source/is_driven arrays and the archived e2+e3 sums and
+  matching it exactly, arm by arm, width by width, all 12 cells. The
+  e2-alone recomputation above uses the identical -e2 convention. No
+  orientation defect found anywhere.
+
+  BASELINE FAIRNESS / HELD-OUT PROVENANCE. tr_i and te_i are computed once
+  per cell (large_system.py:239) and passed BY REFERENCE into every arm's
+  ridge calls and into module_readout; no arm recomputes or diverges from
+  that split. SELFR2's score is itself a held-out ridge R2 (self_r2, the
+  same quantity computed for every other arm's own-lag baseline).
+  LAGCORR's score is a training-set correlation statistic, not a fitted
+  model evaluated out-of-sample, so it is not "held out" in the same sense
+  -- worth noting as a definitional difference, not a leakage or fairness
+  defect, since it never touches test rows at all rather than touching them
+  improperly.
+
+  ALREADY-KNOWN RIDGE FIDELITY ISSUES (no intercept, population rather than
+  sample variance). Confirmed present, unchanged, and explicitly held fixed
+  across every arm in this comparison by prior instruction (recorded
+  earlier for the C01 hierarchy work). Not implicated as a NEW finding here
+  and not proposed for change as part of addressing the leading cause below
+  -- a separate, smaller-magnitude issue from the fixed-alpha one.
+
+### Ranked next tests
+
+  1. LEADING CAUSE, CHEAPEST TEST. Pre-registered below
+     (paper/ridge_alpha_scaling_protocol.md): a CPU-only synthetic
+     extension of check 3 above, testing whether alpha scaled to feature
+     count (or a cross-validated alpha) recovers a planted signal at the
+     SAME (n_train, p) shapes large_system actually used, before spending
+     any GPU time on a real retrain. No encoder training, no dataset
+     touched, minutes of CPU time.
+  2. CONTINGENT ON (1). If alpha-scaling recovers the synthetic signal, a
+     real V=500/V=1000 retrain with a corrected alpha, to confirm the fix
+     transfers from synthetic noise columns to the actual learned system
+     code. This is the expensive, confirmatory step and is explicitly NOT
+     licensed by this diagnosis alone.
+  3. LOWER-RANKED, LARGER CHANGE. If (1) and (2) do not recover
+     performance, an architectural alternative: score own, module and
+     system-code contributions with SEPARATE small ridge fits and combine
+     the predictions rather than concatenating all three into one design
+     matrix, keeping every individual ridge's p small in the way e2's
+     already is. Not designed or scoped here.
+
+### Not established, stated plainly
+
+Whether the real (correlated, learned) system code fails at the same p as
+the i.i.d.-noise synthetic check, whether alpha-scaling is sufficient or
+only necessary, and whether the CLUST-vs-RAND module-share reversal at
+V>=500 has a fuller explanation than "both terms lose meaning once e3
+crosses zero" are all open. No claim is made about any V not in the
+original 12 cells.
