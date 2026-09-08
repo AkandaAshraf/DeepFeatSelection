@@ -215,3 +215,55 @@ the P range or seed count is expanded after seeing a partial result --
 this run is fixed in scope from the moment it starts, not adaptively
 grown; or if any conclusion about the REAL system code, rather than this
 synthetic test, is drawn from this run's result alone.
+
+---
+
+## Result (2026-09-08): A1 fails, A4 holds, and the failure is grid-limited
+
+30s wall-clock, 979 MB peak RSS, 5054 MB free RAM throughout (caps 300s /
+1536 MiB / >=1024 MiB, none approached), 2.8 KB CSV, 80 declared rows plus 5
+p=1 control rows. Pre-flight PASSED (diff 3.33e-16 from boundary_map.ridge_r2
+at alpha=1.0).
+
+  mean test R2           p=20    p=100    p=500   p=1000   p=2000
+  ALPHA-FIXED           0.0115   0.0000   0.0000   0.0000   0.0000
+  ALPHA-SCALED          0.0116   0.0000   0.0000   0.0000   0.0000
+  ALPHA-VAL             0.0127   0.0052   0.0033   0.0031   0.0022
+
+  p=1 empirical control: mean R2 0.0307 (analytic ceiling 0.0225)
+
+A4 GUARD HOLDS: ALPHA-FIXED clamps to exactly 0.0000 at p=100, matching the
+diagnosis check. A1 FAILS: ALPHA-VAL reaches 0.0022 at p=2000, against a
+bar of 0.01125. A2 FAILS: ALPHA-SCALED is indistinguishable from
+ALPHA-FIXED, clamped to 0.0000 by p=100 -- the alpha=p rule of thumb does
+nothing here. By the declared rule this is A CANDIDATE THAT DID NOT
+SURVIVE: validation-selected regularisation does not recover the signal at
+the real pipeline's own p=2000 shape, even under the most permissive
+reading available to it.
+
+**That last clause is the caveat, not decoration.** ALPHA-VAL selected the
+TOP of the declared search grid (alpha=100000) in 5 of 5 seeds at p=2000,
+4 of 5 at p=1000, 2 of 5 at p=500 -- validation selection is running into
+the grid's own declared ceiling, not settling on an interior optimum. The
+void conditions above forbid widening that grid now that a result has been
+seen, so this run cannot be extended to check what a larger alpha would
+have done; that is exactly the discipline the void conditions exist to
+enforce, applied against the reading that would have been most convenient.
+
+**What this run can and cannot say.** It supports, cleanly: no alpha
+WITHIN {0.1 .. 100000} recovers the signal at p=2000, and a naive p-scaled
+rule of thumb is no better than the incumbent fixed value. It does NOT
+support: that no alpha whatsoever could recover it, since the search never
+found an interior optimum to confirm the grid was wide enough to contain
+one. The candidate mechanism is weakened by this result on the range
+actually tested, not ruled out at any regularisation strength. A follow-up
+extending the grid upward, PRE-REGISTERED before any result from it is
+seen, is the natural next step if the candidate is still worth pursuing --
+not a re-run of this one under a wider grid after the fact.
+
+### Not established
+
+One signal strength, one noise structure (i.i.d. Gaussian columns), one
+n_train value. Whether the real, learned, correlated system code behaves
+like this synthetic noise at all remains untested, as stated throughout
+this document before any result existed.
