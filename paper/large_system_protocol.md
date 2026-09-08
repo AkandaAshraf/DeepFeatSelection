@@ -523,12 +523,18 @@ Zero exceptions across 6 cells and 3 arms.
   500              0 of 3                    0 of 3
   1000             0 of 3                    0 of 3
 
-This is not a gradual decline. Both deployable learned arms beat both cheap
-baselines in every seed at V=240 and in zero seeds at V=500, a hard cliff
-between the two widths tested on either side of it -- lining up exactly
-with the capacity_ratio crossing from 4.80 to 2.35 that the original run
-reported, and with the e2/e3 sign crossing the diagnosis found in the same
-interval.
+CORRECTED WORDING, caught before this stood: an earlier draft of this
+paragraph called this "not a gradual decline" and "a hard cliff". Four
+widths were tested, 260 apart and then 500 apart, with nothing in between
+either gap. What is actually established is an OBSERVED CROSSOVER between
+two tested settings: both deployable learned arms beat both cheap
+baselines in every seed at V=240 and in zero seeds at V=500. Whether the
+transition across that untested interval is itself sharp or gradual is not
+something four discrete points can distinguish, and no claim is made about
+its shape. The crossover sits in the same interval as the capacity_ratio
+change from 4.80 to 2.35 that the original run reported and the e2/e3 sign
+change the diagnosis found -- reported as the same interval, not as one
+causing the other; nothing here tests that.
 
 ### What this establishes and what it does not
 
