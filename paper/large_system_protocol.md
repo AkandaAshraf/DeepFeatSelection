@@ -462,3 +462,97 @@ only necessary, and whether the CLUST-vs-RAND module-share reversal at
 V>=500 has a fuller explanation than "both terms lose meaning once e3
 crosses zero" are all open. No claim is made about any V not in the
 original 12 cells.
+
+---
+
+## Closing decision (2026-09-08): no deployable arm beats the cheap baselines at V=500/1000
+
+This completes the scaling investigation opened by the run above and
+continued through the same-day diagnosis and paper/ridge_alpha_scaling_protocol.md.
+The ridge_alpha_scaling result was grid-limited, not a clean negative, and
+is accepted as reported there; nothing here reruns or widens it. The
+question this section answers is narrower and was never directly asked
+before: at the widths where the deployed method degrades, does ANYTHING
+learned still beat the two cheap baselines that never touch the system
+code -- FLAT and HIER-CLUST-TRAIN, both deployable (unlike HIER-TRUE, an
+oracle that requires the true parent structure and is excluded from this
+comparison), against SELFR2 and LAGCORR.
+
+Every AP value below was independently recomputed from the archived truth
+and score arrays and matched the recorded value in cells.csv exactly
+(scripts/scaling_decision.py, assertions on every one of 24 cells, all
+passed). Same source-positive AP convention throughout, same prevalence
+per width, no new definition introduced.
+
+### Per seed, at the two widths that matter
+
+  V=500   prevalence 0.166
+  seed    FLAT   HIER-CLUST   HIER-CLUST     SELFR2   LAGCORR
+                 (deployed)   (e2-only, POST HOC)
+  100    0.114      0.149          0.366       0.700     0.579
+  101    0.115      0.151          0.328       0.845     0.625
+  102    0.110      0.143          0.317       0.822     0.675
+
+  V=1000  prevalence 0.166
+  seed    FLAT   HIER-CLUST   HIER-CLUST     SELFR2   LAGCORR
+                 (deployed)   (e2-only, POST HOC)
+  100    0.095      0.096          0.409       0.774     0.667
+  101    0.099      0.102          0.450       0.774     0.625
+  102    0.095      0.095          0.355       0.840     0.683
+
+The post-hoc e2-only column is labelled exactly that: no deployed rule for
+HIER-CLUST-TRAIN ever scored on e2 alone, this is exploration of already-
+archived arrays after seeing the collapse, same status as the earlier
+post-hoc recomputation for the oracle. It is markedly better than
+HIER-CLUST-TRAIN's own deployed score at both widths, matching the earlier
+finding's direction, but it does not close the gap to either baseline: at
+both widths and every seed, SELFR2 and LAGCORR are both still higher.
+
+### The answer, checked in every one of 6 seed-cells
+
+At V=500 and at V=1000, in 3 of 3 seeds each: FLAT does not beat both
+baselines. HIER-CLUST-TRAIN's deployed score does not beat both baselines.
+HIER-CLUST-TRAIN's post-hoc e2-only score does not beat both baselines.
+Zero exceptions across 6 cells and 3 arms.
+
+### The crossover, all four widths, same per-seed count
+
+  V           FLAT beats both     HIER-CLUST (deployed) beats both
+  120              2 of 3                    2 of 3
+  240              3 of 3                    3 of 3
+  500              0 of 3                    0 of 3
+  1000             0 of 3                    0 of 3
+
+This is not a gradual decline. Both deployable learned arms beat both cheap
+baselines in every seed at V=240 and in zero seeds at V=500, a hard cliff
+between the two widths tested on either side of it -- lining up exactly
+with the capacity_ratio crossing from 4.80 to 2.35 that the original run
+reported, and with the e2/e3 sign crossing the diagnosis found in the same
+interval.
+
+### What this establishes and what it does not
+
+ESTABLISHED, directly, not inferred: at the two largest widths tested,
+training anything -- the full deployed method or its best deployable
+variant -- bought nothing over a linear correlation statistic that costs
+one O(V^2) pass, and nothing over ranking channels by how poorly their own
+history predicts them, which costs zero additional computation beyond what
+the method already computes as an intermediate quantity. This holds in
+every seed-cell checked, not on average across seeds that individually
+disagree.
+
+NOT ESTABLISHED. Whether this crossover is a property of THIS generating
+family and coupling only, or holds more generally, since only one of each
+was run. Whether a deployable arm could be built that keeps the ranking
+quality visible in the post-hoc e2-only score without needing e3's
+oracle-unavailable analogue -- HIER-CLUST-TRAIN's e2-only score improves
+over its own deployed score but was never close to competitive with either
+baseline, so today's diagnosis does not license a claim that fixing e3
+alone would close this gap even if the earlier ridge_alpha_scaling
+candidate had survived. Whether SELFR2 or LAGCORR themselves degrade at
+widths beyond V=1000, which was not tested. No claim beyond the archived
+12 cells and today's two follow-ups is made anywhere in this document.
+
+Runtime: under 2 seconds, CPU only, no GPU touched, no file under Data/ or
+any prior run's output directory read or written beyond the archived
+large_system arrays this section reads.
