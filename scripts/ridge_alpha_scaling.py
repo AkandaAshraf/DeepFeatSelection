@@ -39,11 +39,18 @@ SEEDS = (0, 1, 2, 3, 4)
 VAL_GRID = (0.1, 1, 10, 100, 1000, 10000, 100000)
 
 CAP_RUNTIME_SEC = 300
-CAP_RSS_MB = 500
+CAP_RSS_MB = 1536             # amended from 500MB, see protocol e084c40 --
+                               # the original cap was under this machine's
+                               # own import baseline (508MB), not the workload
+CAP_FREE_MB = 1024            # NEW, matching the amendment
 
 
 def rss_mb() -> float:
     return _LS.host_rss_mb()
+
+
+def free_mb() -> float:
+    return _LS.sys_free_mb()
 
 
 class CapBreach(RuntimeError):
@@ -133,10 +140,13 @@ def main() -> int:
     def check_caps(where: str):
         el = time.time() - t0
         rss = rss_mb()
+        free = free_mb()
         if el > CAP_RUNTIME_SEC:
             raise CapBreach(f"runtime {el:.1f}s > {CAP_RUNTIME_SEC}s at {where}")
         if rss > CAP_RSS_MB:
             raise CapBreach(f"RSS {rss:.1f}MB > {CAP_RSS_MB}MB at {where}")
+        if free < CAP_FREE_MB:
+            raise CapBreach(f"free RAM {free:.1f}MB < {CAP_FREE_MB}MB at {where}")
 
     # p=1 empirical control, per seed, descriptive only, not an arm
     for seed in SEEDS:
@@ -202,7 +212,8 @@ def main() -> int:
 
     print(f"\nTotal runtime: {(time.time()-t0):.1f}s  "
           f"(cap {CAP_RUNTIME_SEC}s)   peak-ish RSS {rss_mb():.0f}MB "
-          f"(cap {CAP_RSS_MB}MB)")
+          f"(cap {CAP_RSS_MB}MB)   free RAM {free_mb():.0f}MB "
+          f"(floor {CAP_FREE_MB}MB)")
 
     print("\nVERDICT (rule fixed before running; no adoption possible "
           "either way)")
