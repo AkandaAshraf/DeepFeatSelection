@@ -387,13 +387,27 @@ Splits: contiguous 60/20/20 train/validation/test on the KEPT n=4000
 samples, with raw-observation support disjointness verified by direct
 enumeration of the actual lag/forecast/preprocessing indices touched at
 each seam, following Rule 132's lesson (verify the claim by enumeration,
-not by trusting a formula matched to a different pipeline's differencing
-convention) -- scripts/parent_screening_split_test.py, modelled on
-scripts/test_embargo_boundary.py's pattern but re-derived for THIS
-pipeline's own embedding (no differencing step here, own-lag features use
-raw values directly, so the required embargo is span=(E-1)*max_delay=6 at
-each seam; verified by enumeration, not assumed from another pipeline's
-formula).
+not by trusting a formula matched to a different pipeline's convention)
+-- scripts/parent_screening_split_test.py, modelled on
+scripts/test_embargo_boundary.py's pattern.
+
+CAUGHT WHILE IMPLEMENTING, corrected here rather than left standing: this
+protocol's first draft stated the required embargo as
+(E-1)*max_delay = 6, reasoning by analogy from a different pipeline's
+differencing convention. That reasoning does not apply here -- a candidate
+group's own multi-lag delay structure is a property of the GENERATOR, not
+of the SCREENING METHOD's feature construction, which only ever reads a
+fixed E-length window aligned the same way for every variable, own or
+candidate. A row's true raw support is that E-length window plus the
+single forward touch to its t+1 target: E+1 consecutive raw indices, and
+enumeration (the split test's own oracle-verified search, not a second
+formula) confirms the minimal sufficient embargo is exactly E=3, not 6.
+The oracle in that test failed on its own first version too, for an
+unrelated reason (the synthetic example it checked against had a
+pre-existing gap that masked the very overlap it was meant to detect) --
+fixed before trusting the oracle's verdict on anything else. The
+implemented embargo is E, verified equal to the enumerated minimum, not
+merely sufficient for it.
 
 Hyperparameter selection (ridge alpha, lasso penalty) uses the training
 block's OWN internal temporal holdout, never validation or test. The
