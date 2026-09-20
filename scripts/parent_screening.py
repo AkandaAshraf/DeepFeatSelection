@@ -3,12 +3,13 @@
 Pre-registration: paper/parent_screening_protocol.md, committed before this
 was written. This file implements the SHARED MACHINERY (graph construction,
 both generator families, size-capped clustering, the intercept+validation-
-selected ridge readout, group encoders, scoring, candidate-set construction)
-plus STAGE A ONLY: toy correctness and feasibility checks, no large training,
-no scientific result. Stage B's full baseline suite (arms 2-4 beyond RANDOM,
-community-detection comparison) and Stages B/C themselves are NOT implemented
-here; they are written only once Stage A's checks pass and Stage B is
-separately authorised, per the protocol's own staged-investment structure.
+selected ridge readout, group encoders, scoring, candidate-set construction,
+metrics) plus STAGE A: correctness and feasibility checks, no scientific
+result. The six Stage B arms, the decision gate, the resource guard and the
+pilot runner live in scripts/parent_screening_arms.py; Stage A's invariance
+check [9] runs that module's production arm paths, not a copy of them.
+Community-detection comparison is not implemented (dependency not installed,
+no installs allowed) and is reported as a missing baseline.
 
     python scripts/parent_screening.py           # runs stage_a()
 """
@@ -486,6 +487,34 @@ def internal_val_split(n: int):
     return tr_idx, va_idx
 
 
+def ridge_select_alpha(Xtr, ytr):
+    """Alpha selection on the embargoed internal split, factored out of
+    ridge_r2_val so every consumer (the R2 readout, the own-history
+    residualiser some baselines need) shares ONE selection procedure.
+    Accepts numpy arrays or torch tensors (torch.as_tensor is a no-op for a
+    float64 tensor already on DEV). Returns (best_alpha, hit_grid_boundary)."""
+    itr_idx, iva_idx = internal_val_split(Xtr.shape[0])
+    Xi_tr, yi_tr = Xtr[itr_idx], ytr[itr_idx]
+    Xi_va, yi_va = Xtr[iva_idx], ytr[iva_idx]
+    best_a, best_err = ALPHA_GRID[0], float("inf")
+    for a in ALPHA_GRID:
+        w = ridge_fit_predict(Xi_tr, yi_tr, a)
+        Xv = torch.as_tensor(Xi_va, dtype=torch.float64, device=DEV)
+        yv = torch.as_tensor(yi_va, dtype=torch.float64, device=DEV)
+        ones = torch.ones((Xv.shape[0], 1), dtype=torch.float64, device=DEV)
+        pred = torch.cat([Xv, ones], dim=1) @ w
+        err = float(((pred - yv) ** 2).mean())
+        if err < best_err:
+            best_err, best_a = err, a
+    return best_a, best_a in (ALPHA_GRID[0], ALPHA_GRID[-1])
+
+
+def ridge_predict(Xe, w):
+    Xe_t = torch.as_tensor(Xe, dtype=torch.float64, device=DEV)
+    ones = torch.ones((Xe_t.shape[0], 1), dtype=torch.float64, device=DEV)
+    return torch.cat([Xe_t, ones], dim=1) @ w
+
+
 def ridge_r2_val(Xtr, ytr, Xeval, yeval):
     """Select alpha on the last VAL_INTERNAL_FRAC of Xtr/ytr (temporal),
     refit on the full Xtr at that alpha, report UNCLIPPED R2 on
@@ -503,22 +532,9 @@ def ridge_r2_val(Xtr, ytr, Xeval, yeval):
     the row objects are identical in kind to the ones the outer enumeration
     already checked, so the same embargo value applies without needing a
     second independent search."""
-    itr_idx, iva_idx = internal_val_split(Xtr.shape[0])
-    Xi_tr, yi_tr = Xtr[itr_idx], ytr[itr_idx]
-    Xi_va, yi_va = Xtr[iva_idx], ytr[iva_idx]
-    best_a, best_err = ALPHA_GRID[0], float("inf")
-    for a in ALPHA_GRID:
-        w = ridge_fit_predict(Xi_tr, yi_tr, a)
-        Xv = torch.as_tensor(Xi_va, dtype=torch.float64, device=DEV)
-        yv = torch.as_tensor(yi_va, dtype=torch.float64, device=DEV)
-        ones = torch.ones((Xv.shape[0], 1), dtype=torch.float64, device=DEV)
-        pred = torch.cat([Xv, ones], dim=1) @ w
-        err = float(((pred - yv) ** 2).mean())
-        if err < best_err:
-            best_err, best_a = err, a
+    best_a, hit_boundary = ridge_select_alpha(Xtr, ytr)
     w_full = ridge_fit_predict(Xtr, ytr, best_a)
     r2 = _r2(Xeval, yeval, w_full)
-    hit_boundary = best_a in (ALPHA_GRID[0], ALPHA_GRID[-1])
     return r2, best_a, hit_boundary
 
 
@@ -530,7 +546,8 @@ def group_bottleneck(group_size: int) -> int:
     return min(GROUP_CAP, 2 * group_size)
 
 
-def train_group_encoder(z_group: np.ndarray, tr_idx, group_size: int, seed: int):
+def train_group_encoder(z_group: np.ndarray, tr_idx, group_size: int, seed: int,
+                        guard=None):
     b = group_bottleneck(group_size)
     d_in = z_group.shape[1]
     torch.manual_seed(seed)
@@ -539,6 +556,8 @@ def train_group_encoder(z_group: np.ndarray, tr_idx, group_size: int, seed: int)
     g = torch.Generator().manual_seed(seed)
     ztr = torch.as_tensor(z_group[tr_idx], device=DEV, dtype=torch.float32)
     for _ in range(EPOCHS):
+        if guard is not None:
+            guard.check_light("encoder epoch")
         perm = torch.randperm(ztr.shape[0], generator=g)
         for i in range(0, len(perm), BATCH):
             bt = ztr[perm[i:i + BATCH]]
@@ -729,39 +748,6 @@ def _run_toy_pipeline(x_obs, groups, targets, seed=901):
     return gains
 
 
-def _run_production_pipeline(x_obs, seed=9500):
-    """The REAL pipeline: cluster_size_capped on train rows (not a hand-
-    fixed grouping), one encoder per REALISED group, scoring for every
-    (target, group) pair, and build_candidate_set for every non-root
-    target. Returns (labels, groups, gains, C, unresolved)."""
-    tr, va, te, m, embargo = splits_for(len(x_obs))
-    x_train_raw = x_obs[:int(0.6 * len(x_obs))]
-    labels = cluster_size_capped(x_train_raw)
-    Vt = x_obs.shape[1]
-    groups = {gid: sorted(np.where(labels == gid)[0].tolist())
-             for gid in sorted(set(labels.tolist()))}
-    nets = {}
-    for gid, members in groups.items():
-        member_windows = [own_lag_window(x_obs, j)[0] for j in members]
-        z_group = np.concatenate(member_windows, axis=1)
-        net = train_group_encoder(z_group, tr, len(members), seed=seed + gid)
-        nets[gid] = (net, z_group, members)
-    gains, C, unresolved = {}, {}, {}
-    k = k_for(Vt)
-    for q in range(Vt):
-        own_raw, target_vals, _ = own_lag_window(x_obs, q)
-        own_feats = poly3(own_raw)
-        gains[q] = {}
-        for gid, (net, z_group, members) in nets.items():
-            excl = members.index(q) if q in members else None
-            codes = group_code(net, z_group, exclude_member_pos=excl)
-            gain, alpha, hit = score_target_against_group(
-                own_feats, target_vals, codes, tr, va)
-            gains[q][gid] = gain
-        C[q], unresolved[q] = build_candidate_set(q, gains[q], groups, k)
-    return labels, groups, gains, C, unresolved
-
-
 def stage_a() -> bool:
     t0 = time.time()
     ok = True
@@ -935,26 +921,22 @@ def stage_a() -> bool:
     ok &= same
 
     # ---- production-pipeline perturbation invariance, extended coverage
-    print("\n[9] PRODUCTION-pipeline perturbation invariance: real "
-          "clustering + real encoders + real candidate-set construction, "
-          "every target, not the hand-fixed 2-target/fixed-group toy above")
-    out = family1_generate(12, 1200, seed=9600)
-    x_full = out["x_obs"]
-    lab_a, groups_a, gains_a, C_a, unres_a = _run_production_pipeline(x_full)
-    x_pert2 = x_full.copy()
-    pert2 = np.arange(len(x_full) - 60, len(x_full))
-    x_pert2[pert2] += np.random.default_rng(321).standard_normal(
-        (len(pert2), x_pert2.shape[1])) * 10.0
-    lab_b, groups_b, gains_b, C_b, unres_b = _run_production_pipeline(x_pert2)
-    labels_same = np.array_equal(lab_a, lab_b)
-    gains_same = all(abs(gains_a[q][g] - gains_b[q][g]) < 1e-9
-                     for q in gains_a for g in gains_a[q])
-    C_same = all(C_a[q] == C_b[q] and unres_a[q] == unres_b[q] for q in C_a)
-    prod_ok = labels_same and gains_same and C_same
-    print(f"    V=12, {len(groups_a)} groups realised, k={k_for(12)}")
-    print(f"    partition labels identical: {labels_same}")
-    print(f"    every (target,group) gain identical: {gains_same}")
-    print(f"    every C_q (and unresolved flag) identical: {C_same}")
+    print("\n[9] PRODUCTION-arm perturbation invariance: ALL six arms through "
+          "their final production paths (parent_screening_arms."
+          "check_invariance), with a same-input determinism control and a "
+          "train-span sensitivity control proving the check can fail")
+    sys.modules.setdefault("parent_screening", sys.modules[__name__])
+    import parent_screening_arms as _ARMS
+    control, perturbed, sens = _ARMS.check_invariance()
+    n_sens = sum(not v for v in sens.values())
+    for name in control:
+        print(f"    {name:36s} control "
+              f"{'identical' if control[name] else 'DIFFERS':9s}"
+              f" | test-block perturbed "
+              f"{'identical' if perturbed[name] else 'CHANGED'}")
+    print(f"    sensitivity: a train-span perturbation changes {n_sens} of "
+          f"{len(sens)} comparisons (must be > 0)")
+    prod_ok = all(control.values()) and all(perturbed.values()) and n_sens > 0
     print(f"    -> {'PASS' if prod_ok else 'FAIL'}")
     ok &= prod_ok
 
@@ -988,8 +970,7 @@ def stage_a() -> bool:
 
     print(f"\n{'=' * 66}")
     print(f"STAGE A {'PASSED' if ok else 'FAILED'} in {time.time()-t0:.1f}s")
-    print("No baseline arms beyond RANDOM, no stress panels, no Stage B/C "
-          "widths were run. Deferred to Stage B's own authorisation.")
+    print("No pilot, no Stage B/C widths, no stress panels were run.")
     print("=" * 66)
     return ok
 
