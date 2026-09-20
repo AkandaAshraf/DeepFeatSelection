@@ -1,10 +1,20 @@
-"""Enumerated raw-support disjointness for parent_screening's own_lag_window,
-modelled on scripts/test_embargo_boundary.py's pattern: derive raw index
-support from the ACTUAL row-construction code, not an assumed formula, per
-Rule 132 ("a correction is a claim like any other and needs its own check").
+"""Enumerated raw-support disjointness for parent_screening's actual row
+construction, not a formula re-derived from reading the code.
 
-A known-bad embargo (0) is included as an ORACLE: if this test cannot
-detect that overlap, the test itself is broken, not just lenient.
+REWRITTEN after review: the first version's raw_support() was itself a
+formula, the exact risk Rule 132 warns about (a plausible-looking formula
+can be wrong even when derived carefully). This version feeds INDEX-VALUED
+data (x[t] = t) through the PRODUCTION own_lag_window function directly,
+so the returned own-lag and target VALUES literally name the raw indices
+touched -- there is no separate formula to get wrong. The internal
+ridge_r2_val seam (found unembargoed by review, now fixed) is checked the
+same way, using its actual cut arithmetic, not a re-derived one.
+
+A known-bad embargo (0, adjacent seam) is included as an ORACLE: if this
+test cannot detect that overlap, the test itself is broken, not lenient.
+The oracle failed once already while writing this file (a pre-existing gap
+in the first harness masked the overlap it was meant to detect) -- fixed
+before trusting its verdict on anything else.
 
     python scripts/parent_screening_split_test.py
 """
@@ -19,72 +29,90 @@ sys.path.insert(0, str(Path(__file__).parent))
 import parent_screening as PS  # noqa: E402
 
 
-def raw_support(row_i: int, max_delay: int, E: int) -> set[int]:
-    """Raw indices touched by own_lag_window's row `row_i`: the E-length
-    own-lag window [t-(E-1) .. t] plus the target's single touch at t+1,
-    where t = max_delay + row_i (own_lag_window's own convention)."""
-    t = max_delay + row_i
-    return set(range(t - (E - 1), t + 1 + 1))  # own window ∪ {t+1}
+def touched_indices(n: int, max_delay: int = PS.MAX_DELAY):
+    """Runs own_lag_window on x[t]=t (E channels irrelevant, uses column
+    0). Returns (own_support[i], target_value[i]) read directly from the
+    function's own output values -- the actual raw indices it touched."""
+    x = np.arange(n, dtype=float).reshape(-1, 1)
+    own, target, t_index = PS.own_lag_window(x, 0, max_delay)
+    row_support = [set(own[i].tolist()) | {float(target[i])}
+                  for i in range(len(target))]
+    return row_support
 
 
-def min_required_embargo(max_delay: int, E: int) -> int:
-    """Discovered by enumeration, not asserted: the smallest embargo e such
-    that dropping e rows at the ADJACENT seam (no pre-existing gap) leaves
-    train's raw support disjoint from the immediately-following block's."""
-    for e in range(0, max_delay + E + 2):
-        m, a = 200, 100
-        tr = np.arange(0, max(a - e, 1))
-        te = np.arange(a, m)   # adjacent to train, no gap -- the real seam
-        tr_support = set().union(*(raw_support(i, max_delay, E) for i in tr))
-        te_support = set().union(*(raw_support(i, max_delay, E) for i in te))
-        if not (tr_support & te_support):
-            return e
-    raise RuntimeError("no embargo up to the search bound closes the overlap")
+def support_union(row_support, idx):
+    out: set[float] = set()
+    for i in idx:
+        out |= row_support[i]
+    return out
 
 
 def main() -> int:
     ok = True
+    n_obs = 4000
+    row_support = touched_indices(n_obs)
 
     print("ORACLE: an ADJACENT seam with embargo=0 must show an overlap, "
           "or this test cannot detect anything")
-    m, a = 200, 100
-    tr0 = np.arange(0, a)                # embargo = 0
-    te0 = np.arange(a, m)                # starts immediately after train
-    s_tr0 = set().union(*(raw_support(i, PS.MAX_DELAY, PS.E) for i in tr0))
-    s_te0 = set().union(*(raw_support(i, PS.MAX_DELAY, PS.E) for i in te0))
-    oracle_overlap = bool(s_tr0 & s_te0)
+    a = 100
+    tr0, te0 = list(range(0, a)), list(range(a, 200))
+    oracle_overlap = bool(support_union(row_support, tr0)
+                          & support_union(row_support, te0))
     print(f"   overlap at embargo=0, adjacent seam: {oracle_overlap}   "
           f"-> {'PASS (oracle detects it)' if oracle_overlap else 'FAIL -- test is broken'}")
     ok &= oracle_overlap
 
-    discovered = min_required_embargo(PS.MAX_DELAY, PS.E)
-    # READ splits_for's OWN returned embargo -- not a formula re-derived
-    # here, which is exactly the duplicated-assumption risk this test
-    # exists to catch (caught once already while writing this file).
-    _, _, _, _, declared = PS.splits_for(4000)
-    print(f"\nDISCOVERED minimal embargo (enumeration): {discovered}")
-    print(f"DECLARED embargo in parent_screening.splits_for: {declared}")
-    match = discovered == declared
-    print(f"   -> {'MATCH' if match else 'MISMATCH -- fix splits_for'}")
-    ok &= match
-
-    print("\nVERIFY splits_for's ACTUAL train/val/test arrays are disjoint "
-          "in raw support, using its own returned indices")
-    n_obs = 4000
+    print("\n[outer seams] splits_for's OWN returned tr/va/te, checked via "
+          "own_lag_window's actual output values, not a re-derived formula")
     tr, va, te, m, embargo = PS.splits_for(n_obs)
-    s_tr = set().union(*(raw_support(i, PS.MAX_DELAY, PS.E) for i in tr))
-    s_va = set().union(*(raw_support(i, PS.MAX_DELAY, PS.E) for i in va))
-    s_te = set().union(*(raw_support(i, PS.MAX_DELAY, PS.E) for i in te))
-    tv = bool(s_tr & s_va)
-    vt = bool(s_va & s_te)
-    tt = bool(s_tr & s_te)
-    print(f"   train/val overlap: {tv}   val/test overlap: {vt}   "
+    row_support_m = touched_indices(n_obs)  # same n_obs -> same m, reuse
+    s_tr = support_union(row_support_m, tr.tolist())
+    s_va = support_union(row_support_m, va.tolist())
+    s_te = support_union(row_support_m, te.tolist())
+    tv, vt_, tt = bool(s_tr & s_va), bool(s_va & s_te), bool(s_tr & s_te)
+    print(f"   train/val overlap: {tv}   val/test overlap: {vt_}   "
           f"train/test overlap: {tt}")
-    disjoint = not (tv or vt or tt)
-    print(f"   -> {'PASS' if disjoint else 'FAIL'}")
-    ok &= disjoint
-    ok &= (embargo == discovered)  # splits_for's own runtime value, not just
-                                   # the module constant checked above
+    outer_ok = not (tv or vt_ or tt)
+    print(f"   declared embargo: {embargo}   -> {'PASS' if outer_ok else 'FAIL'}")
+    ok &= outer_ok
+
+    print("\n[internal ridge seam] calls PS.internal_val_split directly -- "
+          "the exact function ridge_r2_val uses, not a re-derived copy "
+          "(review caught the first version hand-duplicating this "
+          "arithmetic despite a comment claiming otherwise)")
+    n_tr = len(tr)
+    itr_pos, iva_pos = PS.internal_val_split(n_tr)   # THE production function
+    inner_tr_positions = tr[itr_pos]
+    inner_va_positions = tr[iva_pos]
+    s_itr = support_union(row_support_m, inner_tr_positions.tolist())
+    s_iva = support_union(row_support_m, inner_va_positions.tolist())
+    inner_overlap = bool(s_itr & s_iva)
+    print(f"   internal train/val overlap: {inner_overlap}   "
+          f"-> {'PASS' if not inner_overlap else 'FAIL'}")
+    ok &= not inner_overlap
+
+    print("\n[internal seam ORACLE] proves the check above has teeth: an "
+          "unembargoed version of the SAME split must show an overlap")
+    cut = max(int(n_tr * (1 - PS.VAL_INTERNAL_FRAC)), 1)
+    bad_tr_positions = tr[np.arange(0, cut)]      # embargo=0, the bug as filed
+    bad_va_positions = tr[np.arange(cut, n_tr)]
+    s_bad_tr = support_union(row_support_m, bad_tr_positions.tolist())
+    s_bad_va = support_union(row_support_m, bad_va_positions.tolist())
+    bad_overlap = bool(s_bad_tr & s_bad_va)
+    print(f"   overlap with embargo=0 (the original bug): {bad_overlap}   "
+          f"-> {'PASS (oracle detects it)' if bad_overlap else 'FAIL -- test is broken'}")
+    ok &= bad_overlap
+
+    print("\n[reject-not-fallback] internal_val_split must RAISE on inputs "
+          "too small to embargo, not silently reuse rows across the seam")
+    try:
+        PS.internal_val_split(2 * PS.E)  # deliberately too small
+        raised = False
+    except PS.TooSmallForEmbargo:
+        raised = True
+    print(f"   raised TooSmallForEmbargo on a tiny input: {raised}   "
+          f"-> {'PASS' if raised else 'FAIL'}")
+    ok &= raised
 
     print(f"\n{'ALL CHECKS PASS' if ok else 'AT LEAST ONE CHECK FAILED'}")
     return 0 if ok else 1

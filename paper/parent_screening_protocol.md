@@ -93,15 +93,22 @@ Given V and seed:
    allows a root or a non-root as a parent, which is what produces chains
    and common drivers rather than only source-to-sink stars); draw one
    delay per parent edge, independently, from Uniform{1,2,3}.
-3. ORPHAN REPAIR, deterministic, no randomness: for every root with zero
-   children after step 2, take the variable immediately following it in
-   topological order and add the orphan root as one of its parents,
-   replacing that variable's highest-index existing parent if it is
-   already at indegree 3. Re-check; this repair is a single pass and is
-   sufficient because at most n_root roots can be orphaned and each repair
-   consumes one later variable's parent slot without creating a cycle
-   (topological order is preserved: the repair only ever adds an EARLIER
-   variable as a parent of a LATER one).
+3. ORPHAN REPAIR, as implemented after two review-driven rewrites (the
+   first draft of this step, preserved in the amendment section below,
+   described a repair that was wrong): for every root with zero children
+   after step 2, choose as heir the FIRST NON-ROOT variable, searched in
+   topological order from a rotating offset, that has indegree < 3, and
+   append the orphan root to that heir's parent list with a freshly drawn
+   delay from Uniform{1,2,3}. Roots are NEVER eligible heirs (both
+   generators' root branches ignore parent[root] entirely, so an edge into
+   a root would exist in the recorded map and not in the simulated data).
+   No existing edge is ever displaced, so no child-count decrement is ever
+   needed, and no variable's indegree ever exceeds 3, preserving the
+   registered 1-3 indegree range without an exception. Topological order
+   is preserved: the repair only ever adds an EARLIER-ordered root as a
+   parent of a LATER-ordered non-root. If no non-root variable has spare
+   indegree capacity anywhere, the seed is redrawn (the orphan_free
+   validity gate fails), not patched.
 4. Record the realised parent map Pa(q) for every non-root q, the delay
    for every edge, and n_root, before any dynamics are simulated.
 
@@ -129,8 +136,21 @@ work, kept for comparability, not re-tuned here).
 
   root i:      x_i(t+1) = clip( r_i * x_i(t) * (1 - x_i(t)),  0, 1 )
   non-root i:  k = x_i(t)
-               drive = mean_{j in Pa(i)} [ eta_ij * x_j(t - d_ij) ]
+               drive = mean_{j in Pa(i)} [ eta_ij * x_j((t+1) - d_ij) ]
                x_i(t+1) = clip( r_i*k*(1-k)*(1-c) + c*drive*(1-k),  0, 1 )
+
+CORRECTED, caught by review: the first draft wrote drive as
+x_j(t - d_ij), delay measured from the OWN-lag time t. The implemented
+and now EMPIRICALLY VERIFIED convention (scripts/parent_screening.py's
+[3c] lag-impulse test, an impulse on the parent at a known raw index,
+checked against which raw index the effect on x_i(t+1) traces back to,
+for d=1,2,3) is delay measured from the TARGET time t+1: x_j((t+1)-d_ij),
+the standard lag convention in this literature (a lag-d edge predicts the
+TARGET using a d-step-back value, not a (d+1)-step-back one). d=1 under
+this convention reads x_j(t), the same raw time as i's own most recent
+lag -- contemporaneous with i's own last observation, not one step
+further back. Text corrected to match the verified implementation, not
+the other way around.
 
 This is scripts/clean_generator.py's update rule generalised from a single
 parent at fixed delay to a mean over 1-3 parents at per-edge delays; the
@@ -177,16 +197,29 @@ alone.
 
 Parent term (additive targets): gamma_i ~ U(0.4, 0.8); for each edge,
 weight w_ij ~ U(0.3, 0.7); drive_i(t) = mean_{j in Pa(i)} [ w_ij *
-tanh(x_j(t - d_ij)) ].
+tanh(x_j((t+1) - d_ij)) ], the SAME target-relative lag convention as
+Family 1, verified for both families by the [3c] production-path
+lag-impulse test (this line was missed in the first correction and still
+read x_j(t - d_ij), caught by review).
 
   root i:      x_i(t+1) = a_i*x_i(t) + b_i*x_i(t-1) + eps_i(t)
   non-root i:  x_i(t+1) = a_i*x_i(t) + b_i*x_i(t-1)
                         + gamma_i * drive_i(t) + eps_i(t)
 
 Innovation noise eps_i(t) ~ N(0, sigma_i^2) i.i.d. over time, independent
-across channels; sigma_i = 0.7 for roots (their only variance source),
-0.5 for non-roots (declared, not tuned to any target self-predictability
-level).
+across channels; sigma_i ~ Uniform(0.4, 0.6), drawn independently for
+EVERY channel from the same distribution, whether root or non-root.
+
+CORRECTED, disclosed before any pilot ran: this paragraph first set
+sigma_i = 0.7 for roots and 0.5 for non-roots, a value that depended
+directly on root/non-root status. The brief this protocol executes says
+noise distributions must not directly encode that status, and a fixed
+0.7-versus-0.5 split does exactly that: a screening method could partly
+succeed by reading channel noise SCALE as a root/non-root signature
+rather than by reading dependence structure at all. Caught by review of
+the Stage A implementation, fixed in code and here before any pilot seed
+was run, so no scientific result was produced under the role-encoding
+version and none needs to be set aside.
 
 Burn-in and kept length identical to Family 1: 500 discarded, n=4000 kept,
 x(0) ~ N(0, 1)^V.
@@ -216,15 +249,29 @@ assumes a size cap, not a count.
 
 Procedure, frozen: compute d = diff(x_train, axis=0); c = corrcoef(d.T),
 NaN to 0; distance = 1 - |c|. Run scipy.cluster.hierarchy.linkage with
-average linkage on the condensed distance form. Process the linkage
-matrix's merges IN THE ORDER GIVEN (ascending distance, linkage's own
-tie-break for equal distances, which is deterministic given deterministic
-input) and accept a merge only if the two current clusters' combined size
-is <= 8; skip a merge that would exceed 8 and continue to the next one in
-the list (a skipped merge's two clusters remain separate and may still
-each merge with something else later). This terminates with every final
-group of size 1-8, deterministic given x_train, with no cluster COUNT
-declared in advance.
+average linkage on the condensed distance form, producing the FULL
+dendrogram: every merge node, unconditionally, in scipy's own numbering.
+Then CUT the tree top-down: starting from the root, descend into a node's
+two children whenever that node's subtree exceeds 8 leaves, and emit a
+node as one group the moment its subtree has <= 8 leaves. This terminates
+with every final group of size 1-8, deterministic given x_train (scipy's
+own tie-break for equal distances is deterministic given deterministic
+input), with no cluster COUNT declared in advance.
+
+CORRECTED, caught by review: this paragraph first described a DIFFERENT
+algorithm -- process merges in ascending-distance order and SKIP any merge
+that would exceed the cap, leaving those two clusters separate. That
+algorithm is WRONG and was never what the shipped code does: scipy's
+linkage output numbers every internal node by its merge order, and later
+rows reference earlier internal nodes by that number whether or not this
+code chose to use them, so skipping a merge leaves a dangling reference
+for every later row that names it (discovered as an IndexError the first
+time the skip-based version ran). The shipped implementation is the
+top-down cut described above, which never skips a merge and never needs
+to. The protocol text was not updated when the code was fixed; it is now,
+and scripts/parent_screening.py's [3b] behavior check confirms a forced
+correlated block lands in one group under the cut-based rule, alongside
+the existing determinism and size-cap checks.
 
 The same procedure with the SAME frozen distance definition and tie
 ordering is applied for every arm that needs a partition (clustered and
@@ -378,10 +425,16 @@ Truth is Pa(q) as constructed above, held by the evaluator only; the
 screen's API receives only the observed (noised) series and V. Own lags
 are always available to every arm and are excluded from both the
 candidate budget and the parent-recall metric. Roots are recorded
-separately and cannot inflate recall through an empty parent set (a root
-contributes 0 to both the recall numerator and denominator, and 1 to
-complete-target coverage's numerator trivially -- reported, with roots'
-contribution to coverage stated explicitly rather than silently pooled).
+separately and EXCLUDED ENTIRELY from every primary metric's numerator and
+denominator, recall and complete-target coverage alike (the root count per
+system is reported alongside, never folded in). CORRECTED, caught by
+review: an earlier draft of this paragraph said a root contributes "1 to
+complete-target coverage's numerator trivially", counting an empty
+required-parent set as a vacuous success. That would have inflated
+coverage in exactly proportion to how many roots a system happens to have,
+and it never matched the implementation, whose coverage function already
+filtered to non-empty parent sets only. Text corrected to match the
+code, which was right.
 
 Splits: contiguous 60/20/20 train/validation/test on the KEPT n=4000
 samples, with raw-observation support disjointness verified by direct
@@ -453,14 +506,19 @@ reported only if Stage C is reached.
 - >= 0.80 complete-target coverage.
 - >= +0.05 recall over EVERY required deployable baseline at the same
   budget, paired at the graph-seed level.
-- Confirmation additionally requires: lower 95% graph-level bootstrap
-  bound on recall > 0.90, and lower bound on every paired recall
-  difference > 0.05's own bound > 0 -- resampled over whole graph-seed
-  blocks, paired across arms and widths, not over channels (Rule 101).
-  These are CONJUNCTIVE; failing any one fails the confirmation gate.
-  A bootstrap interval is an empirical statement about this generator and
-  these seeds, not a distribution-free coverage guarantee, and is reported
-  as such.
+- Confirmation additionally requires, as SEPARATE conditions (the first
+  draft of this bullet ran them together into a malformed sentence, caught
+  by review): (a) the lower 95% graph-level bootstrap bound on retained-
+  parent recall exceeds 0.90; and (b) for EVERY required deployable
+  baseline, the POINT ESTIMATE of the paired recall difference is >= 0.05
+  AND the lower 95% bootstrap bound of that same paired difference is
+  strictly > 0 (i.e. the interval excludes zero improvement; the bound
+  itself is NOT required to reach 0.05, only to clear zero). Resampling is
+  over whole graph-seed blocks, paired across arms and widths, never over
+  channels (Rule 101). These are CONJUNCTIVE; failing any one fails the
+  confirmation gate. A bootstrap interval is an empirical statement about
+  this generator and these seeds, not a distribution-free coverage
+  guarantee, and is reported as such.
 
 ## Resource caps, measured before finalising, stop rather than shrink on breach
 
@@ -509,9 +567,30 @@ seeds only (excluded from every scientific result):
     clock measured, informing Stage B's resource caps before they are
     trusted.
 
+FROZEN SEED LISTS, exact integers, declared before any scientific
+execution. Checked against every seed in scripts/*.py and paper/*.md at
+freeze time: no five-digit seed appears anywhere else in this repository,
+and none of the four blocks below overlaps any existing range (the
+highest prior named range is 1400-1430; engineering seeds used so far in
+this experiment are 9001-9003, 900/910/920/930/940, 9500, 9600, all
+excluded from every scientific result and none inside a block below).
+
+  Stage B pilot, family 1:            20001 20002 20003 20004 20005 20006
+  Stage B pilot, family 2:            21001 21002 21003 21004 21005 21006
+  Stage C confirmation, family 1:     22001 22002 22003 22004 22005 22006
+                                      22007 22008 22009 22010 22011 22012
+  Stage C confirmation, family 2:     23001 23002 23003 23004 23005 23006
+                                      23007 23008 23009 23010 23011 23012
+
+Stress-panel seeds are frozen separately, only if Stage C is reached, in
+their own amendment committed before that panel runs. A seed used in any
+stage is retired: it cannot be reused for a later stage or a rerun under
+a changed protocol, and a changed protocol after any result gets a fresh
+block, not these seeds again.
+
 STAGE B -- preregistered pilot: V=240, n=4000, 6 independent graph seeds
-per family (seeds drawn fresh and checked unused by any prior experiment
-in this repository before being frozen), primary noise level only, all
+per family (the exact seeds are the frozen lists above), primary noise
+level only, all
 required arms including community detection if feasible within this
 stage's own cap. Maximum 1 hour total training/analysis. If Stage A's
 measurements show that cap is infeasible for the full arm set, this
@@ -519,11 +598,36 @@ document is amended with a cost estimate before Stage B is launched, not
 silently shrunk.
 
 GATE (pilot bars decide investment; a pilot result is never itself
-confirmation): proceed to Stage C only if, in BOTH primary families, arm 6
-reaches pilot mean recall >= 0.90, complete-target coverage >= 0.80, and
-beats every required baseline (arms 1-5, plus any feasible modern method)
-by >= 0.05 recall at the same budget. If a baseline already meets the
-task as well, that baseline is preferred and the learned line stops here.
+confirmation), MACHINE-CHECKABLE: proceed to Stage C only if EVERY one of
+the following holds, computed by the pilot script and printed as
+PASS/FAIL per family per condition, in BOTH primary families at once:
+
+  G1  arm 6's pilot mean retained-parent recall >= 0.90;
+  G2  arm 6's pilot mean complete-target coverage >= 0.80, non-root
+      targets only (roots excluded, count reported alongside);
+  G3  arm 6's mean recall exceeds EVERY required baseline's (arms 1-5,
+      plus any feasible modern method) by >= 0.05 at the same budget;
+  G4  FIXED-BUDGET INTEGRITY, no relaxation: EVERY non-root target's
+      candidate set satisfies |C_q| <= k (the same k = ceil(0.10*(V-1))
+      for every arm), with an UNRESOLVED target counted at its full V-1
+      fallback size, so any unresolved target fails G4 by construction.
+      Only floating-point tolerance is allowed on the reported candidate
+      fraction sum|C_q| / (|Q|*(V-1)), which must not exceed k/(V-1). This
+      is the guard against a recall number produced by abstention rather
+      than screening: an arm that returns V-1 candidates for a target
+      cannot pass a fixed-budget screen by doing so, and abstention is
+      reported (below), never absorbed as a success.
+
+The unresolved rate is REPORTED per family and per arm, descriptively, and
+carries NO separate pass/fail threshold: an earlier draft of this gate
+added a G5 (unresolved fraction <= 0.10) and a 1.5x candidate-budget
+allowance, both flagged by review as new scientific thresholds introduced
+after the registered design, one of them a relaxation of the registered
+10% budget to roughly 15%. Both are withdrawn. Validity is determined by
+the original fixed-budget condition G4 alone; nothing is added to it here.
+
+If a baseline already meets the task as well (G3 fails against it), that
+baseline is preferred and the learned line stops here.
 
 STAGE C -- gated. Untouched V=500 and V=1000, 12 graph seeds per family
 (48 primary system-cells), same architecture/score/split/budget/baselines
@@ -620,3 +724,95 @@ after seeing its own result; if Stage C is launched without Stage B's gate
 having passed in BOTH families; or if any downstream PCMCI run is scored
 on anything but the identical conditional-independence test and identical
 data for both the screened and unscreened arm.
+
+---
+
+## Pre-pilot amendment (2026-09-20): eight defects found by independent review of the Stage A implementation, all fixed before any pilot
+
+Registered before any scientific pilot ran. No pilot seed has been
+executed, so no result exists under any defective version and none needs to
+be set aside or re-registered; the frozen seed lists above were chosen after
+these corrections and are untouched. Each defect below was found by an
+independent reviewer of the Stage A code, reproduced or confirmed against
+the actual implementation before being fixed rather than taken on trust,
+and is now guarded by a test in scripts/parent_screening.py's stage_a() or
+scripts/parent_screening_split_test.py.
+
+1. ORPHAN REPAIR. Reproduced: 14 of 500 engineering seeds at V=30 had a
+   pre-repair orphan root, and in 7 of those 14 the repair's heir was
+   itself a root, so the repair edge was recorded in the parent map but
+   dynamically inert (both generators' root branches never read
+   parent[root]). The displacement branch also never decremented the
+   displaced parent's child count. A first fix allowed indegree 4 for
+   repaired heirs; review correctly flagged that as broadening the
+   registered 1-3 range. Final design: non-root heirs only, indegree
+   strictly <= 3, nothing ever displaced. Guarded by: 1000-seed regression
+   (zero orphans remaining, max observed indegree 3, no root ever a target
+   of a parent edge); independently re-run by the reviewer over seeds
+   0..499 covering every-root-has-child, roots-have-no-parents, indegree
+   1..3, unique edges, DAG ordering, delays 1..3.
+2. LAG CONVENTION, PROTOCOL TEXT. The protocol wrote x_j(t - d) where the
+   code implements x_j((t+1) - d). Resolved in favour of the code, which
+   uses the standard target-relative lag convention. Guarded by [3c],
+   which now drives the PRODUCTION step functions (family1_step_value,
+   family2_drive, extracted into named functions the real generators
+   themselves call) with a controlled impulse and asserts the observed
+   response onset at impulse_index + d for d = 1, 2, 3 in both families. A
+   first version of this test checked a hand-written copy of the
+   recurrence and could not have caught drift in either real generator;
+   caught by the reviewer and rewritten.
+3. CLUSTERING DESCRIPTION. The protocol still described the skip-oversized-
+   merges algorithm the code had already abandoned for a build-full-tree-
+   then-cut-top-down design after the skip version was found to corrupt
+   scipy's linkage node numbering. Text corrected; [3b] adds a behavioral
+   check that a forced-correlated block lands in one group.
+4. FAMILY 2 NOISE ENCODED ROLE. sigma_i was 0.7 for roots and 0.5 for
+   non-roots, directly encoding the status the brief said noise must not
+   encode. Replaced with sigma_i ~ Uniform(0.4, 0.6) for every channel.
+5. INTERNAL RIDGE SEAM UNEMBARGOED. ridge_r2_val split its own training
+   block at [:cut]/[cut:] with no embargo, sharing raw lag/target support
+   at that inner seam, the same leakage the outer splits were built to
+   prevent, missed at the second seam. Fixed with the same E-row embargo.
+   The split arithmetic now lives in ONE function, internal_val_split,
+   which both ridge_r2_val and the regression test call; a first version of
+   the test hand-duplicated the arithmetic while a comment claimed it did
+   not, caught by the reviewer. A too-small input now RAISES
+   TooSmallForEmbargo instead of falling back to a same-slice arrangement
+   (which would let validation selection see its own training rows).
+   Guarded by the split test's outer-seam check, internal-seam check, an
+   embargo=0 ORACLE for each proving the check would fail if the embargo
+   were removed, and a reject-not-fallback check. The split test also no
+   longer re-derives raw support from a formula: it feeds index-valued data
+   through the production own_lag_window and reads the touched raw indices
+   from its output.
+6. GATE MACHINE-CHECKABILITY. Unresolved targets keep all V-1 candidates,
+   so a run resolving nothing could show high recall via fallback alone.
+   The gate is now four explicit, printed conditions (G1-G4 above), with
+   G4 a STRICT fixed-budget check: every target's |C_q| <= k, an
+   unresolved target counted at V-1 so it fails by construction, floating-
+   point tolerance only. My first draft of this fix itself needed
+   correction, caught by review before it was committed: it introduced a
+   1.5x candidate-budget allowance (about 15% against the registered 10%)
+   and a new unresolved-fraction threshold of 0.10, both new scientific
+   criteria the registered design never had. Both withdrawn; the unresolved
+   rate is reported descriptively and validity rests on G4 alone. Metrics
+   candidate_fraction, unresolved_fraction and budget_ok added to the
+   script.
+7. ROOTS IN COVERAGE. Protocol text said roots contribute a trivial 1 to
+   complete-target coverage; the code already excluded them entirely.
+   Text corrected to match the code; root count reported alongside.
+8. MALFORMED CONFIRMATION SENTENCE. Rewritten as two separate conditions:
+   point estimate of the paired recall difference >= 0.05, and the lower
+   bootstrap bound of that difference > 0.
+
+Also frozen here: the exact pilot and confirmation seed lists (above), and
+perturbation invariance extended from a two-target, hand-fixed-group toy
+to the production pipeline (real clustering, real per-group encoders, real
+candidate-set construction, every target). SCOPE OF THAT LAST CHECK, stated
+plainly: it covers the one arm that currently exists end to end (arm 6, the
+learned clustered screen). Arms 2-5 are not yet implemented; each gets its
+own perturbation-invariance check when it is built, and Stage B is not
+launched until all are in place.
+
+Audit gate re-run before this commit: 136 passed, 0 failed. Stage A,
+re-run in full after every fix above: passes, 36.0 s, no GPU-heavy work.

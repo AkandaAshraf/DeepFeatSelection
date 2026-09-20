@@ -68,41 +68,70 @@ def build_dag(V: int, seed: int):
         delays = rng.integers(1, MAX_DELAY + 1, size=d)
         parent[q] = [(int(j), int(dl)) for j, dl in zip(choose, delays)]
 
-    # orphan repair: deterministic single pass
+    # ---- orphan repair, REWRITTEN TWICE after review, indegree cap 1-3
+    # preserved throughout as registered -- broadening it was flagged and
+    # is not done. Three real defects in the first version: (1) heir =
+    # order[pos+1] can itself be a root, and since both generators' root
+    # branches never read parent[root] at all, such a repair edge is
+    # dynamically INERT -- the parent map claims a connection the
+    # simulated data never realises. Reproduced empirically: 14/500
+    # engineering seeds at V=30 have >=1 pre-repair orphan, and heir is
+    # itself a root in 7 of those 14 cases. (2) the displacement branch
+    # (heir already at indegree 3) never decremented the displaced
+    # parent's children_count. (3) a first fix removed displacement by
+    # allowing indegree 4 for a repaired heir -- caught before this
+    # stood: the registered indegree range is 1-3 for every variable, no
+    # exception, and broadening it to simplify a fix is exactly what was
+    # not to be done.
+    #
+    # Final design: heir search skips every root (so an inert repair edge
+    # is impossible) AND skips any heir already at indegree 3 (so the cap
+    # is never exceeded and nothing is ever displaced, which is also why
+    # no decrement bookkeeping is needed -- there is nothing to decrement).
     children_count = np.zeros(V, int)
     for q, plist in parent.items():
         for j, _ in plist:
             children_count[j] += 1
+
+    non_root_positions = list(range(n_root, V))
+    search_offset = 0
     for pos in range(n_root):
         root = order[pos]
         if children_count[root] > 0:
             continue
-        if pos + 1 >= V:
-            continue  # last-in-order root has no later variable; recorded, not fatal
-        heir = order[pos + 1]
-        if len(parent[heir]) >= 3:
-            # replace the heir's highest-index existing parent
-            worst = max(range(len(parent[heir])),
-                       key=lambda i: parent[heir][i][0])
-            parent[heir][worst] = (int(root), int(rng.integers(1, MAX_DELAY + 1)))
-        else:
-            parent[heir].append((int(root), int(rng.integers(1, MAX_DELAY + 1))))
+        heir = None
+        for k in range(len(non_root_positions)):
+            cand_pos = non_root_positions[(search_offset + k)
+                                          % len(non_root_positions)]
+            cand = order[cand_pos]
+            if len(parent[cand]) < 3:
+                heir = cand
+                search_offset = (search_offset + k + 1) % max(
+                    len(non_root_positions), 1)
+                break
+        if heir is None:
+            continue  # no variable anywhere has spare capacity; recorded
+                      # by orphan_free below, causes a seed redraw upstream
+        assert not is_root[heir], "heir search must never select a root"
+        assert len(parent[heir]) < 3, "indegree cap must never be exceeded"
+        parent[heir].append((int(root), int(rng.integers(1, MAX_DELAY + 1))))
         children_count[root] += 1
 
     return order, is_root, parent, n_root
 
 
 def orphan_free(is_root, parent) -> bool:
-    """True iff every root has >=1 child, EXCEPT possibly the root that is
-    last in topological order (build_dag records, does not force-fix, that
-    single edge case since there is no later variable to attach it to)."""
+    """True iff EVERY root has >=1 child. Tightened from the first version's
+    'at most 1 missing' tolerance: the rewritten build_dag's round-robin
+    non-root heir search always succeeds whenever V > n_root (guaranteed
+    in practice at N_ROOT_FRAC=0.12), so a strict check is now the correct
+    validity gate rather than a documented exception."""
     children = set()
     for plist in parent.values():
         for j, _ in plist:
             children.add(j)
     roots = np.where(is_root)[0]
-    missing = [r for r in roots if r not in children]
-    return len(missing) <= 1
+    return all(r in children for r in roots)
 
 
 # ================================================================
@@ -132,6 +161,20 @@ def _is_locked_r(r: float) -> bool:
         return bool(lam <= 0.05 or max_ac >= 0.9)
 
 
+def family1_step_value(x, t, q, r, eta, parent, is_root, coupling):
+    """SINGLE SOURCE OF TRUTH for family1's per-variable transition,
+    extracted after review found the Stage A lag test was checking a
+    hand-written copy of this formula rather than the production code --
+    a lag-convention drift in the REAL generator would have passed
+    unnoticed. family1_generate's own main loop calls this exact function;
+    so does the lag-impulse regression test."""
+    k = x[t, q]
+    if is_root[q]:
+        return r[q] * k * (1 - k)
+    drive = np.mean([eta[q][j] * x[max(t - d + 1, 0), j] for j, d in parent[q]])
+    return r[q] * k * (1 - k) * (1 - coupling) + coupling * drive * (1 - k)
+
+
 def family1_generate(V: int, n: int, seed: int, coupling: float = 0.20):
     """Returns dict with x_obs, x_clean, parent, is_root, diagnostics, or
     raises RuntimeError after MAX_REDRAWS failed validity attempts."""
@@ -157,16 +200,9 @@ def family1_generate(V: int, n: int, seed: int, coupling: float = 0.20):
         # a single initial row using the same recursion (self-consistent
         # burn-in, no separate warm formula needed since max_d < total)
         for t in range(total - 1):
-            nxt = np.empty(V)
-            for q in range(V):
-                k = x[t, q]
-                if is_root[q]:
-                    nxt[q] = r[q] * k * (1 - k)
-                else:
-                    drive = np.mean([eta[q][j] * x[max(t - d + 1, 0), j]
-                                     for j, d in parent[q]])
-                    nxt[q] = r[q] * k * (1 - k) * (1 - coupling) \
-                        + coupling * drive * (1 - k)
+            nxt = np.array([family1_step_value(x, t, q, r, eta, parent,
+                                               is_root, coupling)
+                           for q in range(V)])
             x[t + 1] = np.clip(nxt, 0.0, 1.0)
         x_clean = x[500:]  # drop burn-in; length max_d + n
 
@@ -219,6 +255,14 @@ def _stable_ar2(rng):
             return a, b
 
 
+def family2_drive(x, t, q, w, parent):
+    """SINGLE SOURCE OF TRUTH for family2's lag-dependent drive term, same
+    reasoning as family1_step_value: family2_generate's own loop calls
+    this exact function, so does the lag-impulse regression test."""
+    return np.mean([w[q][j] * np.tanh(x[max(t - d + 1, 0), j])
+                    for j, d in parent[q]])
+
+
 def family2_generate(V: int, n: int, seed: int):
     for attempt in range(MAX_REDRAWS):
         rng = np.random.default_rng(seed * 131 + attempt)
@@ -231,7 +275,15 @@ def family2_generate(V: int, n: int, seed: int):
                  if not is_root[q]}
         w = {q: {j: float(rng.uniform(0.3, 0.7)) for j, _ in parent[q]}
             for q in range(V) if not is_root[q]}
-        sigma = np.where(is_root, 0.7, 0.5)
+        # CORRECTED: the first version set sigma directly from is_root
+        # (0.7 roots, 0.5 non-roots), which is exactly the role-encoding
+        # the brief's own text forbids ("self-dynamics/noise distributions
+        # must not directly encode root-versus-driven status") -- a
+        # screening method could then partly succeed by reading noise
+        # SCALE as a root/non-root signature rather than by reading actual
+        # dependence structure. Replaced with ONE shared, role-independent
+        # distribution: every channel draws its own sigma_i the same way.
+        sigma = rng.uniform(0.4, 0.6, V)
 
         max_d = MAX_DELAY
         total = 500 + max_d + n
@@ -244,9 +296,7 @@ def family2_generate(V: int, n: int, seed: int):
             nxt = a_coef * x[t] + b_coef * x[t - 1]
             for q in range(V):
                 if not is_root[q]:
-                    drive = np.mean([w[q][j] * np.tanh(x[max(t - d + 1, 0), j])
-                                     for j, d in parent[q]])
-                    nxt[q] += gamma[q] * drive
+                    nxt[q] += gamma[q] * family2_drive(x, t, q, w, parent)
             nxt += eps[t + 1]
             if np.any(np.abs(nxt) > 50):
                 blew_up = True
@@ -405,16 +455,57 @@ def _r2(Xe, ye, w):
     return 1.0 - err / var  # UNCLIPPED, per protocol
 
 
+class TooSmallForEmbargo(RuntimeError):
+    pass
+
+
+def internal_val_split(n: int):
+    """SINGLE SOURCE OF TRUTH for ridge_r2_val's internal seam, extracted
+    into its own named, importable function after review found the split
+    test was hand-duplicating this arithmetic despite a comment claiming
+    otherwise. parent_screening_split_test.py calls THIS function, not a
+    re-derived copy, so a change here is what the regression test checks
+    against, and removing the embargo here is what would make it fail.
+
+    Returns (train_idx, val_idx) as index arrays into a length-n array,
+    embargoed by E rows (same value, same asymmetric trim-the-earlier-
+    slice's-tail convention as splits_for's enumeration-verified outer
+    seams). RAISES rather than silently falling back to a same-slice
+    arrangement when n is too small to leave both sides non-degenerate --
+    per review: a same-slice fallback lets validation selection see its
+    own training rows, which is the exact leakage this function exists to
+    prevent, so a too-small input is REJECTED, not accommodated."""
+    cut = max(int(n * (1 - VAL_INTERNAL_FRAC)), 1)
+    tr_idx = np.arange(0, max(cut - E, 0))
+    va_idx = np.arange(cut, n)
+    if len(tr_idx) < 2 or len(va_idx) < 2:
+        raise TooSmallForEmbargo(
+            f"internal_val_split: n={n} leaves train={len(tr_idx)} "
+            f"val={len(va_idx)} rows after embargo E={E}; too small to "
+            f"select alpha without reusing rows across the seam")
+    return tr_idx, va_idx
+
+
 def ridge_r2_val(Xtr, ytr, Xeval, yeval):
     """Select alpha on the last VAL_INTERNAL_FRAC of Xtr/ytr (temporal),
     refit on the full Xtr at that alpha, report UNCLIPPED R2 on
-    (Xeval, yeval). Returns (r2, alpha_used, hit_grid_boundary)."""
-    n = Xtr.shape[0]
-    cut = max(int(n * (1 - VAL_INTERNAL_FRAC)), 1)
-    Xi_tr, yi_tr = Xtr[:cut], ytr[:cut]
-    Xi_va, yi_va = Xtr[cut:], ytr[cut:]
-    if len(yi_va) < 2:
-        Xi_va, yi_va = Xtr, ytr  # degenerate tiny-n fallback, both same slice
+    (Xeval, yeval). Returns (r2, alpha_used, hit_grid_boundary).
+
+    EMBARGOED at the internal cut, same E-row embargo and same asymmetric
+    convention (trim only the earlier slice's tail) that splits_for's
+    enumeration-verified outer seams use. The first version cut Xtr[:cut]
+    / Xtr[cut:] directly with no embargo at all: since every row here is
+    itself an own_lag_window (or group-window) output, an unembargoed
+    internal seam shares raw support exactly the way an unembargoed OUTER
+    seam would, and this is the same class of leakage the outer splits
+    were built to prevent -- it was simply missed at this second, inner
+    seam. Reproduced conceptually rather than re-enumerated separately:
+    the row objects are identical in kind to the ones the outer enumeration
+    already checked, so the same embargo value applies without needing a
+    second independent search."""
+    itr_idx, iva_idx = internal_val_split(Xtr.shape[0])
+    Xi_tr, yi_tr = Xtr[itr_idx], ytr[itr_idx]
+    Xi_va, yi_va = Xtr[iva_idx], ytr[iva_idx]
     best_a, best_err = ALPHA_GRID[0], float("inf")
     for a in ALPHA_GRID:
         w = ridge_fit_predict(Xi_tr, yi_tr, a)
@@ -525,9 +616,58 @@ def retained_parent_recall(C: dict[int, list[int]], parent: dict[int, list]):
 
 
 def complete_target_coverage(C: dict[int, list[int]], parent: dict[int, list]):
+    """Non-root targets ONLY (parent[q] non-empty). Roots are EXCLUDED
+    entirely, not pooled in as vacuous successes -- an earlier protocol
+    draft said a root "contributes 1 to coverage's numerator trivially",
+    which the CODE never actually did (this filter already excluded them)
+    and which review correctly flagged as inflating the metric with
+    contentless successes if it had been implemented that way. Root count
+    is reported separately by the caller, not folded in here."""
     vals = [set(j for j, _ in parent[q]).issubset(set(C[q]))
            for q in parent if parent[q]]
     return float(np.mean(vals)) if vals else float("nan")
+
+
+def candidate_fraction(C: dict[int, list[int]], V: int, non_root_q):
+    """sum|C_q| / (|Q|*(V-1)). MACHINE-CHECKABLE GUARD, per review: an arm
+    that resolves NOTHING returns the full V-1 fallback for every target,
+    which can still show high recall (a target's true parents are trivially
+    "retained" when every other variable is in C_q) without the screen
+    having done anything. This metric rises toward 1.0 exactly when that
+    happens, so requiring it near the declared k/(V-1) is what catches a
+    recall number produced by abstention rather than by screening."""
+    q_list = list(non_root_q)
+    if not q_list:
+        return float("nan")
+    return sum(len(C[q]) for q in q_list) / (len(q_list) * (V - 1))
+
+
+def unresolved_fraction(unresolved: dict[int, bool], non_root_q):
+    """REPORTED descriptively, never a pass/fail threshold on its own: an
+    earlier draft added a G5 requiring this <= 0.10, withdrawn after
+    review as a new scientific criterion the registered design never had.
+    Validity rests on budget_ok alone."""
+    q_list = list(non_root_q)
+    if not q_list:
+        return float("nan")
+    return sum(1 for q in q_list if unresolved.get(q, False)) / len(q_list)
+
+
+def budget_ok(C: dict[int, list[int]], k: int, V: int, non_root_q) -> bool:
+    """G4, STRICT: every non-root target's |C_q| <= k, with an unresolved
+    target already counted at its full V-1 fallback size by
+    build_candidate_set (so an unresolved target fails this by
+    construction, since V-1 > k for every V this protocol uses). Only a
+    floating-point tolerance is allowed on the aggregate fraction. No
+    relaxation factor: an earlier draft's 1.5x allowance (about 15% against
+    the registered 10%) was withdrawn after review."""
+    q_list = list(non_root_q)
+    if not q_list:
+        return False
+    if any(len(C[q]) > k for q in q_list):
+        return False
+    frac = candidate_fraction(C, V, q_list)
+    return frac <= k / (V - 1) + 1e-12
 
 
 # ================================================================
@@ -544,20 +684,14 @@ def _toy_orientation_system(n=2000, coupling=0.30, seed=900):
     is_root = np.array([True, False, False, True, True])
     parent = {0: [], 1: [(0, 1)], 2: [(1, 1)], 3: [], 4: []}
     r = np.array([3.75, 3.75, 3.75, 3.75, 3.75])  # away from lock windows
+    eta = {q: {j: 1.0 for j, _ in plist} for q, plist in parent.items()}
     total = 300 + n
     x = np.empty((total, V))
     x[0] = rng.uniform(0.2, 0.8, V)
     for t in range(total - 1):
-        nxt = np.empty(V)
-        for q in range(V):
-            k = x[t, q]
-            if is_root[q]:
-                nxt[q] = r[q] * k * (1 - k)
-            else:
-                j, d = parent[q][0]
-                drive = x[max(t - d + 1, 0), j]
-                nxt[q] = r[q] * k * (1 - k) * (1 - coupling) \
-                    + coupling * drive * (1 - k)
+        nxt = np.array([family1_step_value(x, t, q, r, eta, parent,
+                                           is_root, coupling)
+                       for q in range(V)])
         x[t + 1] = np.clip(nxt, 0.0, 1.0)
     return x[300:]
 
@@ -593,6 +727,39 @@ def _run_toy_pipeline(x_obs, groups, targets, seed=901):
                 own_feats, target_vals, codes, tr, va)
             gains[q][gid] = gain
     return gains
+
+
+def _run_production_pipeline(x_obs, seed=9500):
+    """The REAL pipeline: cluster_size_capped on train rows (not a hand-
+    fixed grouping), one encoder per REALISED group, scoring for every
+    (target, group) pair, and build_candidate_set for every non-root
+    target. Returns (labels, groups, gains, C, unresolved)."""
+    tr, va, te, m, embargo = splits_for(len(x_obs))
+    x_train_raw = x_obs[:int(0.6 * len(x_obs))]
+    labels = cluster_size_capped(x_train_raw)
+    Vt = x_obs.shape[1]
+    groups = {gid: sorted(np.where(labels == gid)[0].tolist())
+             for gid in sorted(set(labels.tolist()))}
+    nets = {}
+    for gid, members in groups.items():
+        member_windows = [own_lag_window(x_obs, j)[0] for j in members]
+        z_group = np.concatenate(member_windows, axis=1)
+        net = train_group_encoder(z_group, tr, len(members), seed=seed + gid)
+        nets[gid] = (net, z_group, members)
+    gains, C, unresolved = {}, {}, {}
+    k = k_for(Vt)
+    for q in range(Vt):
+        own_raw, target_vals, _ = own_lag_window(x_obs, q)
+        own_feats = poly3(own_raw)
+        gains[q] = {}
+        for gid, (net, z_group, members) in nets.items():
+            excl = members.index(q) if q in members else None
+            codes = group_code(net, z_group, exclude_member_pos=excl)
+            gain, alpha, hit = score_target_against_group(
+                own_feats, target_vals, codes, tr, va)
+            gains[q][gid] = gain
+        C[q], unresolved[q] = build_candidate_set(q, gains[q], groups, k)
+    return labels, groups, gains, C, unresolved
 
 
 def stage_a() -> bool:
@@ -647,6 +814,55 @@ def stage_a() -> bool:
           f"max={sizes.max()} (cap {GROUP_CAP})")
     print(f"    -> {'PASS' if deterministic and size_ok else 'FAIL'}")
     ok &= deterministic and size_ok
+
+    print("\n[3b] clustering BEHAVIOR, not just shape: the forced-correlated "
+          "block (columns 5-9) must land in one group together")
+    forced_block = set(range(5, 10))
+    block_groups = {lab1[c] for c in forced_block}
+    behavior_ok = len(block_groups) == 1
+    print(f"    group ids for columns 5-9: {sorted(lab1[c] for c in forced_block)}"
+          f"   -> {'PASS' if behavior_ok else 'FAIL'}")
+    ok &= behavior_ok
+
+    print("\n[3c] lag-impulse test on the PRODUCTION step functions "
+          "themselves, not a hand-written recurrence (review caught the "
+          "first version testing a duplicated formula that could not have "
+          "detected drift in either real generator)")
+    lag_ok = True
+    impulse_idx = 4
+    for d in (1, 2, 3):
+        # -- family1_step_value --
+        total = 10
+        x = np.zeros((total, 2))
+        x[impulse_idx, 0] = 1.0          # driver held fixed externally,
+        is_root = np.array([True, False])  # never evolved by the step fn
+        parent = {0: [], 1: [(0, d)]}
+        eta = {1: {0: 1.0}}
+        r = np.array([3.75, 3.75])
+        for t in range(total - 1):
+            x[t + 1, 1] = family1_step_value(x, t, 1, r, eta, parent,
+                                             is_root, 0.20)
+        resp = [t + 1 for t in range(total - 1) if abs(x[t + 1, 1]) > 1e-9]
+        f1_ok = bool(resp) and resp[0] == impulse_idx + d
+        lag_ok &= f1_ok
+        print(f"    family1 d={d}: x_i first responds at t+1={resp[0] if resp else '?'}"
+              f" (expected impulse_idx+d={impulse_idx+d})   "
+              f"-> {'OK' if f1_ok else 'MISMATCH'}")
+
+        # -- family2_drive --
+        x2 = np.zeros((total, 2))
+        x2[impulse_idx, 0] = 1.0
+        w = {1: {0: 1.0}}
+        parent2 = {0: [], 1: [(0, d)]}
+        drives = [family2_drive(x2, t, 1, w, parent2) for t in range(total - 1)]
+        resp2 = [t + 1 for t, dv in enumerate(drives) if abs(dv) > 1e-9]
+        f2_ok = bool(resp2) and resp2[0] == impulse_idx + d
+        lag_ok &= f2_ok
+        print(f"    family2 d={d}: drive first nonzero feeding t+1={resp2[0] if resp2 else '?'}"
+              f" (expected impulse_idx+d={impulse_idx+d})   "
+              f"-> {'OK' if f2_ok else 'MISMATCH'}")
+    print(f"    -> {'PASS' if lag_ok else 'FAIL'}")
+    ok &= lag_ok
 
     # ---- sized_random size-multiset check
     print("\n[4] sized_random reproduces the exact size multiset")
@@ -717,6 +933,58 @@ def stage_a() -> bool:
     print(f"    gains identical after perturbing the last 50 raw rows: {same}")
     print(f"    -> {'PASS' if same else 'FAIL'}")
     ok &= same
+
+    # ---- production-pipeline perturbation invariance, extended coverage
+    print("\n[9] PRODUCTION-pipeline perturbation invariance: real "
+          "clustering + real encoders + real candidate-set construction, "
+          "every target, not the hand-fixed 2-target/fixed-group toy above")
+    out = family1_generate(12, 1200, seed=9600)
+    x_full = out["x_obs"]
+    lab_a, groups_a, gains_a, C_a, unres_a = _run_production_pipeline(x_full)
+    x_pert2 = x_full.copy()
+    pert2 = np.arange(len(x_full) - 60, len(x_full))
+    x_pert2[pert2] += np.random.default_rng(321).standard_normal(
+        (len(pert2), x_pert2.shape[1])) * 10.0
+    lab_b, groups_b, gains_b, C_b, unres_b = _run_production_pipeline(x_pert2)
+    labels_same = np.array_equal(lab_a, lab_b)
+    gains_same = all(abs(gains_a[q][g] - gains_b[q][g]) < 1e-9
+                     for q in gains_a for g in gains_a[q])
+    C_same = all(C_a[q] == C_b[q] and unres_a[q] == unres_b[q] for q in C_a)
+    prod_ok = labels_same and gains_same and C_same
+    print(f"    V=12, {len(groups_a)} groups realised, k={k_for(12)}")
+    print(f"    partition labels identical: {labels_same}")
+    print(f"    every (target,group) gain identical: {gains_same}")
+    print(f"    every C_q (and unresolved flag) identical: {C_same}")
+    print(f"    -> {'PASS' if prod_ok else 'FAIL'}")
+    ok &= prod_ok
+
+    print("\n[10] G4 fixed-budget gate: an all-fallback arm with PERFECT "
+          "recall must still fail; a within-budget arm must pass")
+    Vg, kg = 30, k_for(30)
+    parent_g = {q: [] for q in range(Vg)}
+    non_root_g = list(range(5, Vg))
+    for q in non_root_g:
+        parent_g[q] = [((q - 1) % Vg, 1), ((q - 2) % Vg, 1)]
+    others = lambda q: [v for v in range(Vg) if v != q]  # noqa: E731
+    C_full = {q: others(q) for q in range(Vg)}                    # abstain on all
+    C_tight = {q: sorted({j for j, _ in parent_g[q]} |
+                         set(others(q)[:max(kg - 2, 0)]))[:kg]
+              for q in range(Vg)}
+    C_one_bad = dict(C_tight)
+    C_one_bad[non_root_g[0]] = others(non_root_g[0])              # 1 abstains
+    rec_full = retained_parent_recall(C_full, parent_g)
+    g_full = budget_ok(C_full, kg, Vg, non_root_g)
+    g_tight = budget_ok(C_tight, kg, Vg, non_root_g)
+    g_one = budget_ok(C_one_bad, kg, Vg, non_root_g)
+    gate_ok = (rec_full == 1.0) and (not g_full) and g_tight and (not g_one)
+    print(f"    V={Vg}, k={kg}")
+    print(f"    all-V-1 arm: recall={rec_full:.2f}  budget_ok={g_full} "
+          f"(perfect recall, must FAIL the budget)")
+    print(f"    within-budget arm: budget_ok={g_tight} (must PASS)")
+    print(f"    within-budget arm with ONE target abstaining: "
+          f"budget_ok={g_one} (must FAIL)")
+    print(f"    -> {'PASS' if gate_ok else 'FAIL'}")
+    ok &= gate_ok
 
     print(f"\n{'=' * 66}")
     print(f"STAGE A {'PASSED' if ok else 'FAILED'} in {time.time()-t0:.1f}s")
