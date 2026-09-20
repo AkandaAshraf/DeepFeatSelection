@@ -816,3 +816,156 @@ launched until all are in place.
 
 Audit gate re-run before this commit: 136 passed, 0 failed. Stage A,
 re-run in full after every fix above: passes, 36.0 s, no GPU-heavy work.
+
+---
+
+## Pre-pilot amendment 2 (2026-09-20): Stage B definitions frozen, abstention rule retained, resource status and cost estimate
+
+Registered before any scientific pilot ran. No pilot seed has been executed.
+Engineering seeds used so far, all excluded from every scientific result and
+none inside a frozen block: 900, 910, 920, 930, 940, 9001-9003, 9500, 9600,
+9700, 9702, 9800, 9801, 9900 (9701 is reserved for a timing run that has not
+happened). This amendment freezes definitions the protocol left implicit; it
+changes no registered parameter, arm, seed list, threshold or cap.
+
+1. THE UNRESOLVED THRESHOLD (0.01) IS RETAINED, AND WHAT IT WILL PROBABLY DO
+   IS STATED IN ADVANCE. While building Stage B, a smoke run on engineering
+   seed 9800 (family 1, V=24, n=1200) showed the learned clustered screen
+   declaring about 95% of targets unresolved. The scale of the per-target
+   maximum group gain was then measured on engineering seeds 9800 (family 1)
+   and 9801 (family 2), V=24, n=1200, learned clustered arm, encoder seed =
+   group id (scripts/parent_screening_arms.py --engineering-diag; artifact
+   ExpOutput/parent_screening/engineering_gain_scale.json, sha256
+   801687bf90325752755e9baa1f5af354898b3aebdf682ecffd270930dfd9dfd0):
+   family 1, seed 9800, 21 non-root targets: max group gain median +0.0024,
+   90th percentile +0.0049, maximum +0.0061, none above 0.01 (all 21
+   unresolved); the 3 roots, median +0.0001. Family 2, seed 9801, 21
+   non-root targets: median +0.0050, 90th percentile +0.0195, maximum
+   +0.0553, 29% above 0.01 (71% unresolved); the 3 roots, median +0.0013.
+   The threshold was fixed at registration from a noise-scale reference (the
+   ~0.005 clean-ghost floor measured elsewhere in this project) without first
+   measuring what gain a driven target actually achieves under these
+   generators at the registered coupling; that is the Rule 122/123 error of
+   fixing a bar without measuring the metric's scale, made here in the
+   protocol. A first internal draft of this amendment WITHDREW abstention.
+   Independent review rejected that, correctly: the threshold is a specific
+   registered rule, changing it after observing that the method would fail
+   it redefines the evaluated method, and a fixed-budget failure caused by
+   abstention is a valid negative outcome. The threshold is therefore
+   unchanged, no second no-abstention arm is added, and any scale-aware
+   abstention rule would be a new design needing its own protocol and fresh
+   seeds. PREDICTION, stated before any pilot seed runs: at V=240 arms 4-6
+   will abstain on a large share of non-root targets, so G4 fails for arm 6
+   because of the registered abstention rule; if so the pilot is reported
+   as exactly that, a valid negative caused by the registered rule, and is
+   NOT reported as evidence about ranking quality in either direction. The
+   share of unresolved targets, the recall over resolved targets only, and
+   every arm's per-target maximum gain are reported descriptively and gated
+   on nothing.
+
+2. PREPROCESSING, ALL ARMS. Each variable is standardised with the mean and
+   standard deviation of the raw rows [0, R), R = MAX_DELAY + t_last + 2,
+   where t_last is the last TRAIN row: exactly the raw support of the
+   training block. No validation or test observation enters any mean, scale,
+   dictionary knot, clustering distance, encoder, readout or penalty choice.
+   The first differences used by the clustering are taken inside that span.
+
+3. BASELINE DEFINITIONS, exact.
+   RANDOM: k indices drawn without replacement from the other V-1 variables,
+   RNG seeded by (system seed, target).
+   LAGCORR: for every candidate j and target q, the absolute Pearson
+   correlation over TRAIN rows between x_j((t+1)-d) and the target
+   x_q(t+1), maximised over d in {1,2,3}; the residualised variant replaces
+   the target by q's own-history ridge residual (same readout and alpha
+   selection as the screening method, TRAIN rows only). The k largest form
+   the shortlist. The deployed variant is the one with the larger mean
+   VALIDATION R2 gain when each target's shortlist (each candidate
+   contributing its single best-lag column) is appended to that target's own-
+   history ridge; both variants are reported.
+   LASSO: per candidate variable a 7-column block [its lag-1, lag-2 and
+   lag-3 values, and hinge(lag 1) = max(0, lag1 - knot) at the 20/40/60/80%
+   TRAIN quantiles of lag 1], every column standardised with TRAIN
+   statistics; the target is q's own-history
+   ridge residual; scikit-learn Lasso, no intercept, tol 1e-4, at most 2000
+   iterations, warm-started along a five-point penalty path of 10^-1,
+   10^-1.5, 10^-2, 10^-2.5, 10^-3 times alpha_max. The penalty is chosen on
+   the embargoed internal split of TRAIN with EVERY fitted quantity (the own-
+   history residualiser, the residual's centring and scale, alpha_max, the
+   coefficients) taken from the inner-fit rows only and the inner-validation
+   rows transformed with those fixed quantities; the final model is refit on
+   all TRAIN rows at the chosen RELATIVE penalty. The k candidates with the
+   largest summed absolute coefficient over their block are the shortlist.
+   Non-converged fits are counted and reported. The registered phrase "same
+   frozen grid width as the ridge grid, five points log-spaced" leaves the
+   span open; the two-decade relative span above (narrower than the ridge
+   grid's four decades, chosen for convergence and sparsity at V=240) is a
+   disclosed interpretation fixed here before any pilot seed, not a claim of
+   equivalence. A chosen penalty sitting at a grid end would handicap this
+   baseline and so flatter arm 6 in G3; that caveat applies to any G3 pass.
+   PCA-GROUP: the arm-6 partition; each group's code is PCA fitted on TRAIN
+   rows of its members' concatenated own-lag windows, b_G components, a
+   target inside a group scored with its own window zeroed (the same
+   convention the learned arm's per-member masking makes in-distribution).
+   LEARNED-SIZEDRAND: hierarchy_repair.sized_random on the arm-6 size
+   multiset, seed = system seed + 777, learned encoders as arm 6.
+   Ties everywhere break by ascending variable index; nothing consults truth.
+
+4. GATE MECHANICS. evaluate_gate returns FAIL, printing every reason, for any
+   input that is not exactly two families x six arms x the six registered
+   seeds each, with every metric a finite number in [0,1]; the two cases an
+   independent reviewer reproduced (empty input, and one family holding one
+   perfect arm-6 cell) are regression cases. G4 is evaluated on arm 6;
+   budget_ok, the unresolved share and recall over resolved targets only are
+   reported for every arm. A baseline arm that abstains (arms 4 and 5 apply
+   the same rule) is counted at its V-1 fallback size in its own recall, and
+   that inflation of a comparator makes G3 harder for arm 6, not easier.
+
+5. PILOT MECHANICS. Each system's shortlists are written to disk before that
+   system's truth file is written; all metrics are computed only after the
+   twelfth system; every cap is enforced inside the target, group and
+   encoder-epoch loops with the process TREE measured (a child process is
+   counted); completions resume only under an identical code and
+   configuration hash and their elapsed time counts against the 1 h cap; the
+   runner refuses to start unless a reviewer's clearance file names the
+   committed HEAD and every script and this protocol are committed.
+
+6. MISSING REQUIRED COMPARISON. The community-detection method
+   (arXiv:2501.10886, DADApy) is not installed and installation is not
+   permitted here. Per the clause above, any Stage B result is an internal
+   feasibility result and the missing comparison is named; G3 is evaluated
+   against arms 1-5 only, and no state-of-the-art claim is available.
+
+7. RESOURCE STATUS AND COST ESTIMATE. The caps under "Resource caps" were
+   provisional pending measurement; they are confirmed unchanged. Measured
+   2026-09-20 on this machine: 28.5 GB installed; available RAM 2.1-2.4 GB
+   with no experiment running and 0.9-1.8 GB while one torch process ran
+   (own working set 506 MB after imports, 613 MB after the CUDA context,
+   about 720 MB after preparing one V=240 system with GPU allocation 147
+   MiB; the V<=16 preflight process was observed at 1.28 GB), the remainder
+   held by a virtual machine, an editor and browsers that are not this
+   project's to close. Under the
+   retained 2 GiB floor a guarded Stage B run would breach at its first
+   poll on this machine as it stands. That is classified RESOURCE-BLOCKED,
+   not a scientific negative, and no V=240 timing was run for the same
+   reason. COST ESTIMATE, an extrapolation and NOT a measurement (engineering
+   seed 9800, V=24, n=1200, twelve groups: LAGCORR 0.9 s, LASSO 2.8 s,
+   clustering 0.1 s, PCA-GROUP 2.3 s, LEARNED-SIZEDRAND 16.7 s, LEARNED-
+   CLUSTERED 11.9 s; the LASSO figure is from the draft before its leakage
+   fix, which changes what is fitted on, not how much; scoring grows with
+   targets x groups, encoders with groups, LASSO with targets x candidates x
+   rows): roughly 0.6-1.5 h per
+   system at V=240, so about 7-18 h for the twelve systems against the 1 h
+   cap. By the Stage B clause above this is the cost estimate that must be
+   recorded before launch; the cap, the arm set, the seeds and the cell
+   count are unchanged, nothing has been shrunk, and how the estimate is
+   resolved against the cap is a separate labelled amendment. Stage B has not
+   been launched.
+
+Checks behind this amendment: the arms preflight (gate refusals, tree RSS
+with a spawned child, per-loop breach granularity, LASSO inner-validation
+leakage test with a leaky reference that must change, arms scoring equal to
+the reviewed reference scoring to 0.0, all-arm invariance with a same-input
+determinism control and a train-span sensitivity control) passed; Stage A
+re-run in full after the refactor passes all ten checks (109.0 s), the
+label-orientation gains (B +0.0259, C +0.0006) unchanged to four decimals;
+audit gate 136 passed, 0 failed.
