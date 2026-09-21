@@ -26,9 +26,15 @@ Arms 4-6 apply the REGISTERED unresolved rule (max group gain <= 0.01 -> the
 target keeps all V-1 candidates and fails G4 by construction). It is not
 tuned, relaxed or bypassed anywhere in this file.
 
+Group scoring and the LAGCORR proxy run as BATCHED solves over targets (same
+normal equations, embargoed split, alpha grid and tie rule as the reviewed
+reference; only the loop over independent systems became a batch dimension);
+the per-target reference loops are kept and the preflight asserts equivalence.
+
     python scripts/parent_screening_arms.py --preflight
     python scripts/parent_screening_arms.py --engineering-diag
-    python scripts/parent_screening_arms.py --timing       # bounded, locked
+    python scripts/parent_screening_arms.py --dry-run      # V=16, engineering
+    python scripts/parent_screening_arms.py --timing       # <=180 s, locked
     python scripts/parent_screening_arms.py --run-pilot    # needs clearance
 """
 from __future__ import annotations
@@ -206,9 +212,11 @@ class ResourceGuard:
     (clock, free RAM, GPU peak) and runs at loop granularity; check_full
     (tree RSS, disk) is rate-limited to once per 10 s."""
 
-    def __init__(self, runtime_cap_sec: float = CAP_RUNTIME_SEC):
+    def __init__(self, runtime_cap_sec: float = CAP_RUNTIME_SEC,
+                 out_dir: Path | None = None):
         self.t0 = time.perf_counter()
         self.runtime_cap = runtime_cap_sec
+        self.out_dir = out_dir or OUT
         self.peak_tree_rss = 0.0
         self.min_free = float("inf")
         self.n_light = self.n_full = 0
@@ -251,8 +259,8 @@ class ResourceGuard:
         if tree > CAP_RSS_MB:
             raise CapBreach(f"process-TREE RSS {tree:.0f}MB > {CAP_RSS_MB}MB "
                             f"at {where}")
-        disk = (sum(f.stat().st_size for f in OUT.rglob("*") if f.is_file())
-                / 2 ** 20) if OUT.exists() else 0.0
+        disk = (sum(f.stat().st_size for f in self.out_dir.rglob("*")
+                    if f.is_file()) / 2 ** 20) if self.out_dir.exists() else 0.0
         if disk > CAP_DISK_MB:
             raise CapBreach(f"disk {disk:.1f}MiB > {CAP_DISK_MB}MiB at {where}")
 
@@ -301,6 +309,89 @@ def _ridge_w(F, y):
     return PS.ridge_fit_predict(F, y, a)
 
 
+# ----------------------------------------------------------------
+# Batched twins of the reviewed ridge readout. Same normal equations, same
+# embargoed internal split (PS.internal_val_split), same alpha grid, same
+# strict-'<' first-wins selection, same unbiased-variance R2; only the loop
+# over independent systems becomes a batch dimension. Equivalence to the
+# reference path is asserted in the preflight, to 1e-9 on gains and exactly on
+# alpha choices, shortlists and abstention flags.
+# ----------------------------------------------------------------
+
+BATCH_CHUNK = 64
+
+
+def _b_ones(X):
+    ones = torch.ones(X.shape[:-1] + (1,), dtype=torch.float64, device=DEV)
+    return torch.cat([X, ones], dim=-1)
+
+
+def _b_solve(gram, xty, alpha):
+    """(X'X + alpha*I) w = X'y per system, intercept (last) entry unpenalised,
+    exactly PS.ridge_fit_predict's system. alpha: float, or (Q,) tensor."""
+    p = gram.shape[-1]
+    eye = torch.eye(p, dtype=torch.float64, device=DEV)
+    a = alpha if torch.is_tensor(alpha) else torch.tensor(
+        float(alpha), dtype=torch.float64, device=DEV)
+    A = gram + (a * eye if a.dim() == 0 else a.reshape(-1, 1, 1) * eye)
+    A[:, -1, -1] -= a
+    return torch.linalg.solve(A, xty.unsqueeze(-1)).squeeze(-1)
+
+
+def _b_gram(X1, y):
+    return X1.transpose(1, 2) @ X1, (X1.transpose(1, 2) @ y.unsqueeze(-1)).squeeze(-1)
+
+
+def batched_alpha_index(X1tr, ytr):
+    """Index into PS.ALPHA_GRID per system, chosen on the embargoed internal
+    split of the train rows. Strict '<', first grid point wins ties, a NaN
+    error never wins: the selection semantics of PS.ridge_select_alpha."""
+    itr, iva = PS.internal_val_split(X1tr.shape[1])
+    itr, iva = (torch.as_tensor(itr, device=DEV), torch.as_tensor(iva, device=DEV))
+    Xi, yi, Xv, yv = X1tr[:, itr], ytr[:, itr], X1tr[:, iva], ytr[:, iva]
+    gram, xty = _b_gram(Xi, yi)
+    best_err = torch.full((X1tr.shape[0],), float("inf"), dtype=torch.float64,
+                          device=DEV)
+    best_idx = torch.zeros(X1tr.shape[0], dtype=torch.long, device=DEV)
+    for i, a in enumerate(PS.ALPHA_GRID):
+        w = _b_solve(gram, xty, a)
+        err = (((Xv @ w.unsqueeze(-1)).squeeze(-1) - yv) ** 2).mean(dim=1)
+        better = err < best_err
+        best_err = torch.where(better, err, best_err)
+        best_idx = torch.where(better, torch.full_like(best_idx, i), best_idx)
+    return best_idx
+
+
+def batched_fit_at(X1tr, ytr, idx):
+    alphas = torch.tensor(PS.ALPHA_GRID, dtype=torch.float64, device=DEV)[idx]
+    gram, xty = _b_gram(X1tr, ytr)
+    return _b_solve(gram, xty, alphas)
+
+
+def batched_r2_val(X, y, tr_t, va_t):
+    """Twin of PS.ridge_r2_val over a batch. X (Q,m,p) WITHOUT the ones
+    column, y (Q,m). Returns (r2 (Q,), alpha_index (Q,))."""
+    X1tr, ytr = _b_ones(X[:, tr_t]), y[:, tr_t]
+    idx = batched_alpha_index(X1tr, ytr)
+    w = batched_fit_at(X1tr, ytr, idx)
+    ye = y[:, va_t]
+    pred = (_b_ones(X[:, va_t]) @ w.unsqueeze(-1)).squeeze(-1)
+    err = ((pred - ye) ** 2).mean(dim=1)
+    return 1.0 - err / (ye.var(dim=1) + 1e-12), idx
+
+
+def batched_own_r2(prep, guard=None):
+    V, out = prep["V"], np.empty(prep["V"])
+    for s in range(0, V, BATCH_CHUNK):
+        if guard:
+            guard.check_light("own r2")
+        r2, _ = batched_r2_val(prep["feats_t"][s:s + BATCH_CHUNK],
+                               prep["target_t"][s:s + BATCH_CHUNK],
+                               prep["tr_t"], prep["va_t"])
+        out[s:s + BATCH_CHUNK] = r2.cpu().numpy()
+    return out
+
+
 # ================================================================
 # Arm 1: RANDOM
 # ================================================================
@@ -332,9 +423,19 @@ def _abs_corr(Ld_tr, Tq_tr):
     return np.abs(a.T @ b) / len(a)
 
 
-def _own_residual_train(prep, guard=None):
+def _own_residual_train(prep, guard=None, batched=True):
     V, tr_t = prep["V"], prep["tr_t"]
     res = np.empty((V, len(prep["tr"])))
+    if batched:
+        for s in range(0, V, BATCH_CHUNK):
+            if guard:
+                guard.check_light("lagcorr residual")
+            F1 = _b_ones(prep["feats_t"][s:s + BATCH_CHUNK][:, tr_t])
+            y = prep["target_t"][s:s + BATCH_CHUNK][:, tr_t]
+            w = batched_fit_at(F1, y, batched_alpha_index(F1, y))
+            res[s:s + BATCH_CHUNK] = (
+                y - (F1 @ w.unsqueeze(-1)).squeeze(-1)).cpu().numpy()
+        return res
     for q in range(V):
         if guard:
             guard.check_light("lagcorr residual")
@@ -344,15 +445,16 @@ def _own_residual_train(prep, guard=None):
     return res
 
 
-def screen_lagcorr(prep, k: int, guard=None):
+def screen_lagcorr(prep, k: int, guard=None, batched: bool = True):
     """Both variants, the validation proxy per variant, and the DEPLOYED
     choice. The proxy is each variant's mean validation R2 improvement when a
     target's top-k candidates (each contributing its single best-lag column)
     are appended to that target's own-history fit. Every fit uses TRAIN rows
-    only; validation rows only score."""
+    only; validation rows only score. batched=False is the per-target
+    reference loop the batched path is tested against."""
     V, tr = prep["V"], prep["tr"]
     L, T = _lag_matrices(prep)
-    resid = _own_residual_train(prep, guard)
+    resid = _own_residual_train(prep, guard, batched)
     results = {}
     for variant in ("raw", "resid"):
         Tq = T[tr] if variant == "raw" else resid.T
@@ -367,18 +469,34 @@ def screen_lagcorr(prep, k: int, guard=None):
         results[variant] = dict(C=C, best_lag=best_lag)
     proxy = {}
     tr_t, va_t = prep["tr_t"], prep["va_t"]
+    if batched:
+        Ls = np.stack([L[d] for d in LAGS])                      # (3, m, V)
+        own = batched_own_r2(prep, guard)
     for variant, r in results.items():
         gains = []
-        for q in range(V):
-            if guard:
-                guard.check_light("lagcorr proxy")
-            cols = np.stack([L[int(r["best_lag"][j, q])][:, j]
-                             for j in r["C"][q]], axis=1)
-            Lc = torch.as_tensor(cols, dtype=torch.float64, device=DEV)
-            F, y = prep["feats_t"][q], prep["target_t"][q]
-            X = torch.cat([F, Lc], dim=1)
-            r_full = PS.ridge_r2_val(X[tr_t], y[tr_t], X[va_t], y[va_t])[0]
-            gains.append(r_full - _own_r2(prep, q))
+        if batched:
+            for s in range(0, V, BATCH_CHUNK):
+                if guard:
+                    guard.check_light("lagcorr proxy")
+                e = min(V, s + BATCH_CHUNK)
+                Lc = np.stack([Ls[r["best_lag"][r["C"][q], q] - 1, :,
+                                  r["C"][q]].T for q in range(s, e)])
+                X = torch.cat([prep["feats_t"][s:e], torch.as_tensor(
+                    Lc, dtype=torch.float64, device=DEV)], dim=2)
+                r2, _ = batched_r2_val(X, prep["target_t"][s:e], tr_t, va_t)
+                gains.extend(float(r2[i]) - float(own[s + i])
+                             for i in range(e - s))
+        else:
+            for q in range(V):
+                if guard:
+                    guard.check_light("lagcorr proxy")
+                cols = np.stack([L[int(r["best_lag"][j, q])][:, j]
+                                 for j in r["C"][q]], axis=1)
+                Lc = torch.as_tensor(cols, dtype=torch.float64, device=DEV)
+                F, y = prep["feats_t"][q], prep["target_t"][q]
+                X = torch.cat([F, Lc], dim=1)
+                r_full = PS.ridge_r2_val(X[tr_t], y[tr_t], X[va_t], y[va_t])[0]
+                gains.append(r_full - _own_r2(prep, q))
         proxy[variant] = float(np.mean(gains))
     deployed = "resid" if proxy["resid"] > proxy["raw"] else "raw"
     return results, proxy, deployed
@@ -509,12 +627,46 @@ def _pca_codes(z, tr, members, b):
     return full, excl
 
 
-def screen_groups(prep, labels, kind: str, k: int, seed_base: int, guard=None):
+def _score_group_batched(prep, members, code_full, code_excl, own, guard=None):
+    """Gain of one group for EVERY target at once (targets processed in
+    chunks): the group's code for a non-member target is the shared full code,
+    for a member target its own-window-excluded code. Returns
+    (gains list of len V with None where the group is only the target itself,
+    n_boundary_alpha, n_scored)."""
+    V, tr_t, va_t = prep["V"], prep["tr_t"], prep["va_t"]
+    pos = {j: i for i, j in enumerate(members)}
+    gains, n_hit, n_tot = [None] * V, 0, 0
+    last = len(PS.ALPHA_GRID) - 1
+    for s in range(0, V, BATCH_CHUNK):
+        if guard:
+            guard.check_light("group scoring")
+        e = min(V, s + BATCH_CHUNK)
+        code = code_full.unsqueeze(0).repeat(e - s, 1, 1)
+        for q in range(s, e):
+            if q in pos:
+                code[q - s] = code_excl[pos[q]]
+        X = torch.cat([prep["feats_t"][s:e], code], dim=2)
+        r2, idx = batched_r2_val(X, prep["target_t"][s:e], tr_t, va_t)
+        r2, hit = r2.cpu().numpy(), ((idx == 0) | (idx == last)).cpu().numpy()
+        for q in range(s, e):
+            if members == [q]:
+                continue                # only q itself: nothing to rank
+            gains[q] = float(r2[q - s]) - float(own[q])
+            n_hit += int(hit[q - s])
+            n_tot += 1
+    return gains, n_hit, n_tot
+
+
+def screen_groups(prep, labels, kind: str, k: int, seed_base: int, guard=None,
+                  batched: bool = True):
     """kind in {'learned','pca'}. One encoder (or PCA basis) per group;
     per-(target,group) ridge readouts; own-history R2 computed ONCE per
     target; codes for non-member targets computed ONCE per group. The full
     per-target gain table is returned in diag so the abstention decision can
-    be audited and the invariance check can compare gains, not only sets."""
+    be audited and the invariance check can compare gains, not only sets.
+    batched=True scores every target against a group in one batched solve;
+    batched=False is the per-(target,group) reference loop the batched path is
+    tested against."""
     V, tr_t, va_t = prep["V"], prep["tr_t"], prep["va_t"]
     groups = {g: sorted(np.where(labels == g)[0].tolist())
               for g in sorted(set(labels.tolist()))}
@@ -537,25 +689,36 @@ def screen_groups(prep, labels, kind: str, k: int, seed_base: int, guard=None):
             full, excl = _pca_codes(z, prep["tr"], members, b)
         code_full[gid] = as_t(full)
         code_excl[gid] = [as_t(e) for e in excl]
-    gains, C, unresolved = {}, {}, {}
+    gains, C, unresolved = {q: {} for q in range(V)}, {}, {}
     alpha_hits = alpha_total = 0
-    for q in range(V):
-        if guard:
-            guard.check_light("group scoring")
-        F, y = prep["feats_t"][q], prep["target_t"][q]
-        r2_own = PS.ridge_r2_val(F[tr_t], y[tr_t], F[va_t], y[va_t])[0]
-        gains[q] = {}
+    if batched:
+        own = batched_own_r2(prep, guard)
         for gid, members in groups.items():
-            if all(j == q for j in members):
-                continue                # only q itself: nothing to rank
-            code = (code_excl[gid][pos_of[gid][q]] if q in pos_of[gid]
-                    else code_full[gid])
-            X = torch.cat([F, code], dim=1)
-            r2_full, _, hit = PS.ridge_r2_val(X[tr_t], y[tr_t],
-                                              X[va_t], y[va_t])
-            gains[q][gid] = r2_full - r2_own
-            alpha_hits += int(hit)
-            alpha_total += 1
+            g_scores, n_hit, n_tot = _score_group_batched(
+                prep, members, code_full[gid], code_excl[gid], own, guard)
+            for q, g in enumerate(g_scores):
+                if g is not None:
+                    gains[q][gid] = g
+            alpha_hits += n_hit
+            alpha_total += n_tot
+    else:
+        for q in range(V):
+            if guard:
+                guard.check_light("group scoring")
+            F, y = prep["feats_t"][q], prep["target_t"][q]
+            r2_own = PS.ridge_r2_val(F[tr_t], y[tr_t], F[va_t], y[va_t])[0]
+            for gid, members in groups.items():
+                if all(j == q for j in members):
+                    continue                # only q itself: nothing to rank
+                code = (code_excl[gid][pos_of[gid][q]] if q in pos_of[gid]
+                        else code_full[gid])
+                X = torch.cat([F, code], dim=1)
+                r2_full, _, hit = PS.ridge_r2_val(X[tr_t], y[tr_t],
+                                                  X[va_t], y[va_t])
+                gains[q][gid] = r2_full - r2_own
+                alpha_hits += int(hit)
+                alpha_total += 1
+    for q in range(V):
         C[q], unresolved[q] = PS.build_candidate_set(q, gains[q], groups, k)
     diag = dict(n_groups=len(groups),
                 sizes=sorted(len(v) for v in groups.values()),
@@ -640,11 +803,13 @@ def _finite_unit(v) -> bool:
             and bool(np.isfinite(v)) and 0.0 <= float(v) <= 1.0)
 
 
-def validate_pilot_inputs(per_family) -> list[str]:
+def validate_pilot_inputs(per_family, seeds=None) -> list[str]:
     """Every reason the gate must REFUSE to evaluate. Empty list = complete.
     Required: exactly the two families; exactly the six arms in each; exactly
     the six registered seeds per arm, unique; every metric a finite number in
-    [0,1]; budget_ok a real bool."""
+    [0,1]; budget_ok a real bool. `seeds` defaults to the registered lists and
+    is overridden ONLY by the engineering dry-run, never by the pilot."""
+    registered = seeds or FROZEN_SEEDS
     if not isinstance(per_family, dict) or set(per_family) != set(FAMILIES):
         got = sorted(per_family) if isinstance(per_family, dict) else per_family
         return [f"families must be exactly {FAMILIES}, got {got}"]
@@ -655,20 +820,21 @@ def validate_pilot_inputs(per_family) -> list[str]:
             problems.append(f"{fam}: arms must be exactly {ARMS}, got "
                             f"{sorted(arms) if isinstance(arms, dict) else arms}")
             continue
-        want = sorted(FROZEN_SEEDS[fam])
+        want = sorted(registered[fam])
         for a in ARMS:
             rows = arms[a]
             if not isinstance(rows, list) or not all(
                     isinstance(r, dict) for r in rows):
                 problems.append(f"{fam}/{a}: cells must be a list of dicts")
                 continue
-            seeds = [r.get("seed") for r in rows]
+            got_seeds = [r.get("seed") for r in rows]
             try:
-                seeds_sorted = sorted(seeds)
+                seeds_sorted = sorted(got_seeds)
             except TypeError:
                 seeds_sorted = None
             if seeds_sorted != want:
-                problems.append(f"{fam}/{a}: seeds {seeds} != registered {want}")
+                problems.append(f"{fam}/{a}: seeds {got_seeds} != registered "
+                                f"{want}")
             for r in rows:
                 bad = [kx for kx in METRIC_KEYS if not _finite_unit(r.get(kx))]
                 if bad:
@@ -680,9 +846,9 @@ def validate_pilot_inputs(per_family) -> list[str]:
     return problems
 
 
-def evaluate_gate(per_family, verbose: bool = True) -> bool:
+def evaluate_gate(per_family, verbose: bool = True, seeds=None) -> bool:
     """True iff the input is COMPLETE and G1-G4 hold in BOTH families."""
-    problems = validate_pilot_inputs(per_family)
+    problems = validate_pilot_inputs(per_family, seeds)
     if problems:
         if verbose:
             print("  GATE REFUSES INCOMPLETE INPUT -> FAIL")
@@ -711,8 +877,8 @@ def evaluate_gate(per_family, verbose: bool = True) -> bool:
             for a, v in sorted(margins.items()):
                 print(f"        vs {a:18s} {v:+.3f}")
             n_ok = sum(bool(r["budget_ok"]) for r in arms[a6])
-            print(f"    G4 fixed budget in every seed ({n_ok}/6 seeds ok) "
-                  f"-> {'PASS' if g4 else 'FAIL'}")
+            print(f"    G4 fixed budget in every seed ({n_ok}/{len(arms[a6])} "
+                  f"seeds ok) -> {'PASS' if g4 else 'FAIL'}")
         ok_all &= g1 and g2 and g3 and g4
     if verbose:
         print(f"  GATE (both families, all of G1-G4): "
@@ -810,59 +976,71 @@ def tree_rss_selftest() -> bool:
 
 
 class _CountingGuard(ResourceGuard):
-    """Test double: counts check_light calls and breaches on the stop_at-th."""
+    """Test double: counts check_light calls per label and breaches on the
+    stop_at-th poll of stop_label only."""
 
-    def __init__(self, stop_at: float = float("inf")):
+    def __init__(self, stop_label: str | None = None,
+                 stop_at: float = float("inf")):
         super().__init__(runtime_cap_sec=1e9)
-        self.stop_at, self.calls = stop_at, 0
+        self.stop_label, self.stop_at, self.calls = stop_label, stop_at, {}
 
     def check_light(self, where: str):
-        self.calls += 1
-        if self.calls >= self.stop_at:
-            raise CapBreach(f"synthetic stop after {self.calls} checks at "
-                            f"{where}")
+        self.calls[where] = self.calls.get(where, 0) + 1
+        if where == self.stop_label and self.calls[where] >= self.stop_at:
+            raise CapBreach(f"synthetic stop after {self.calls[where]} polls "
+                            f"at {where}")
 
 
 def guard_granularity_selftest() -> bool:
-    """The guard must be polled INSIDE every long loop, once per iteration,
-    and a breach must stop the arm mid-loop. For each loop: (a) a never-
-    stopping counting guard shows the loop polls more than 3 times; (b) a
-    guard that breaches on its 3rd poll stops the arm after exactly 3 polls,
-    at the expected label (so a breach at iteration 3 of many cannot be
-    deferred to the end of the arm). Then a real blown wall-clock cap raises
-    at the first poll of the lasso loop."""
+    """The guard must be polled INSIDE every long loop, once per iteration
+    (per chunk in the batched loops, run here with a tiny chunk so a small
+    system still has several), and a breach must stop the arm mid-loop. For
+    each loop label: (a) a never-stopping counting guard shows that label is
+    polled more than 3 times; (b) a guard that breaches on the 3rd poll OF THAT
+    LABEL stops the arm after exactly 3 polls of it, at that label, so a
+    breach at iteration 3 of many cannot be deferred to the end of the arm.
+    Then a real blown wall-clock cap raises at the first poll of the lasso
+    loop."""
+    global BATCH_CHUNK
+    saved_chunk, BATCH_CHUNK = BATCH_CHUNK, 4
+    try:
+        return _granularity_checks()
+    finally:
+        BATCH_CHUNK = saved_chunk
+
+
+def _granularity_checks() -> bool:
     x = PS.family1_generate(14, 1200, seed=9900)["x_obs"]
     prep = prep_system(x)
     labels = clustered_labels(prep)
     k = PS.k_for(14)
-    n_groups = len(set(labels.tolist()))
     z_small = np.zeros((len(prep["xs"]) - 4, 6), np.float32)
     loops = [
-        ("lasso target", 3, lambda g: screen_lasso(prep, k, g)),
-        ("lagcorr residual", 3, lambda g: screen_lagcorr(prep, k, g)),
-        ("lagcorr proxy", 14 + 3,
-         lambda g: screen_lagcorr(prep, k, g)),
-        ("encoder epoch", 3, lambda g: PS.train_group_encoder(
+        ("lasso target", lambda g: screen_lasso(prep, k, g)),
+        ("lagcorr residual", lambda g: screen_lagcorr(prep, k, g)),
+        ("lagcorr proxy", lambda g: screen_lagcorr(prep, k, g)),
+        ("encoder epoch", lambda g: PS.train_group_encoder(
             z_small, prep["tr"], 2, seed=0, guard=g)),
-        ("group scoring", n_groups + 3,
+        ("group scoring",
          lambda g: screen_groups(prep, labels, "pca", k, 0, g)),
     ]
     ok = True
-    for label, stop_at, run in loops:
+    for label, run in loops:
         free = _CountingGuard()
         run(free)
-        stopper = _CountingGuard(stop_at)
+        n_free = free.calls.get(label, 0)
+        stopper = _CountingGuard(label, 3)
         try:
             run(stopper)
             raised, msg = False, "no breach raised"
         except CapBreach as e:
             raised, msg = True, str(e)
-        good = (free.calls > stop_at and raised and stopper.calls == stop_at
+        good = (n_free > 3 and raised and stopper.calls.get(label) == 3
                 and label in msg)
         ok &= good
-        print(f"    {'OK ' if good else 'BAD'} '{label}': loop polls "
-              f"{free.calls}x unstopped; breach at poll {stopper.calls}/"
-              f"{stop_at} raised mid-arm at '{label}': {raised and label in msg}")
+        print(f"    {'OK ' if good else 'BAD'} '{label}': polled {n_free}x "
+              f"unstopped; breach on poll {stopper.calls.get(label)}/3 raised "
+              f"mid-arm at that label: {raised and label in msg}")
     g = ResourceGuard(runtime_cap_sec=0.0)
     time.sleep(0.05)
     try:
@@ -877,20 +1055,32 @@ def guard_granularity_selftest() -> bool:
 
 
 def scoring_equivalence_selftest() -> bool:
-    """The arms module scores groups with its own tensor loop (own R2 once per
-    target, codes cached per group). That loop must reproduce, to 1e-9, the
-    reference path Stage A validated: PS.score_target_against_group on numpy.
-    PCA arm (no training) for every (target, group); the learned arm with the
-    same seeds for every pair on a small system."""
+    """The arms module scores groups with a BATCHED solve (default) and keeps
+    its per-(target,group) tensor loop as a second path. Both must reproduce,
+    to 1e-9, the reference Stage A validated (PS.score_target_against_group
+    on numpy) and agree EXACTLY on alpha choices, shortlists and abstention
+    flags. PCA arm (no training) for every (target, group); the learned arm
+    with the same seeds on a small system; LAGCORR batched vs per-target."""
     x = PS.family1_generate(14, 1200, seed=9900)["x_obs"]
     prep = prep_system(x)
     labels = clustered_labels(prep)
     k = PS.k_for(14)
     groups = {g: sorted(np.where(labels == g)[0].tolist())
               for g in sorted(set(labels.tolist()))}
-    worst = {}
+    worst, exact = {}, True
     for kind in ("pca", "learned"):
-        _, _, diag = screen_groups(prep, labels, kind, k, 0)
+        Cb, ub, diag = screen_groups(prep, labels, kind, k, 0, batched=True)
+        Cl, ul, dl = screen_groups(prep, labels, kind, k, 0, batched=False)
+        same = (Cb == Cl and ub == ul
+                and diag["alpha_boundary_rate"] == dl["alpha_boundary_rate"])
+        loop_diff = max(abs(diag["gains"][q][g] - dl["gains"][q][g])
+                        for q in diag["gains"] for g in diag["gains"][q])
+        keys_same = all(diag["gains"][q].keys() == dl["gains"][q].keys()
+                        for q in diag["gains"])
+        exact &= same and keys_same and loop_diff < 1e-9
+        print(f"    {kind}: batched vs loop  max |gain diff| {loop_diff:.2e}, "
+              f"shortlists+flags+alpha-boundary-rate identical: {same}, "
+              f"same (target,group) pairs: {keys_same}")
         codes = {}
         for gid, members in groups.items():
             z = np.concatenate([prep["own_raw"][j] for j in members],
@@ -916,9 +1106,51 @@ def scoring_equivalence_selftest() -> bool:
                     prep["tr"], prep["va"])
                 w = max(w, abs(ref - diag["gains"][q][gid]))
         worst[kind] = w
-    ok = all(v < 1e-9 for v in worst.values())
-    print(f"    max |arms gain - reference gain|: pca {worst['pca']:.2e}, "
-          f"learned {worst['learned']:.2e}   -> {'PASS' if ok else 'FAIL'}")
+    rb, pb, db = screen_lagcorr(prep, k, batched=True)
+    rl, pl, dl_ = screen_lagcorr(prep, k, batched=False)
+    lag_same = (db == dl_ and all(rb[v]["C"] == rl[v]["C"] for v in rb)
+                and all(abs(pb[v] - pl[v]) < 1e-9 for v in pb))
+    print(f"    LAGCORR batched vs per-target: shortlists (both variants) and "
+          f"deployed variant identical, proxies within 1e-9: {lag_same}")
+    ok = all(v < 1e-9 for v in worst.values()) and exact and lag_same
+    print(f"    max |batched gain - PS reference gain|: pca "
+          f"{worst['pca']:.2e}, learned {worst['learned']:.2e}   -> "
+          f"{'PASS' if ok else 'FAIL'}")
+    return ok
+
+
+def clearance_selftest() -> bool:
+    """The pilot's launch gate: missing file, wrong hash, a dirty guarded file
+    and the correct clearance must be told apart."""
+    probe = OUT / "clearance_probe.txt"
+    OUT.mkdir(parents=True, exist_ok=True)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+    ok = True
+    tmp = Path(".clearance_probe.tmp")
+    try:
+        probe.unlink(missing_ok=True)
+        r_missing = clearance_state(probe)[0]
+        probe.write_text("cleared 0000000\n")
+        r_wrong = clearance_state(probe)[0]
+        probe.write_text(f"cleared {head[:12]}\n")
+        tmp.write_text("untracked probe\n")
+        r_dirty = clearance_state(probe, guarded=[str(tmp)])[0]
+        tmp.unlink()
+        clean = not subprocess.run(
+            ["git", "status", "--porcelain", "--", *GUARDED_FILES],
+            capture_output=True, text=True).stdout.strip()
+        r_good = clearance_state(probe)[0] if clean else None
+    finally:
+        probe.unlink(missing_ok=True)
+        tmp.unlink(missing_ok=True)
+    good_ok = (r_good is True) if clean else True
+    ok = (not r_missing) and (not r_wrong) and (not r_dirty) and good_ok
+    print(f"    missing file refused: {not r_missing}; wrong hash refused: "
+          f"{not r_wrong}; dirty guarded file refused: {not r_dirty}; correct "
+          f"clearance on a clean tree accepted: "
+          f"{r_good if clean else 'skipped (guarded files uncommitted)'}   "
+          f"-> {'PASS' if ok else 'FAIL'}")
     return ok
 
 
@@ -1025,8 +1257,12 @@ def _preflight() -> bool:
     ok &= guard_granularity_selftest()
     print("[d] lasso tuning never fits on inner-validation labels")
     ok &= lasso_leak_selftest()
-    print("[e] scoring fast path == the reviewed reference scoring path")
+    print("[e] batched scoring == per-target loop == the reviewed reference "
+          "scoring path (method-preserving batching)")
     ok &= scoring_equivalence_selftest()
+    print("[g] the pilot launch gate tells missing / wrong / dirty / correct "
+          "clearance apart")
+    ok &= clearance_selftest()
     print("[f] per-arm test-block invariance through the FINAL production "
           "arm paths (same-input determinism control; train-span "
           "sensitivity control proves the check can fail)")
@@ -1107,46 +1343,167 @@ def _take_lock(what: str):
                     f"{time.strftime('%Y-%m-%dT%H:%M:%S')}\n")
 
 
-def timing_run(system_cap_sec: float = 600, lasso_subset: int = 12) -> dict:
-    """One V=240 engineering system per family (seeds 9700/9701), each capped
-    at system_cap_sec by the guard. LASSO runs on `lasso_subset` targets and
-    is extrapolated linearly (per-target cost is uniform); every other arm
-    runs in full. Records actual elapsed and a conservative extrapolation to
-    the 12-system pilot against the 1h cap."""
+def _pca_group_codes(prep, members):
+    z = np.concatenate([prep["own_raw"][j] for j in members],
+                       axis=1).astype(np.float32)
+    return z, _pca_codes(z, prep["tr"], members,
+                         PS.group_bottleneck(len(members)))
+
+
+def timing_probe(total_cap_sec: float = 180.0, seed: int = 9700) -> dict:
+    """ONE engineering system (family 1, engineering seed 9700; family 2 seed
+    9701 for generation only) at the registered pilot shape V=240, n=4000.
+    The whole probe is capped at total_cap_sec by the guard, polled at the
+    start, before every stage and inside every loop, with the registered
+    free-RAM floor UNCHANGED; a breach stops the probe, saves what was
+    measured and is not retried. Real timings where cheap (generation,
+    preparation, clustering, LAGCORR and PCA-GROUP end to end through the
+    batched path); sampled where expensive (encoders, LASSO targets, the
+    per-target reference loop). Then a projection of one system and of the
+    12-system pilot against the 1 h cap, for the reference loops and for the
+    batched path. The result is written after every stage."""
     OUT.mkdir(parents=True, exist_ok=True)
-    _take_lock("parent_screening engineering timing (2 systems, V=240)")
-    rec = {}
+    path = OUT / "engineering_timing.json"
+    _take_lock("parent_screening engineering timing probe (<=180 s, V=240)")
+    guard = ResourceGuard(total_cap_sec)
+    V, n = 240, 4000
+    rec = dict(seed=seed, V=V, n=n, total_cap_sec=total_cap_sec,
+               caps=dict(free_ram_floor_mb=CAP_FREE_MB, gpu_gib=CAP_GPU_GIB,
+                         tree_rss_mb=CAP_RSS_MB, disk_mb=CAP_DISK_MB,
+                         pilot_runtime_sec=CAP_RUNTIME_SEC),
+               stages={}, samples={}, breach=None, projection=None)
+
+    def save():
+        rec["guard"] = guard.snapshot()
+        path.write_text(json.dumps(rec, indent=1, default=float))
+
+    def stage(name, fn):
+        guard.check_light(f"stage {name}")
+        t0 = time.perf_counter()
+        res = fn()
+        rec["stages"][name] = time.perf_counter() - t0
+        save()
+        return res
+
     try:
-        for fam, gen, seed in (("family1", PS.family1_generate, 9700),
-                               ("family2", PS.family2_generate, 9701)):
-            guard = ResourceGuard(system_cap_sec)
+        guard.check_full("probe start")
+        guard.check_light("probe start")
+        out = stage("generate_family1", lambda: PS.family1_generate(V, n, seed))
+        prep = stage("prep_system", lambda: prep_system(out["x_obs"]))
+        labels = stage("cluster", lambda: clustered_labels(prep))
+        groups = {g: sorted(np.where(labels == g)[0].tolist())
+                  for g in sorted(set(labels.tolist()))}
+        G, k = len(groups), PS.k_for(V)
+        rec["G"], rec["group_sizes"] = G, sorted(len(v) for v in groups.values())
+        stage("LAGCORR_batched_full",
+              lambda: screen_lagcorr(prep, k, guard, batched=True))
+        _, unres, _ = stage("PCA-GROUP_batched_full", lambda: screen_groups(
+            prep, labels, "pca", k, 0, guard, batched=True))
+        rec["samples"]["pca_unresolved_share_all_targets"] = float(
+            np.mean(list(unres.values())))
+
+        tr_t, va_t = prep["tr_t"], prep["va_t"]
+        by_size = sorted(groups, key=lambda g: (-len(groups[g]), g))
+        pair_groups = [by_size[i] for i in np.linspace(
+            0, G - 1, min(4, G)).astype(int)]
+        pair_targets = list(range(0, V, max(V // 8, 1)))[:8]
+
+        def ref_pairs():
+            n_pairs, t0 = 0, time.perf_counter()
+            for gid in pair_groups:
+                members = groups[gid]
+                _, (full, excl) = _pca_group_codes(prep, members)
+                for q in pair_targets:
+                    guard.check_light("reference pair sample")
+                    c = excl[members.index(q)] if q in members else full
+                    F, y = prep["feats_t"][q], prep["target_t"][q]
+                    X = torch.cat([F, torch.as_tensor(
+                        c, dtype=torch.float64, device=DEV)], dim=1)
+                    PS.ridge_r2_val(X[tr_t], y[tr_t], X[va_t], y[va_t])
+                    n_pairs += 1
+            return (time.perf_counter() - t0) / n_pairs
+        rec["samples"]["t_pair_reference_sec"] = stage("ref_pair_sample",
+                                                       ref_pairs)
+
+        def enc_sample():
+            times = {}
+            for gid in (by_size[0], by_size[len(by_size) // 2], by_size[-1]):
+                members = groups[gid]
+                z = np.concatenate([prep["own_raw"][j] for j in members],
+                                   axis=1).astype(np.float32)
+                t0 = time.perf_counter()
+                PS.train_group_encoder(z, prep["tr"], len(members), seed=gid,
+                                       guard=guard)
+                times[len(members)] = time.perf_counter() - t0
+            return times
+        enc_times = stage("encoder_sample", enc_sample)
+        rec["samples"]["t_encoder_by_group_size_sec"] = enc_times
+
+        def lasso_sample():
             t0 = time.perf_counter()
-            out = gen(240, 4000, seed)
-            t_gen = time.perf_counter() - t0
-            timings, err = {}, None
-            try:
-                run_all_arms(out["x_obs"], seed, guard, timings,
-                             lasso_targets=lasso_subset)
-            except CapBreach as e:
-                err = str(e)
-            lasso_full = timings.get("LASSO", 0.0) * 240 / lasso_subset
-            per_sys = t_gen + lasso_full + sum(
-                v for kx, v in timings.items() if kx != "LASSO")
-            rec[fam] = dict(gen_sec=t_gen, timings=timings,
-                            lasso_full_extrapolated_sec=lasso_full,
-                            breach=err, per_system_sec=per_sys,
-                            **guard.snapshot())
-        pilot_total = 6 * sum(r["per_system_sec"] for r in rec.values())
-        rec["pilot_extrapolated_sec"] = pilot_total
-        rec["pilot_cap_sec"] = CAP_RUNTIME_SEC
-        rec["fits_cap"] = bool(pilot_total <= CAP_RUNTIME_SEC and not any(
-            r["breach"] for r in rec.values() if isinstance(r, dict)
-            and "breach" in r))
-        (OUT / "engineering_timing.json").write_text(json.dumps(
-            rec, indent=1, default=float))
-        return rec
+            D = _dictionary(prep)
+            t_dict, per = time.perf_counter() - t0, []
+            for q in (0, V // 2, V - 1):
+                guard.check_light("lasso sample")
+                t1 = time.perf_counter()
+                _, info = lasso_target(prep, D, q)
+                per.append((time.perf_counter() - t1, info["nonconverged"]))
+            return t_dict, per
+        t_dict, lasso_per = stage("lasso_sample", lasso_sample)
+        rec["samples"]["t_lasso_dictionary_sec"] = t_dict
+        rec["samples"]["t_lasso_target_sec"] = [p[0] for p in lasso_per]
+        rec["samples"]["lasso_nonconverged_in_sample"] = [p[1] for p in lasso_per]
+
+        stage("generate_family2", lambda: PS.family2_generate(V, n, seed + 1))
+
+        def ref_resid():
+            t0, m = time.perf_counter(), 6
+            for q in range(m):
+                guard.check_light("reference residual sample")
+                _ridge_w(prep["feats_t"][q][tr_t], prep["target_t"][q][tr_t])
+            return (time.perf_counter() - t0) / m
+        rec["samples"]["t_resid_reference_sec"] = stage("ref_resid_sample",
+                                                        ref_resid)
+
+        st, sm = rec["stages"], rec["samples"]
+        t_pair, t_enc = sm["t_pair_reference_sec"], float(np.mean(
+            list(enc_times.values())))
+        t_enc_max = float(max(enc_times.values()))
+        t_lasso = float(np.mean(sm["t_lasso_target_sec"]))
+        fixed = ((st["generate_family1"] + st["generate_family2"]) / 2
+                 + st["prep_system"] + st["cluster"])
+        lasso_arm = t_dict + V * t_lasso
+        lag_ref = V * sm["t_resid_reference_sec"] + 2 * V * t_pair
+        score_ref = V * G * t_pair + V * t_pair
+        score_b = st["PCA-GROUP_batched_full"]
+        learned_ref = G * t_enc + score_ref
+        learned_b = G * t_enc + score_b
+        sys_ref = fixed + lag_ref + lasso_arm + score_ref + 2 * learned_ref
+        sys_b = (fixed + st["LAGCORR_batched_full"] + lasso_arm + score_b
+                 + 2 * learned_b)
+        rec["projection"] = dict(
+            basis="one V=240 system; encoder and LASSO costs sampled, the rest "
+                  "measured or per-pair extrapolated; NOT a pilot",
+            per_system_sec=dict(reference_loops=sys_ref, batched=sys_b),
+            pilot_12_systems_sec=dict(reference_loops=12 * sys_ref,
+                                      batched=12 * sys_b),
+            pilot_cap_sec=CAP_RUNTIME_SEC,
+            batched_fits_cap=bool(12 * sys_b <= CAP_RUNTIME_SEC),
+            batched_over_cap_factor=12 * sys_b / CAP_RUNTIME_SEC,
+            batched_breakdown_per_system_sec=dict(
+                fixed=fixed, LAGCORR=st["LAGCORR_batched_full"],
+                LASSO=lasso_arm, PCA_GROUP=score_b,
+                LEARNED_each=learned_b, encoders_each_arm=G * t_enc,
+                encoders_conservative_each_arm=G * t_enc_max),
+            lasso_share_of_batched_system=lasso_arm / sys_b)
+    except CapBreach as e:
+        rec["breach"] = str(e)
     finally:
-        LOCK.unlink(missing_ok=True)
+        try:
+            save()
+        finally:
+            LOCK.unlink(missing_ok=True)
+    return rec
 
 
 # ================================================================
@@ -1160,32 +1517,40 @@ def _src_hash() -> str:
     return h.hexdigest()[:16]
 
 
-def config_hash() -> str:
-    cfg = dict(seeds=FROZEN_SEEDS, arms=ARMS, alpha_grid=PS.ALPHA_GRID,
-               lasso_grid=LASSO_GRID_REL, lags=LAGS, group_cap=PS.GROUP_CAP,
-               E=PS.E, unresolved=PS.UNRESOLVED_GAIN, V=240, n=4000,
-               src=_src_hash())
-    return hashlib.sha256(json.dumps(cfg, sort_keys=True,
+PILOT_CFG = dict(V=240, n=4000, seeds=FROZEN_SEEDS, out=OUT, dry=False)
+DRY_SEEDS = {"family1": (9910, 9911), "family2": (9920, 9921)}
+DRYRUN_CFG = dict(V=16, n=1200, seeds=DRY_SEEDS,
+                  out=Path("ExpOutput/parent_screening_dryrun"), dry=True)
+
+
+def config_hash(cfg=None) -> str:
+    cfg = cfg or PILOT_CFG
+    blob = dict(seeds=cfg["seeds"], arms=ARMS, alpha_grid=PS.ALPHA_GRID,
+                lasso_grid=LASSO_GRID_REL, lags=LAGS, group_cap=PS.GROUP_CAP,
+                E=PS.E, unresolved=PS.UNRESOLVED_GAIN, V=cfg["V"], n=cfg["n"],
+                src=_src_hash())
+    return hashlib.sha256(json.dumps(blob, sort_keys=True,
                                      default=str).encode()).hexdigest()[:16]
 
 
-def clearance_state() -> tuple[bool, str]:
+def clearance_state(path=None, guarded=None) -> tuple[bool, str]:
     """The pilot may start only if the reviewer's clearance file reads
     'cleared <hash>' with <hash> a prefix of the CURRENT git HEAD, and every
     guarded script/protocol is committed (so the code that runs is the code
     that was reviewed)."""
-    if not CLEARANCE.exists():
-        return False, f"{CLEARANCE} does not exist"
+    path = Path(path) if path else CLEARANCE
+    guarded = guarded or GUARDED_FILES
+    if not path.exists():
+        return False, f"{path} does not exist"
     head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                           text=True).stdout.strip()
-    toks = CLEARANCE.read_text().split()
+    toks = path.read_text().split()
     if len(toks) < 2 or toks[0] != "cleared" or len(toks[1]) < 7 \
             or not head.startswith(toks[1]):
         return False, (f"clearance file must read 'cleared <commit-hash>' "
                        f"matching HEAD {head[:12]}")
-    dirty = subprocess.run(["git", "status", "--porcelain", "--",
-                            *GUARDED_FILES], capture_output=True,
-                           text=True).stdout.strip()
+    dirty = subprocess.run(["git", "status", "--porcelain", "--", *guarded],
+                           capture_output=True, text=True).stdout.strip()
     if dirty:
         return False, f"guarded files have uncommitted changes:\n{dirty}"
     return True, head
@@ -1221,39 +1586,54 @@ def _restore(payload_arm, V):
     return C, unres
 
 
-def run_pilot():
-    ok, info = clearance_state()
-    if not ok:
-        raise SystemExit("pilot NOT cleared: " + info)
-    OUT.mkdir(parents=True, exist_ok=True)
-    ch = config_hash()
+def run_pilot(cfg=None):
+    """cfg=PILOT_CFG is the registered Stage B pilot (needs clearance, the
+    registered seeds, V=240). cfg=DRYRUN_CFG runs the SAME code path on tiny
+    engineering systems in a separate directory to exercise the runner end to
+    end; its gate verdict is meaningless and no clearance is needed."""
+    cfg = cfg or PILOT_CFG
+    V, n, seeds, out_dir, dry = (cfg["V"], cfg["n"], cfg["seeds"],
+                                 cfg["out"], cfg["dry"])
+    if dry:
+        info = "dry-run"
+    else:
+        ok, info = clearance_state()
+        if not ok:
+            raise SystemExit("pilot NOT cleared: " + info)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ch = config_hash(cfg)
     spent = 0.0
-    for f in OUT.glob("done_*.json"):
+    for f in out_dir.glob("done_*.json"):
         d = json.loads(f.read_text())
         if d.get("config") == ch:
             spent += d.get("system_sec", 0.0)
-    _take_lock("parent_screening Stage B pilot (12 systems, V=240)")
-    guard = ResourceGuard(CAP_RUNTIME_SEC - spent)
+    _take_lock(f"parent_screening {'DRY RUN' if dry else 'Stage B pilot'} "
+               f"({sum(len(v) for v in seeds.values())} systems, V={V})")
+    guard = ResourceGuard(CAP_RUNTIME_SEC - spent, out_dir=out_dir)
     try:
+        guard.check_full("run start")
+        guard.check_light("run start")
         for fam, gen in (("family1", PS.family1_generate),
                          ("family2", PS.family2_generate)):
-            for seed in FROZEN_SEEDS[fam]:
-                done = OUT / f"done_{fam}_{seed}.json"
+            for seed in seeds[fam]:
+                done = out_dir / f"done_{fam}_{seed}.json"
                 if done.exists() and json.loads(done.read_text()
                                                 ).get("config") == ch:
                     print(f"  {fam} {seed}: RESUMED", flush=True)
                     continue
                 guard.check_light(f"generate {fam} {seed}")
                 t_sys = time.perf_counter()
-                out = gen(240, 4000, seed)
+                out = gen(V, n, seed)
                 timings = {}
                 res, prep, labels = run_all_arms(out["x_obs"], seed, guard,
                                                  timings)
-                (OUT / f"shortlists_{fam}_{seed}.json").write_text(
-                    json.dumps(_payload(res, 240)))
+                (out_dir / f"shortlists_{fam}_{seed}.json").write_text(
+                    json.dumps(_payload(res, V)))
                 # truth is written only AFTER this system's shortlists are on disk
-                (OUT / f"evaluator_{fam}_{seed}.json").write_text(json.dumps(
-                    {str(q): out["parent"][q] for q in out["parent"]}))
+                (out_dir / f"evaluator_{fam}_{seed}.json").write_text(
+                    json.dumps({str(q): [[int(j), int(d)]
+                                         for j, d in out["parent"][q]]
+                                for q in out["parent"]}))
                 sys_sec = time.perf_counter() - t_sys
                 done.write_text(json.dumps(dict(
                     config=ch, head=info, family=fam, seed=seed,
@@ -1262,23 +1642,25 @@ def run_pilot():
                 print(f"  {fam} {seed}: shortlists frozen, {sys_sec:.0f}s "
                       f"(run total {guard.elapsed():.0f}s)", flush=True)
         per_family = {fam: {a: [] for a in ARMS} for fam in FAMILIES}
-        k = PS.k_for(240)
+        k = PS.k_for(V)
         for fam in FAMILIES:
-            for seed in FROZEN_SEEDS[fam]:
+            for seed in seeds[fam]:
                 truth = {int(q): [tuple(e) for e in v] for q, v in json.loads(
-                    (OUT / f"evaluator_{fam}_{seed}.json").read_text()).items()}
-                pl = json.loads((OUT / f"shortlists_{fam}_{seed}.json"
+                    (out_dir / f"evaluator_{fam}_{seed}.json").read_text()
+                ).items()}
+                pl = json.loads((out_dir / f"shortlists_{fam}_{seed}.json"
                                  ).read_text())
                 for a in ARMS:
-                    C, unres = _restore(pl[a], 240)
-                    m = arm_metrics(C, unres, truth, 240, k)
+                    C, unres = _restore(pl[a], V)
+                    m = arm_metrics(C, unres, truth, V, k)
                     m["seed"] = seed
                     per_family[fam][a].append(m)
-        (OUT / "pilot_metrics.json").write_text(json.dumps(
+        (out_dir / "pilot_metrics.json").write_text(json.dumps(
             per_family, indent=1, default=lambda o: bool(o)
             if isinstance(o, np.bool_) else float(o)))
-        print("\nSTAGE B GATE")
-        passed = evaluate_gate(per_family)
+        print("\nSTAGE B GATE" + ("  [DRY RUN: engineering seeds, verdict "
+                                  "meaningless]" if dry else ""))
+        passed = evaluate_gate(per_family, seeds=seeds)
         print("\nDESCRIPTIVE (not gated): mean over seeds")
         for fam in FAMILIES:
             for a in ARMS:
@@ -1291,8 +1673,16 @@ def run_pilot():
                       f"  unresolved {np.mean([r['unresolved_fraction'] for r in rows]):.3f}"
                       f"  resolved-only recall "
                       f"{(np.mean(rr) if rr else float('nan')):.3f}"
-                      f"  budget_ok {sum(bool(r['budget_ok']) for r in rows)}/6")
+                      f"  budget_ok {sum(bool(r['budget_ok']) for r in rows)}/{len(rows)}")
         return passed
+    except CapBreach as e:
+        done_n = len(list(out_dir.glob("done_*.json")))
+        print(f"\nRESOURCE CAP BREACH: {e}\n  {done_n} of "
+              f"{sum(len(v) for v in seeds.values())} systems completed and "
+              f"preserved in {out_dir}; stopping, not retrying, nothing "
+              f"shrunk. Classification: resource-limited, not a scientific "
+              f"result.", flush=True)
+        raise SystemExit(4)
     finally:
         LOCK.unlink(missing_ok=True)
 
@@ -1308,8 +1698,11 @@ if __name__ == "__main__":
             LOCK.unlink(missing_ok=True)
         raise SystemExit(0)
     if "--timing" in sys.argv:
-        r = timing_run()
+        r = timing_probe()
         print(json.dumps(r, indent=1, default=float))
+        raise SystemExit(0 if r["breach"] is None else 3)
+    if "--dry-run" in sys.argv:
+        run_pilot(DRYRUN_CFG)
         raise SystemExit(0)
     if "--run-pilot" in sys.argv:
         raise SystemExit(0 if run_pilot() else 2)
