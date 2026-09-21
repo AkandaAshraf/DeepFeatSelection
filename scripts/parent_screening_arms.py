@@ -743,13 +743,15 @@ def sized_random_labels(labels, V, seed):
 # ================================================================
 
 def run_all_arms(x_obs: np.ndarray, seed: int, guard=None,
-                 timings: dict | None = None, lasso_targets=None):
+                 timings: dict | None = None, lasso_targets=None, checkpoint=None):
     prep = prep_system(x_obs)
     V = prep["V"]
     k = PS.k_for(V)
     out = {}
 
     def timed(name, fn):
+        if checkpoint is not None:
+            return checkpoint(name, fn, timings)
         t0 = time.perf_counter()
         res = fn()
         if timings is not None:
