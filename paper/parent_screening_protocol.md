@@ -969,3 +969,122 @@ determinism control and a train-span sensitivity control) passed; Stage A
 re-run in full after the refactor passes all ten checks (109.0 s), the
 label-orientation gains (B +0.0259, C +0.0006) unchanged to four decimals;
 audit gate 136 passed, 0 failed.
+
+---
+
+## Stage B stop report and amendment 3 (2026-09-21): measured cost estimate, method-preserving batching, Stage B not launched, RESOURCE-LIMITED
+
+Registered before any pilot seed ran; no pilot seed has been executed. Stage B
+was not launched, and Stage C and the downstream utility test were not
+reached. No registered parameter, arm, seed list, threshold or cap was
+changed: the 0.01 unresolved threshold, the 1 h Stage B cap, the 2 GiB free-RAM
+floor, the six arms and the twelve frozen pilot cells stand as registered.
+Engineering seeds used since amendment 2, all excluded from every result and
+none inside a frozen block: 9701 (family-2 generation in the timing probe),
+9900 (equivalence and guard tests), 9910, 9911, 9920, 9921 (dry-run).
+
+1. WHAT WAS BUILT AND CHECKED (commit 8f81914 and the two before it). The
+   group-scoring loops and the lagged-correlation proxy now solve all targets
+   in one batched ridge system: same normal equations, same embargoed
+   internal split, same alpha grid, same strict first-wins tie rule, only the
+   loop over independent systems became a batch dimension. The per-target
+   loops were kept, and the preflight asserts equivalence on an engineering
+   system (V=14): batched against looped gains, and against the reviewed
+   reference scoring, differ by at most 4.4e-15 (PCA arm) and 9.1e-15
+   (learned arm), with identical shortlists, abstention flags and alpha
+   choices; the lagged-correlation shortlists and deployed variant are
+   identical. The resource guard is polled per chunk inside the batched loops
+   (tested with a small chunk); all-arm invariance holds (15 of 15
+   comparisons identical under a same-input control and under a test-block
+   perturbation, 14 of 15 changed under a train-span perturbation, so the
+   check can fail). The pilot runner was exercised end to end by a dry-run
+   through the same code path on four engineering systems (V=16, 48 s):
+   shortlists, truth files, completion manifests, metrics and the gate ran; its
+   gate verdict is meaningless by construction. The launch gate that refuses
+   a pilot without a reviewer clearance naming the committed HEAD was tested
+   for a missing file, a wrong hash and a dirty guarded file.
+
+2. BOUNDED TIMING PROBE. One engineering system (family 1, seed 9700, V=240,
+   n=4000; family-2 seed 9701 for generation only) under a 180 s total cap
+   with the guard polled at the start and inside every loop and every
+   registered cap unchanged. It used 67.8 s, breached nothing, and saved after
+   every stage (ExpOutput/parent_screening/engineering_timing.json, sha256
+   ba7d3ea08408eed4b97fa61401c576c5f3b5ee532dc81304a53281fb241986ac). Caps
+   observed: peak process-tree RSS 1.52 GB of 3.00, minimum available RAM
+   3.17 GB against the 2.00 floor (4.8 GB at launch), GPU peak 0.36 GiB of 6.
+   MEASURED in full: generation 6.8 s (family 1) and 6.2 s (family 2),
+   preparation 0.24 s, clustering 0.04 s, which yields 146 groups (91
+   singletons, 34 pairs, 13 triples, 3 fours, 2 fives, 1 six, 2 sevens); the
+   lagged-correlation arm 1.13 s; the PCA-group arm 6.26 s, with 95.8% of all
+   targets unresolved under the registered rule. SAMPLED: the per-target
+   reference scoring loop 7.04 ms per (target, group) pair, i.e. about 248 s
+   per group arm at this group count against 6.26 s batched (about 40 times
+   slower); encoder training on three groups (sizes 7, 1, 1) 7.20, 3.24 and
+   2.86 s (the last derived from the stage total, because the artifact's
+   per-size record kept only one of the two singleton timings); LASSO on
+   three targets 8.55, 13.22 and 11.55 s per target.
+
+3. PROJECTION, AN EXTRAPOLATION FROM THOSE SAMPLES AND NOT A MEASURED FULL
+   RUN. Encoder cost per learned arm is taken as linear in group size between
+   the one-member and seven-member samples, applied to the realised sizes
+   (about 511 s per arm); the LASSO arm as the mean sampled target time times
+   240 targets (about 2,666 s). Per system, on the batched path: about 3,714
+   s, of which LASSO 72%, the two learned arms' encoders and scoring 28%, and
+   everything else under 1%. Twelve systems: about 44,600 s, or 12.4 h, about
+   12.4 times the 3,600 s cap. Across the sampling spread (fastest to slowest
+   sampled LASSO target; every encoder as fast as the fastest sample to every
+   encoder as slow as the seven-member sample) the range is about 9.7 to 17.7
+   times the cap. The artifact's own projection block reports 14.1 times
+   because it averaged the two sampled sizes without weighting by how many
+   groups are singletons; the size-weighted figure here supersedes it. Both
+   rest on three groups and three targets from one engineering system.
+
+4. CONCLUSION, STATED NARROWLY. Under the registered 1 h cap on this machine,
+   the tested implementation cannot complete the twelve-system, six-arm pilot:
+   even its faster batched path is projected to exceed the cap by roughly an
+   order of magnitude, with LASSO and encoder training the dominant costs. This
+   does not show that no implementation could; it shows the tested one cannot.
+   The two remaining accelerations were not adopted and are not claimed
+   impossible: batching encoder training across groups would not reproduce the
+   sequential random streams or summation order bit for bit, and replacing the
+   registered scikit-learn LASSO solver would change the registered baseline.
+   Per the Stage B clause above ("if Stage A's measurements show that cap is
+   infeasible ... this document is amended with a cost estimate before Stage B
+   is launched, not silently shrunk"), this is that amendment; nothing was
+   shrunk, and the cap was not extended.
+
+5. LASSO CONVERGENCE LIMITATION. Ten of the eighteen sampled LASSO fits (2, 4
+   and 4 of the six per target) reached the 2000-iteration limit without
+   meeting the 1e-4 tolerance, so the registered baseline as implemented is
+   itself not fully converged, and any LASSO comparison would carry that
+   limitation; tightening it would raise its cost further.
+
+6. ENGINEERING ABSTENTION IS NOT A SCIENTIFIC RESULT. The PCA-group arm's
+   95.8% unresolved share at V=240, and the dry-run's 92-96% (family 1) and
+   46-58% (family 2) unresolved shares for the group arms at V=16, are
+   engineering observations on non-registered seeds. They support the
+   expectation stated in amendment 2 that the registered abstention rule would
+   make arm 6 fail G4 if the pilot were run; that is an expectation, not a
+   pilot result, and no pilot was run.
+
+7. RESOURCE NOTE. On 2026-09-20 the 2 GiB free-RAM floor could not be met
+   alongside a torch process (2.1-2.4 GB available idle) and Stage B was held;
+   on 2026-09-21 available RAM ranged 2.3-5.3 GB and the probe ran under the
+   unchanged floor. The floor was never lowered and no application or virtual
+   machine was closed.
+
+8. VERDICT. Final verdict under the four categories above: 4. INCONCLUSIVE /
+   RESOURCE-LIMITED, on the ground of incomplete execution (Stage B not
+   launched because the registered cap cannot be met by the tested
+   implementation on this machine). No success claim of any kind is made, and
+   nothing here is a negative result about parent screening itself. Any change
+   to the cap, scale, arm set, abstention rule or seeds would be a new
+   registered protocol with fresh seeds, not a continuation of this one.
+
+Checks behind this amendment: arms preflight passed (commit 8f81914 code;
+gate refusals, tree RSS, per-loop guard granularity, LASSO leakage test with a
+leaky reference that must change, batched and looped scoring against the
+reviewed reference, launch-gate clearance, all-arm invariance); the dry-run
+exited cleanly; the preflight (including the clearance-accepted case, which
+needs a clean tree) and Stage A were re-run on commit 8f81914, whose code is
+the code that was probed; audit gate 136 passed, 0 failed.
