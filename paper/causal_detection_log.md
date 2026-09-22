@@ -4116,3 +4116,41 @@ NOT ESTABLISHED. One family, one coupling, redundancy 0, 12 cells from 3
 seeds. Cluster count fixed at V/6, matching the generator's source count, an
 advantage not removed here. Twelve of 48 arm-cells yielded no within-cell
 correlation (every module had the same in-module-parent fraction).
+
+
+2026-09-21  PARENT SCREENING AT A FIXED CANDIDATE BUDGET: LEARNED GROUP
+CODES DO NOT EARN THEIR PLACE; LAGGED CORRELATION DOES THE JOB WHERE THE JOB
+CAN BE DONE. Pre-registered (paper/parent_screening_protocol.md and its
+laptop extension paper/parent_screening_laptop_protocol.md), twelve fresh
+systems at V=240, six arms, one uninterrupted 10.6 h run, every metric
+recomputed independently from the saved shortlists and truth afterwards.
+The gate fails in both generator families. Full tables in the laptop
+protocol's Result section; the two numbers that matter: at a strict 10%
+budget, max lagged correlation retains 0.928 of true parents with 0.873
+complete-target coverage in the AR/tanh family (chance 0.100 / 0.036);
+in the logistic-map family nothing budget-respecting exceeds 0.535 / 0.355.
+The learned clustered screen matched PCA codes on the same partition and
+a size-matched random partition in both families (margins within 0.014),
+and under its registered 0.01 abstention rule it declined to screen 98.9%
+and 55.3% of targets, exactly as predicted from engineering seeds before
+the run. LASSO was non-converged in most fits at its registered iteration
+limit and is under-stated. One coupling, one width, six seeds per family:
+a pilot verdict, not a confirmation, and nothing about real recordings.
+
+Rule added:
+
+133. MEASURE THE SIGNAL'S SCALE BEFORE FREEZING A THRESHOLD ON IT. The
+     unresolved rule was registered at 0.01 from a noise-scale reference
+     borrowed from another pipeline, without first measuring what gain a
+     driven target actually achieves under these generators. Engineering
+     seeds then showed typical gains of 0.002-0.005, and review correctly
+     refused to move the threshold once that was known, because moving it
+     after seeing that the method would fail redefines the method. The
+     pilot was therefore decided by the threshold, not by the ranking it
+     was meant to gate. Rules 122 and 123 already say to compute chance
+     levels and headroom; this is the same error one level down: any
+     absolute threshold on a learned quantity must be preceded by a
+     measurement of that quantity's scale on engineering data, recorded in
+     the protocol, before the threshold is frozen. A threshold that is not
+     preceded by such a measurement is a guess, and a registered guess is
+     still a guess.
