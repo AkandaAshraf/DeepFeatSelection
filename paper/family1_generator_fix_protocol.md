@@ -67,3 +67,22 @@ generator, not a defect, and is not changed here.
 
 Resources: CPU plus light GPU, `.agent-lock`, expected ~10 minutes, outputs in
 ExpOutput/forecast_horizon_check_f1b/.
+
+## Pre-run amendment (2026-09-23, engineering seeds only; no fresh seed drawn)
+
+The acceptance bar "median lag-2 autocorrelation below 0.5 in absolute value"
+was set without measuring that statistic's scale on the corrected generator,
+the error Rule 133 names. Measured on engineering seeds 9960-9961 (V=24,
+n=2000): the corrected generator's driven channels have median lag-2
+autocorrelation 0.40-0.66 at every coupling and r range tried, while their
+forecast skill decays genuinely (simplex 0.94 -> about 0 by h=10) and parents
+separate cleanly from non-parents (0.35 vs 0.07). Linear lag-2 correlation is
+therefore a poor proxy for period-2 locking in a nonlinear map. It is REPLACED,
+before any fresh seed, by the statistic that actually exposed the defect: the
+median share of a driven channel's variance left after removing the period-2
+alternation, var(z(t) - z(t-2)) / (2 var z). Measured scale: defective
+generator 0.006, corrected generator 0.371 (c=0.3), white noise 1.0, a pure
+period-2 cycle 0. Bar: >= 0.20. Lag-2 autocorrelation is still reported.
+Nothing else changes: generator parameters (c = 0.30, r ~ U(3.8, 4.0)), seeds,
+models, the adequacy criterion and the other two acceptance bars stand as
+registered.

@@ -7,6 +7,7 @@ target) is adequate iff (a) s(1) >= 0.10 and s(1) > persistence(1),
 (b) s(h+1) <= s(h) + 0.02 for all h, (c) s(1) - s(10) >= 0.05.
 
     python scripts/forecast_horizon_check.py
+    python scripts/forecast_horizon_check.py --family1b   # family1_generator_fix_protocol.md
 """
 from __future__ import annotations
 
@@ -128,6 +129,12 @@ def verdict(s, pers):
 
 
 def main():
+    global OUT, SEEDS, NOISE
+    f1b = "--family1b" in sys.argv
+    if f1b:
+        import generators_v2 as G2
+        OUT = Path("ExpOutput/forecast_horizon_check_f1b")
+        SEEDS, NOISE = {"family1b": (28001, 28002, 28003, 28004)}, {"family1b": 28091}
     OUT.mkdir(parents=True, exist_ok=True)
     PA._take_lock("forecast horizon check (V=24, 10 systems, small encoders)")
     guard = PA.ResourceGuard(1800, out_dir=OUT)
@@ -135,14 +142,19 @@ def main():
     try:
         guard.check_full("start")
         jobs = []
-        for fam, gen in (("family1", PS.family1_generate),
-                         ("family2", PS.family2_generate)):
+        gens = ((("family1b", G2.family1b_generate),) if f1b else
+                (("family1", PS.family1_generate), ("family2", PS.family2_generate)))
+        for fam, gen in gens:
             for s in SEEDS[fam]:
-                jobs.append((fam, s, "dynamical", lambda g=gen, s=s: g(V, N, s)["x_obs"]))
+                jobs.append((fam, s, "dynamical", lambda g=gen, s=s: g(V, N, s)))
             jobs.append((fam, NOISE[fam], "noise", lambda s=NOISE[fam]:
-                         np.random.default_rng(s).standard_normal((N, V))))
+                         dict(x_obs=np.random.default_rng(s).standard_normal((N, V)))))
+        acc = {}
         for fam, seed, kind, make in jobs:
-            res, sizes = run_system(make(), guard)
+            sysd = make()
+            res, sizes = run_system(sysd["x_obs"], guard)
+            if f1b and kind == "dynamical":
+                acc[seed] = acceptance(sysd)
             for r in res:
                 for mname in MODELS:
                     s = r["curves"][mname]
@@ -158,6 +170,53 @@ def main():
     finally:
         PA.LOCK.unlink(missing_ok=True)
     report(rows, guard)
+    if f1b:
+        report_acceptance(rows, acc)
+
+
+def acceptance(sysd):
+    """Generator-level checks on DRIVEN channels (family1_generator_fix_protocol)."""
+    x, parent = sysd["x_obs"], sysd["parent"]
+    z = (x - x.mean(0)) / (x.std(0) + 1e-12)
+    driven = [q for q in parent if parent[q]]
+    ac2 = [np.corrcoef(z[:-2, q], z[2:, q])[0, 1] for q in driven]
+    p2left = ((z[2:] - z[:-2]).var(0) / 2)[driven]
+    P, Nn = [], []
+    for q in driven:
+        pa = {j for j, _ in parent[q]}
+        for j in range(z.shape[1]):
+            if j == q:
+                continue
+            m = max(abs(np.corrcoef(z[:-d, j], z[d:, q])[0, 1]) for d in (1, 2, 3))
+            (P if j in pa else Nn).append(m)
+    return dict(driven=driven, ac2_median=float(np.median(ac2)),
+                p2_var_left=float(np.median(p2left)),
+                parent_corr=float(np.median(P)), nonparent_corr=float(np.median(Nn)))
+
+
+def report_acceptance(rows, acc):
+    fam = "family1b"
+    m1 = [r for r in rows if r["family"] == fam and r["kind"] == "dynamical"
+          and r["model"] == "M1_SIMPLEX" and r["q"] in acc[r["seed"]]["driven"]]
+    rate = float(np.mean([r["adequate"] for r in m1]))
+    ac2 = float(np.median([a["ac2_median"] for a in acc.values()]))
+    p2 = float(np.median([a["p2_var_left"] for a in acc.values()]))
+    sep = all(a["parent_corr"] > a["nonparent_corr"] for a in acc.values())
+    ok = rate >= 0.80 and p2 >= 0.20 and sep
+    print()
+    print("FAMILY 1b ACCEPTANCE (driven channels)")
+    print(f"  M1 simplex adequate on driven: {rate:.2f} (need >=0.80)")
+    print(f"  period-2 variance left on driven: {p2:.3f} (need >=0.20; defective "
+          f"generator 0.006)")
+    print(f"  median lag-2 autocorrelation (reported only): {ac2:+.3f}")
+    for s, a in acc.items():
+        print(f"  seed {s}: parent |corr| {a['parent_corr']:.3f} vs non-parent "
+              f"{a['nonparent_corr']:.3f}")
+    print(f"  parents above non-parents in every seed: {sep}")
+    print(f"  FAMILY 1b {'ACCEPTED' if ok else 'REJECTED'}")
+    (OUT / "acceptance.json").write_text(json.dumps(dict(
+        accepted=bool(ok), m1_driven_adequate=rate, ac2_median=ac2, p2_var_left=p2,
+        per_seed={str(k): v for k, v in acc.items()}), indent=1, default=float))
 
 
 def report(rows, guard):
