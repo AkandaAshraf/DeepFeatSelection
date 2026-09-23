@@ -91,3 +91,20 @@ test, not a proven cause. No threshold or model changes after results.
 CPU plus light GPU (192 tiny encoders); `.agent-lock` held; expected well
 under 30 minutes; free RAM checked before launch and >= 2 GiB throughout;
 outputs under ExpOutput/forecast_horizon_check/ (compact CSV/JSON, < 5 MB).
+
+## Pre-run amendment (2026-09-23, before the script exists or any system is generated)
+
+Added at the user's direction, because the autoencoder is the component meant
+to raise screening recall and the encoder that actually screened in the
+parent-screening pilot is the GROUP encoder, not a one-channel one:
+
+- M5 GROUP-AE: the size-capped clustering of the standardised TRAIN span
+  (PS.cluster_size_capped), one masked autoencoder per group
+  (PS.train_group_encoder, per-member masking, bottleneck min(8, 2|G|),
+  encoder seed = group id), trained once per system on train rows; for
+  target q, its own group's code concatenated with poly3 of q's own last 3
+  values, same ridge. Same adequacy criterion and 80% bar as M1-M4. The
+  code includes q's own window, so this is a forecasting-adequacy test of
+  the representation, not a parent-screening score.
+
+Nothing else changes.
