@@ -108,3 +108,24 @@ parent-screening pilot is the GROUP encoder, not a one-channel one:
   the representation, not a parent-screening score.
 
 Nothing else changes.
+
+## Result (2026-09-23): controls pass; no model verdict is available on either family, because both generators fail the check's premise
+
+Run 455e757, seeds 26001-26004 / 27001-27004 plus noise 26091 / 27091, 1015 s,
+no resource breach. Controls behaved: every model failed (a) on 100% of noise
+channels in both families, and C-LEAK failed (c) on 100% of targets where M3
+learns (96/96 family 1, 50/50 family 2). The check itself works.
+
+  family 1   M1-M5 adequate 0.17-0.20; median skill 0.99-1.00 at EVERY horizon
+             1..10; 77/96 fail (c): skill never decays.
+  family 2   M2-M5 adequate 0.51-0.55, M1 0.05; median s(1) 0.10-0.12, gone by
+             h=3; 42-46/96 fail (a): the channel's own past barely predicts it.
+
+Neither is a statement about the models. Family 1: its driven channels are
+locked into a period-2 cycle (median lag-1 autocorrelation -0.994, 0.6% of
+variance left after removing the alternation); every model predicts a flip
+at all horizons. Diagnosed and corrected in paper/family1_generator_fix_
+protocol.md. Family 2: own-history predictability is weak by construction
+(innovation noise and parent drive dominate), which is why lagged correlation
+screens well there; recorded as a property of that generator. No verdict word
+on M1-M5 is drawn from this run.

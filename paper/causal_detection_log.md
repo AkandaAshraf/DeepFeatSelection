@@ -4154,3 +4154,32 @@ Rule added:
      the protocol, before the threshold is frozen. A threshold that is not
      preceded by such a measurement is a guess, and a registered guess is
      still a guess.
+
+
+2026-09-23  THE FAMILY-1 BENCHMARK WAS NOT CHAOTIC WHERE IT MATTERED. A
+forecast-horizon check (paper/forecast_horizon_check_protocol.md) found every
+model holding skill 0.99 from horizon 1 to 10 on the family-1 generator used
+by both parent-screening runs. Cause: the coupling form scales each driven
+map's effective logistic parameter to r(1-c) = 2.88-3.12, below the onset of
+chaos, so every DRIVEN channel locks into a period-2 cycle (0.6% of variance
+left after removing the alternation) and true parents correlate LESS with
+their targets than non-parents (0.965 vs 0.987). Roots, which the coupling
+never touches, were chaotic all along, which is why no root-level diagnostic
+could have caught it. The family-1 halves of both parent-screening results
+are measurements on a defective generator, not evidence about screening
+chaotic systems (paper/family1_generator_fix_protocol.md). A diffusive
+coupled-map replacement removes the locking and restores parent signal
+(0.36-0.38 vs 0.05-0.08) but failed its own frozen acceptance on the simplex
+reference's negative-skill tail and is not adopted.
+
+Rule added:
+
+134. VALIDATE THE BENCHMARK ON THE CHANNELS THE QUESTION IS ABOUT. A generator
+     is not validated by checking that its roots are chaotic, that nothing
+     diverges, or that clipping is rare; all three held here while every
+     driven channel was a period-2 oscillator. Before any study on a synthetic
+     family, run the forecast-horizon check on the channels the study scores
+     (here: driven targets), and require skill to decay with horizon and true
+     parents to out-correlate non-parents. A benchmark whose targets are
+     predictable at every horizon from their own past leaves no variance for
+     any parent, learned or not, to explain.

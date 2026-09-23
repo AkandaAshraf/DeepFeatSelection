@@ -86,3 +86,28 @@ period-2 cycle 0. Bar: >= 0.20. Lag-2 autocorrelation is still reported.
 Nothing else changes: generator parameters (c = 0.30, r ~ U(3.8, 4.0)), seeds,
 models, the adequacy criterion and the other two acceptance bars stand as
 registered.
+
+## Result (2026-09-23): family 1b REJECTED under the frozen rule
+
+Run a41eb8e, seeds 28001-28004 plus noise 28091, 457 s, no resource breach.
+Controls passed (noise fails (a) on 100% for every model; C-LEAK fails (c) on
+96/96). Acceptance on driven channels:
+
+  simplex M1 adequate          0.75   (bar 0.80)            FAIL
+  period-2 variance left       0.419  (bar 0.20; defective 0.006)   pass
+  parent vs non-parent |corr|  0.356-0.377 vs 0.047-0.078 in all 4 seeds   pass
+
+All 24 of M1's failures are criterion (b): simplex skill turns negative after
+h ~ 6 (median -0.04 to -0.18) and fluctuates upward there by more than the
+0.02 allowance. The rule is applied as frozen: family 1b is REJECTED and no
+model verdict is drawn on it. Neither the tolerance nor the acceptance rule is
+changed after this result.
+
+Descriptive only, explicitly not a verdict: on these chaotic driven data the
+ridge models decay smoothly and are adequate on 94-99% of targets (M2 0.94,
+M3 0.99, M4 0.99, M5 0.99); median skill h=1 -> 5 -> 10: M3 0.95 -> 0.24 ->
+0.03, M4 0.95 -> 0.24 -> 0.03, M5 0.96 -> 0.26 -> 0.04. Neither autoencoder
+exceeds the poly3 readout by more than 0.04 at any horizon. The generator's
+physical defect is fixed (period-2 locking gone, parents recoverable); what
+failed is a bar on the reference method's noisy negative-skill tail. Any
+further use of family 1b needs a new registration.
